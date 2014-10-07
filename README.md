@@ -13,7 +13,7 @@ regular-routes-server
 - client: Install IntelliJ-Idea IDE for android client development 
 
 - server: Install PyCharm IDE for web server / flask development 
-- server: Install Flask-RESTful extension 
+- server: Install Flask-classy  (REST extension pacakge; found from python repo & PyCharm package download list) 
 
 
 #Python virtualenv
