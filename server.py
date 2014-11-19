@@ -83,6 +83,17 @@ def data_post():
   return jsonify({
   })
 
+@app.route('/devices')
+def devices():
+  rows = db.engine.execute(text(
+    'SELECT id, token\
+      FROM devices\
+      ORDER BY token DESC'))
+  result = ""
+  for row in rows:
+    result += '%s = %s\n' % (row[1], row[0])
+  return str(result)
+
 @app.route('/visualize/<int:device_id>')
 def visualize(device_id):
   rows = db.engine.execute(text(
