@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 from datetime import datetime
-from flask import Flask, abort, jsonify, request
+from flask import Flask, abort, jsonify, request, render_template
 from flask.ext.sqlalchemy import SQLAlchemy
 from sqlalchemy.sql import text
 from uuid import uuid4
@@ -82,6 +82,31 @@ def data_post():
     )
   return jsonify({
   })
+
+@app.route('/visualize/<int:device_id>')
+def visualize(device_id):
+  rows = db.engine.execute(text(
+    'SELECT ST_Y(coordinate::geometry), ST_X(coordinate::geometry)\
+      FROM device_data\
+      WHERE device_id = :device_id\
+      ORDER BY time DESC\
+      LIMIT 100'), device_id = device_id)
+  points = []
+  for row in rows:
+    points.append({
+      'type': 'Feature',
+      'geometry': {
+        'type': 'Point',
+        'coordinates': [ row[1], row[0] ]
+      }
+    })
+  geojson = {
+    'type': 'FeatureCollection',
+    'features': points
+  };
+  return render_template('visualize.html',
+      api_key = app.config['MAPS_API_KEY'],
+      geojson = geojson)
 
 if __name__ == '__main__':
   if app.debug:
