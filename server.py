@@ -100,8 +100,7 @@ def visualize(device_id):
     'SELECT ST_Y(coordinate::geometry), ST_X(coordinate::geometry)\
       FROM device_data\
       WHERE device_id = :device_id\
-      ORDER BY time DESC\
-      LIMIT 100'), device_id = device_id)
+        AND time > CURRENT_DATE', device_id = device_id))
   points = []
   for row in rows:
     points.append({
