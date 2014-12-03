@@ -1,4 +1,16 @@
-$(window).on('load', function() {
+$(document).ready(function() {
+  var date = $('#date');
+  date.pickadate({
+    clear: '',
+    firstDay: 1,
+    format: 'dd.mm.yyyy',
+    hiddenName: true,
+    onClose: function() {
+      update(this.get('select', 'yyyy-mm-dd'));
+    }
+  });
+  date.pickadate('picker').open();
+
   var mapCanvas = $('#map-canvas');
   var mapOptions = {
     center: { lat: 60.1841396, lng: 24.8300838 },
@@ -54,13 +66,14 @@ $(window).on('load', function() {
     }
   });
 
-  function update() {
+  function update(date) {
     mapCanvas.css('opacity', 0.1);
-    $.getJSON('../visualize/' + device_id + '/geojson', function(response) {
+    map.data.forEach(function(feature) {
+      map.data.remove(feature);
+    });
+    $.getJSON('../visualize/' + device_id + '/geojson?date=' + date, function(response) {
       map.data.addGeoJson(response);
       mapCanvas.css('opacity', '');
     });
   }
-
-  update();
 });

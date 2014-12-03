@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
 import json
-from datetime import datetime
+from datetime import datetime, date, timedelta
 from flask import Flask, abort, jsonify, request, render_template
-from flask.ext.sqlalchemy import SQLAlchemy
+from flask.ext.sqlalchemy import SQLAlchemy, get_debug_queries
 from sqlalchemy.sql import text
 from uuid import uuid4
 
@@ -95,25 +95,15 @@ def devices():
     result += '%s = %s\n' % (row[1], row[0])
   return str(result)
 
-def next_data_point(device_id, time = None):
-  if time:
-    query = text(
-      'SELECT id, ST_Y(coordinate::geometry) as longitude, ST_X(coordinate::geometry) as latitude, ST_AsGeoJSON(coordinate) as geojson, coordinate, accuracy, time\
-        FROM device_data\
-        WHERE device_id = :device_id\
-        AND time > :time\
-        ORDER BY time ASC\
-        LIMIT 1'
-    )
-  else:
-    query = text(
-      'SELECT id, ST_Y(coordinate::geometry) as longitude, ST_X(coordinate::geometry) as latitude, ST_AsGeoJSON(coordinate) as geojson, coordinate, accuracy, time\
-        FROM device_data\
-        WHERE device_id = :device_id\
-        ORDER BY time ASC\
-        LIMIT 1'
-    )
-  return db.engine.execute(query, device_id = device_id, time = time).first()
+def data_points(device_id, datetime_start, datetime_end):
+  return db.engine.execute(text(
+    'SELECT id, ST_Y(coordinate::geometry) as longitude, ST_X(coordinate::geometry) as latitude, ST_AsGeoJSON(coordinate) as geojson, coordinate, accuracy, time\
+      FROM device_data\
+      WHERE device_id = :device_id\
+      AND time >= :time_start\
+      AND time < :time_end\
+      ORDER BY time ASC'
+  ), device_id = device_id, time_start = datetime_start, time_end = datetime_end)
 
 @app.route('/visualize/<int:device_id>')
 def visualize(device_id):
@@ -122,13 +112,20 @@ def visualize(device_id):
       device_id = device_id)
 
 @app.route('/visualize/<int:device_id>/geojson')
-def visualize_geojson(device_id):
-  point = next_data_point(device_id)
-  prev_point = None
+def visualize_device_geojson(device_id):
+  if 'date' in request.args:
+    date_start = datetime.strptime(request.args['date'], '%Y-%m-%d').date()
+  else:
+    date_start = date.today()
+
+  date_end = date_start + timedelta(days=1)
+
+  points = data_points(device_id, datetime.fromordinal(date_start.toordinal()), datetime.fromordinal(date_end.toordinal()))
+
   features = []
   links = set()
   waypoints = set()
-  while point:
+  for point in points:
     point_geo = json.loads(point['geojson'])
     features.append({
       'type': 'Feature',
@@ -157,7 +154,6 @@ def visualize_geojson(device_id):
             'type': 'snap-line'
           }
         })
-    point = next_data_point(device_id, point['time'])
   rows = db.engine.execute(text(
     'SELECT ST_AsGeoJSON(geom), wpt_id\
       FROM waypointsclustered'
@@ -193,7 +189,13 @@ def visualize_geojson(device_id):
   geojson = {
     'type': 'FeatureCollection',
     'features': features
-  };
+  }
+  # for query in sorted(get_debug_queries(), key=lambda x: x.duration):
+  #   print query.statement
+  #   result = db.engine.execute('EXPLAIN ANALYZE %s' % (query.statement), query.parameters)
+  #   for row in result:
+  #     print row[0]
+  #   print '  %s seconds' % (query.duration)
   return jsonify(geojson);
 
 if __name__ == '__main__':
