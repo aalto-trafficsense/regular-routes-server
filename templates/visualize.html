@@ -8,20 +8,12 @@
       src="https://maps.googleapis.com/maps/api/js?key={{ api_key }}">
     </script>
     <script type="text/javascript">
-      function initialize() {
-        var mapOptions = {
-          center: { lat: 60.1841396, lng: 24.8300838 },
-          zoom: 16
-        };
-        var geojson = {{ geojson|tojson|safe }};
-        var map = new google.maps.Map(document.getElementById('map-canvas'),
-            mapOptions);
-        map.data.addGeoJson(geojson);
-      }
-      google.maps.event.addDomListener(window, 'load', initialize);
+      var device_id = {{ device_id }};
     </script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/zepto/1.1.4/zepto.min.js"></script>
   </head>
   <body>
     <div id="map-canvas"></div>
+    <script src="../static/js/visualize.js"></script>
   </body>
 </html>

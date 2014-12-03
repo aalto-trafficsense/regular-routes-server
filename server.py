@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import json
 from datetime import datetime
 from flask import Flask, abort, jsonify, request, render_template
 from flask.ext.sqlalchemy import SQLAlchemy
@@ -21,7 +22,7 @@ db.engine.execute(text(
 db.engine.execute(text(
   'CREATE TABLE IF NOT EXISTS device_data\
     ( id serial PRIMARY KEY\
-    , device_id integer REFERENCES devices\
+    , device_id integer REFERENCES devices NOT NULL\
     , coordinate geography(point, 4326) NOT NULL\
     , accuracy double precision NOT NULL\
     , time timestamp NOT NULL\
@@ -94,29 +95,106 @@ def devices():
     result += '%s = %s\n' % (row[1], row[0])
   return str(result)
 
+def next_data_point(device_id, time = None):
+  if time:
+    query = text(
+      'SELECT id, ST_Y(coordinate::geometry) as longitude, ST_X(coordinate::geometry) as latitude, ST_AsGeoJSON(coordinate) as geojson, coordinate, accuracy, time\
+        FROM device_data\
+        WHERE device_id = :device_id\
+        AND time > :time\
+        ORDER BY time ASC\
+        LIMIT 1'
+    )
+  else:
+    query = text(
+      'SELECT id, ST_Y(coordinate::geometry) as longitude, ST_X(coordinate::geometry) as latitude, ST_AsGeoJSON(coordinate) as geojson, coordinate, accuracy, time\
+        FROM device_data\
+        WHERE device_id = :device_id\
+        ORDER BY time ASC\
+        LIMIT 1'
+    )
+  return db.engine.execute(query, device_id = device_id, time = time).first()
+
 @app.route('/visualize/<int:device_id>')
 def visualize(device_id):
-  rows = db.engine.execute(text(
-    'SELECT ST_Y(coordinate::geometry), ST_X(coordinate::geometry)\
-      FROM device_data\
-      WHERE device_id = :device_id\
-        AND time > CURRENT_DATE'), device_id = device_id)
-  points = []
-  for row in rows:
-    points.append({
+  return render_template('visualize.html',
+      api_key = app.config['MAPS_API_KEY'],
+      device_id = device_id)
+
+@app.route('/visualize/<int:device_id>/geojson')
+def visualize_geojson(device_id):
+  point = next_data_point(device_id)
+  prev_point = None
+  features = []
+  links = set()
+  waypoints = set()
+  while point:
+    point_geo = json.loads(point['geojson'])
+    features.append({
       'type': 'Feature',
-      'geometry': {
-        'type': 'Point',
-        'coordinates': [ row[1], row[0] ]
+      'geometry': point_geo,
+      'properties': {
+        'type': 'raw-point',
+        'title': 'accuracy: %d' % (point['accuracy'])
+      }
+    })
+    if point['accuracy'] < 500:
+      link = db.engine.execute(text(
+        'SELECT lnk_id, lnk_1, lnk_2, ST_AsGeoJSON(ST_ShortestLine(lnk_geom, :coordinate ::geometry)) as geojson\
+          FROM links\
+          WHERE lnk_geom && (ST_Buffer(:coordinate ::geography, 500) ::geometry)\
+          ORDER BY ST_Distance(lnk_geom, :coordinate ::geometry) ASC\
+          LIMIT 1'), coordinate = point['coordinate']).first()
+      if link:
+        links.add(link['lnk_id'])
+        waypoints.add(link['lnk_1'])
+        waypoints.add(link['lnk_2'])
+        link_geo = json.loads(link['geojson'])
+        features.append({
+          'type': 'Feature',
+          'geometry': link_geo,
+          'properties': {
+            'type': 'snap-line'
+          }
+        })
+    point = next_data_point(device_id, point['time'])
+  rows = db.engine.execute(text(
+    'SELECT ST_AsGeoJSON(geom), wpt_id\
+      FROM waypointsclustered'
+  ))
+  for row in rows:
+    if row[1] in waypoints:
+      feature_type = 'route-point'
+    else:
+      feature_type = 'link-point'
+    features.append({
+      'type': 'Feature',
+      'geometry': json.loads(row[0]),
+      'properties': {
+        'type': feature_type
+      }
+    })
+  rows = db.engine.execute(text(
+    'SELECT ST_AsGeoJSON(lnk_geom), lnk_id\
+      FROM links'
+  ))
+  for row in rows:
+    if row[1] in links:
+      feature_type = 'route-line'
+    else:
+      feature_type = 'link-line'
+    features.append({
+      'type': 'Feature',
+      'geometry': json.loads(row[0]),
+      'properties': {
+        'type': feature_type
       }
     })
   geojson = {
     'type': 'FeatureCollection',
-    'features': points
+    'features': features
   };
-  return render_template('visualize.html',
-      api_key = app.config['MAPS_API_KEY'],
-      geojson = geojson)
+  return jsonify(geojson);
 
 if __name__ == '__main__':
   if app.debug:
