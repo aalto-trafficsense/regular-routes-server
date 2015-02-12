@@ -2,7 +2,7 @@
 
 import json
 from datetime import datetime, date, timedelta
-from flask import Flask, abort, jsonify, request, render_template
+from flask import Flask, abort, jsonify, request, render_template, Response
 from flask.ext.sqlalchemy import SQLAlchemy, get_debug_queries
 from sqlalchemy.sql import text
 from uuid import uuid4
@@ -104,6 +104,26 @@ def devices():
   for row in rows:
     result += '%s = %s\n' % (row[1], row[0])
   return str(result)
+
+@app.route('/csv')
+def export_csv():
+  rows = db.engine.execute(text(
+    'SELECT\
+        device_id, time,\
+        ST_Y(coordinate::geometry) as longitude,\
+        ST_X(coordinate::geometry) as latitude,\
+        accuracy\
+      FROM device_data\
+      ORDER BY device_id, time ASC'
+  ))
+  # Poor man's CSV generation. Doesn't handle escaping properly.
+  # Python's CSV library doesn't handle unicode, and seems to be
+  # tricky to wrap as a generator (expected by Flask)
+  def generate_csv():
+    yield '"device_id","time","longitude","latitude","accuracy"\n'
+    for row in rows:
+      yield ','.join(['"%s"' % (str(x)) for x in row]) + '\n'
+  return Response(generate_csv(), mimetype='text/csv')
 
 def data_points(device_id, datetime_start, datetime_end):
   return db.engine.execute(text(
