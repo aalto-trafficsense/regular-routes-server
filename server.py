@@ -64,23 +64,33 @@ def authenticate_post():
 def data_post():
   session_id = request.args['sessionId']
   device = session_id
-  for point in request.json['dataPoints']:
-    time = datetime.fromtimestamp(long(point['time']) / 1000.0)
 
-    location = point['location']
-    coordinate = 'POINT(%f %f)' % (float(location['longitude']), float(location['latitude']))
-    accuracy = float(location['accuracy'])
+  batch_size = 1024
+  def batch_chunks(x):
+    for i in xrange(0, len(x), batch_size):
+      yield x[i:i+batch_size]
 
+  for chunk in batch_chunks(dataPoints):
+    batch = []
+    for point in chunk:
+      time = datetime.fromtimestamp(long(point['time']) / 1000.0)
+
+      location = point['location']
+      coordinate = 'POINT(%f %f)' % (float(location['longitude']), float(location['latitude']))
+      accuracy = float(location['accuracy'])
+
+      batch.append({
+        'device': device,
+        'coordinate': coordinate,
+        'accuracy': accuracy,
+        'time': time
+      })
     db.engine.execute(text(
       'INSERT INTO device_data\
         (device_id, coordinate, accuracy, time)\
         VALUES\
-        (:device, :coordinate, :accuracy, :time)'),
-      device = device,
-      coordinate = coordinate,
-      accuracy = accuracy,
-      time = time
-    )
+        (:device, :coordinate, :accuracy, :time)'), batch)
+
   return jsonify({
   })
 
