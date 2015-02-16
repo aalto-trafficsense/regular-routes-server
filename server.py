@@ -63,6 +63,7 @@ def authenticate_post():
 @app.route('/data', methods = ['POST'])
 def data_post():
   session_id = request.args['sessionId']
+  dataPoints = request.args['dataPoints']
   device = session_id
 
   batch_size = 1024
