@@ -186,7 +186,6 @@ def data_post():
     return jsonify({
     })
 
-
 @app.route('/devices')
 def devices():
     try:
