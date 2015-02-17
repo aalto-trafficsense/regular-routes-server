@@ -30,9 +30,9 @@ class SortableActivityData(object):
 
 
 app = Flask(__name__)
-app.config.from_pyfile('regularroutes.cfg')
-app.debug = True
-# app.config.from_envvar('REGULARROUTES_SETTINGS')
+#app.config.from_pyfile('regularroutes.cfg')
+#app.debug = True
+app.config.from_envvar('REGULARROUTES_SETTINGS')
 db = SQLAlchemy(app)
 metadata = MetaData()
 
@@ -453,6 +453,6 @@ def get_activity_type_id(activity):
 # App starting point:
 if __name__ == '__main__':
     if app.debug:
-        app.run(host='192.168.1.2')
+        app.run(host='0.0.0.0')
     else:
         app.run()
