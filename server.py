@@ -128,33 +128,36 @@ def data_post():
      Note: to link activity data to corresponding location data, primary key is returned from single insert.
            Multi insert does not provide such mean to link data -> for performance improvement, some better
            approach should be investigated.
-    batch_size = 1024
-    def batch_chunks(x):
-        for i in xrange(0, len(x), batch_size):
-            yield x[i:i+batch_size]
     """
     session_id = request.args['sessionId']
     device_id = session_id
     data_points = request.json['dataPoints']
 
+    batch_size = 1024
+    def batch_chunks(x):
+        for i in xrange(0, len(x), batch_size):
+            yield x[i:i+batch_size]
 
-    # for chunk in batch_chunks(data_points):
-    for point in data_points:
-        time = datetime.fromtimestamp(long(point['time']) / 1000.0)
-        location = point['location']
-        coordinate = 'POINT(%f %f)' % (float(location['longitude']), float(location['latitude']))
-        accuracy = float(location['accuracy'])
+    for chunk in batch_chunks(data_points):
+        batch = []
+        for point in chunk:
+            time = datetime.fromtimestamp(long(point['time']) / 1000.0)
+            location = point['location']
+            coordinate = 'POINT(%f %f)' % (float(location['longitude']), float(location['latitude']))
+            accuracy = float(location['accuracy'])
 
-        insertion = device_data_table.insert({
-            'device_id': device_id,
-            'coordinate': coordinate,
-            'accuracy': accuracy,
-            'time': time
-        })
-        result = db.engine.execute(insertion)
-        row_id = result.inserted_primary_key[0]
+            batch.append({
+                'device_id': device_id,
+                'coordinate': coordinate,
+                'accuracy': accuracy,
+                'time': time
+            })
+        result_ids = db.engine.execute(
+                device_data_table.insert(batch).returning(device_data_table.c.id))
 
-        if row_id is not None:
+        activity_batch = []
+        for row in result_ids:
+            row_id = row[0]
             activity_data = point['activityData']
             if activity_data is not None:
                 activities = activity_data['activities']
@@ -174,15 +177,14 @@ def data_post():
                     # store data sorted by confidence level with ordinal value
                     i = 1
                     for activity in data_arr:
-                        ins = activity_data_table.insert({
+                        activity_batch.append({
                             'activity_type_id': activity.activity_type_id,
                             'device_data_id': row_id,
                             'confidence': activity.confidence,
                             'ordinal': i
                         })
-                        db.engine.execute(ins)
                         i += 1
-
+        db.engine.execute(activity_data_table.insert(activity_batch))
     return jsonify({
     })
 
