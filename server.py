@@ -234,7 +234,6 @@ def export_csv():
     rows = db.engine.execute(query)
     return Response(generate_csv(rows), mimetype='text/csv')
 
-
 @app.route('/csv/<page>')
 def export_csv_block(page):
     entry_block_size = 10000
@@ -259,6 +258,22 @@ def export_csv_block(page):
     rows = db.engine.execute(query, limit=limit, offset=offset)
     return Response(generate_csv(rows), mimetype='text/csv')
 
+
+@app.route('/csv/waypoints')
+def export_csv_waypoints():
+    query = text(
+        'SELECT wpt_id,\
+            ST_Y(geom::geometry) as longitude,\
+            ST_X(geom::geometry) as latitude\
+            FROM waypointsclustered')
+    rows = db.engine.execute(query)
+    return Response(generate_csv_waypoints(rows), mimetype='text/csv')
+
+
+def generate_csv_waypoints(rows):
+    yield '"wpt_id";"longitude";"latitude"\n'
+    for row in rows:
+        yield ';'.join(['"%s"' % (str(x)) for x in row]) + '\n'
 
 @app.route('/visualize/<int:device_id>')
 def visualize(device_id):
