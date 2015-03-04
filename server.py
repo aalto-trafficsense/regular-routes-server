@@ -252,7 +252,7 @@ def export_csv_block(page):
         ST_X(coordinate::geometry) as latitude,\
         accuracy \
       FROM device_data \
-      ORDER BY device_id, time ASC \
+      ORDER BY time ASC \
       LIMIT :limit OFFSET :offset'
     )
 
