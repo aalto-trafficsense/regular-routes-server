@@ -236,33 +236,28 @@ massive_advanced_csv_query = """
         ST_Y(coordinate::geometry) as longitude,
         ST_X(coordinate::geometry) as latitude,
         accuracy,
-        activity_guess_1,
-        activity_guess_1_conf,
-        activity_guess_2,
-        activity_guess_2_conf,
-        activity_guess_3,
-        activity_guess_3_conf
+        activity_types[1] AS activity_guess_1,
+        confidences[1]    AS activity_guess_1_conf,
+        activity_types[2] AS activity_guess_2,
+        confidences[2]    AS activity_guess_2_conf,
+        activity_types[3] AS activity_guess_3,
+        confidences[3]    AS activity_guess_3_conf
       FROM device_data
       LEFT JOIN LATERAL (
-        SELECT
-          first_value(device_data_id) OVER device_data_point AS device_data_id,
-          nth_value(activity_type, 1) OVER device_data_point AS activity_guess_1,
-          nth_value(confidence,    1) OVER device_data_point AS activity_guess_1_conf,
-          nth_value(activity_type, 2) OVER device_data_point AS activity_guess_2,
-          nth_value(confidence,    2) OVER device_data_point AS activity_guess_2_conf,
-          nth_value(activity_type, 3) OVER device_data_point AS activity_guess_3,
-          nth_value(confidence,    3) OVER device_data_point AS activity_guess_3_conf,
-          row_number()                OVER device_data_point AS row_number,
-          rank()                      OVER device_data_point AS rank
+        SELECT DISTINCT ON (device_data_id)
+          device_data_id,
+          array_agg(activity_type) OVER device_data_point AS activity_types,
+          array_agg(confidence)    OVER device_data_point AS confidences
         FROM
           activity_data
         JOIN activity_type
         ON activity_type.id = activity_type_id
         WINDOW device_data_point AS (
           PARTITION BY device_data_id ORDER BY ordinal
+          RANGE BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING
         )
       ) AS activity_data
-      ON device_data.id = device_data_id AND row_number = rank
+      ON device_data.id = device_data_id
       ORDER BY time ASC
 """
 
