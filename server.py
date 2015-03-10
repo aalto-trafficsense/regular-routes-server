@@ -93,6 +93,18 @@ if not activity_type_table.exists(bind=db.engine):
 """
 metadata.create_all(bind=db.engine, checkfirst=True)
 
+
+def fetch_activity_types():
+    rows = db.engine.execute(select([activity_type_table]))
+    result = {}
+    for row in rows:
+        id = row[activity_type_table.c.id]
+        activity_type = row[activity_type_table.c.activity_type]
+        result[activity_type] = id
+    return result
+
+activity_types_cache = fetch_activity_types()
+
 # REST interface:
 
 
@@ -138,52 +150,50 @@ def data_post():
         for i in xrange(0, len(x), batch_size):
             yield x[i:i+batch_size]
 
+    def prepare_point(point):
+        location = point['location']
+
+        return {
+            'device_id': device_id,
+            'coordinate': 'POINT(%f %f)' % (float(location['longitude']), float(location['latitude'])),
+            'accuracy': float(location['accuracy']),
+            'time': datetime.fromtimestamp(long(point['time']) / 1000.0)
+        }
+
+    def prepare_point_activities(id, point):
+        if not 'activityData' in point or not 'activities' in point['activityData']:
+            return
+        activities = point['activityData']['activities']
+
+        def parse_activities():
+            for activity in activities:
+                activity_type = activity['activityType']
+                if activity_type in activity_types_cache:
+                    yield {
+                        'type_id': activity_types_cache[activity_type],
+                        'confidence': int(activity['confidence'])
+                    }
+
+        sorted_activities = sorted(parse_activities(), key=lambda x: x['confidence'], reverse=True)
+        for (i, x) in enumerate(sorted_activities):
+            yield {
+                'activity_type_id': x['type_id'],
+                'device_data_id': id,
+                'confidence': x['confidence'],
+                'ordinal': i + 1
+            }
+
     for chunk in batch_chunks(data_points):
-        batch = []
-        for point in chunk:
-            time = datetime.fromtimestamp(long(point['time']) / 1000.0)
-            location = point['location']
-            coordinate = 'POINT(%f %f)' % (float(location['longitude']), float(location['latitude']))
-            accuracy = float(location['accuracy'])
+        batch = [prepare_point(x) for x in chunk]
+        result_ids = [row[0] for row in db.engine.execute(
+                device_data_table.insert(batch).returning(device_data_table.c.id))]
 
-            batch.append({
-                'device_id': device_id,
-                'coordinate': coordinate,
-                'accuracy': accuracy,
-                'time': time
-            })
-        result_ids = db.engine.execute(
-                device_data_table.insert(batch).returning(device_data_table.c.id))
+        def prepare_activities():
+            for (id, x) in zip(result_ids, chunk):
+                for point_activity in prepare_point_activities(id, x):
+                    yield point_activity
 
-        activity_batch = []
-        for row in result_ids:
-            row_id = row[0]
-            activity_data = point['activityData']
-            if activity_data is not None:
-                activities = activity_data['activities']
-
-                if activities is not None:
-                    # create sorted list sort activities by confidence
-                    data_arr = []
-                    for activity in activities:
-                        activity_type_str = activity['activityType']
-                        activity_type_id = get_activity_type_id(activity_type_str)
-                        if activity_type_id >= 0:
-                            act = SortableActivityData(activity_type_str, activity_type_id, int(activity['confidence']))
-                            data_arr.append(act)
-
-                    data_arr.sort(reverse=True)
-
-                    # store data sorted by confidence level with ordinal value
-                    i = 1
-                    for activity in data_arr:
-                        activity_batch.append({
-                            'activity_type_id': activity.activity_type_id,
-                            'device_data_id': row_id,
-                            'confidence': activity.confidence,
-                            'ordinal': i
-                        })
-                        i += 1
+        activity_batch = list(prepare_activities())
         db.engine.execute(activity_data_table.insert(activity_batch))
     return jsonify({
     })
@@ -474,22 +484,6 @@ def get_device_token(device_id):
         print 'Exception: ' + e.message
 
     return None
-
-
-def get_activity_type_id(activity):
-    if activity is None:
-        return -1
-
-    try:
-        query = select([table('activity_type', column('id'))]).where("activity_type='" + activity + "'")
-        row = db.engine.execute(query).first()
-        if not row:
-            return -1
-        return int(row[0])
-    except DataError as e:
-        print 'Exception: ' + e.message
-
-    return -1
 
 # App starting point:
 if __name__ == '__main__':
