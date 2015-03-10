@@ -263,7 +263,8 @@ massive_advanced_csv_query = """
 
 @app.route('/csv/')
 def export_csv():
-    rows = db.engine.execute(text(massive_advanced_csv_query))
+    rows = db.engine.execution_options(
+            stream_results=True).execute(text(massive_advanced_csv_query))
     return Response(generate_csv(rows), mimetype='text/csv')
 
 @app.route('/csv/<page>')
@@ -277,7 +278,8 @@ def export_csv_block(page):
     limit = entry_block_size
 
     query = text(massive_advanced_csv_query + ' LIMIT :limit OFFSET :offset')
-    rows = db.engine.execute(query, limit=limit, offset=offset)
+    rows = db.engine.execution_options(
+            stream_results=True).execute(query, limit=limit, offset=offset)
     return Response(generate_csv(rows), mimetype='text/csv')
 
 
