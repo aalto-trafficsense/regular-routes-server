@@ -229,19 +229,46 @@ def device(device_value):
 
     return jsonify({'device_token': device_token, 'device_id': device_id})
 
+
+massive_advanced_csv_query = """
+      SELECT
+        device_id, time,
+        ST_Y(coordinate::geometry) as longitude,
+        ST_X(coordinate::geometry) as latitude,
+        accuracy,
+        activity_guess_1,
+        activity_guess_1_conf,
+        activity_guess_2,
+        activity_guess_2_conf,
+        activity_guess_3,
+        activity_guess_3_conf
+      FROM device_data
+      LEFT JOIN LATERAL (
+        SELECT
+          first_value(device_data_id) OVER device_data_point AS device_data_id,
+          nth_value(activity_type, 1) OVER device_data_point AS activity_guess_1,
+          nth_value(confidence,    1) OVER device_data_point AS activity_guess_1_conf,
+          nth_value(activity_type, 2) OVER device_data_point AS activity_guess_2,
+          nth_value(confidence,    2) OVER device_data_point AS activity_guess_2_conf,
+          nth_value(activity_type, 3) OVER device_data_point AS activity_guess_3,
+          nth_value(confidence,    3) OVER device_data_point AS activity_guess_3_conf,
+          row_number()                OVER device_data_point AS row_number,
+          rank()                      OVER device_data_point AS rank
+        FROM
+          activity_data
+        JOIN activity_type
+        ON activity_type.id = activity_type_id
+        WINDOW device_data_point AS (
+          PARTITION BY device_data_id ORDER BY ordinal
+        )
+      ) AS activity_data
+      ON device_data.id = device_data_id AND row_number = rank
+      ORDER BY time ASC
+"""
+
 @app.route('/csv/')
 def export_csv():
-    query = text(
-        'SELECT\
-        id, device_id, time,\
-        ST_Y(coordinate::geometry) as longitude,\
-        ST_X(coordinate::geometry) as latitude,\
-        accuracy \
-      FROM device_data \
-      ORDER BY device_id, time ASC'
-    )
-
-    rows = db.engine.execute(query)
+    rows = db.engine.execute(text(massive_advanced_csv_query))
     return Response(generate_csv(rows), mimetype='text/csv')
 
 @app.route('/csv/<page>')
@@ -254,17 +281,7 @@ def export_csv_block(page):
         offset = (int(page)-1) * entry_block_size
     limit = entry_block_size
 
-    query = text(
-        'SELECT\
-        id, device_id, time,\
-        ST_Y(coordinate::geometry) as longitude,\
-        ST_X(coordinate::geometry) as latitude,\
-        accuracy \
-      FROM device_data \
-      ORDER BY time ASC \
-      LIMIT :limit OFFSET :offset'
-    )
-
+    query = text(massive_advanced_csv_query + ' LIMIT :limit OFFSET :offset')
     rows = db.engine.execute(query, limit=limit, offset=offset)
     return Response(generate_csv(rows), mimetype='text/csv')
 
@@ -393,19 +410,14 @@ def generate_csv(rows):
     # Python's CSV library doesn't handle unicode, and seems to be
     # tricky to wrap as a generator (expected by Flask)
     yield '"device_id";"time";"longitude";"latitude";"accuracy";"activity_guess_1";"activity_guess_1_conf";"activity_guess_2";"activity_guess_2_conf";"activity_guess_3";"activity_guess_3_conf"\n'
+
+    def to_str(x):
+        if x is None:
+            return ''
+        return str(x)
+
     for row in rows:
-
-        act_data = get_activity_data(int(row[0]))
-        to_fill = (3 - len(act_data))
-        activities = []
-        for act in act_data:
-            activities.append('"{0:s}";{1:d}'.format(str(act.activity_type), int(act.confidence)))
-
-        for _ in itertools.repeat(None, to_fill):
-            activities.append('"{0:s}";{1:d}'.format('UNKNOWN', 0))
-
-        yield ';'.join(['"%s"' % (str(x)) for x in row[1:]]) + ''.join(
-            [';%s' % (str(x)) for x in activities]) + '\n'
+        yield ';'.join(['"%s"' % (to_str(x)) for x in row]) + '\n'
 
 
 def data_points(device_id, datetime_start, datetime_end):
