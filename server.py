@@ -446,34 +446,6 @@ def data_points(device_id, datetime_start, datetime_end):
     '''), device_id=device_id, time_start=datetime_start, time_end=datetime_end)
 
 
-def get_activity_data(device_data_id):
-    """Get activities linked to device data row, sorted descending by confidence level """
-    activity_data_query_text = 'SELECT id, activity_type_id, confidence FROM activity_data WHERE device_data_id = :device_data_id AND ordinal = :ordinal'
-    activity_type_query_text = 'SELECT activity_type FROM activity_type WHERE id in (SELECT activity_type_id FROM activity_data WHERE id = :activity_data_id)'
-
-    activities = []
-    try:
-        for i in range(1, 4):
-
-            act_data_res = db.engine.execute(text(activity_data_query_text), device_data_id=int(device_data_id),
-                                             ordinal=int(i)).first()
-            if act_data_res is None:
-                break
-            else:
-                act_type_id = int(act_data_res['activity_type_id'])
-                act_type_res = db.engine.execute(text(activity_type_query_text),
-                                                 activity_data_id=act_data_res['id']).first()
-                act_type_str = act_type_res[
-                    'activity_type'] if act_type_res is not None else 'UNKNOWN'
-                confidence = int(act_data_res['confidence'])
-                activities.append(SortableActivityData(act_type_str, act_type_id, confidence))
-    except TypeError as e:
-        print 'Exception: ' + e.message
-
-    activities.sort(reverse=True)
-    return activities
-
-
 def verify_device_auth_id(device_auth_id):
     if device_auth_id is None or device_auth_id == '':
         print 'empty device_auth_id'
