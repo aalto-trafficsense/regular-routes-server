@@ -6,27 +6,11 @@ import geoalchemy2 as ga2
 from datetime import datetime, date, timedelta
 from flask import Flask, abort, jsonify, request, render_template, Response
 from flask.ext.sqlalchemy import SQLAlchemy
-from sqlalchemy import MetaData, Table, Column, ForeignKey, Integer, String, desc, subquery
+from sqlalchemy import MetaData, Table, Column, ForeignKey, Enum, Integer, String, desc, subquery
 from sqlalchemy.dialects.postgres import DOUBLE_PRECISION, TIMESTAMP, UUID
 from sqlalchemy.exc import DataError
 from sqlalchemy.sql import text, func, column, table, select
 from uuid import uuid4
-
-
-class SortableActivityData(object):
-    """Class used to sort activity data by confidence level"""
-
-    def __init__(self, activity_type, activity_type_id, confidence):
-        self.activity_type = activity_type
-        self.activity_type_id = activity_type_id
-        self.confidence = confidence
-
-    def __cmp__(self, other):
-        if hasattr(other, 'confidence'):
-            return cmp(self.confidence, other.confidence)
-
-    def __repr__(self):
-        return '{type:%s, conf:%d}' % (str(self.activity_type), int(self.confidence))
 
 
 app = Flask(__name__)
@@ -37,6 +21,14 @@ db = SQLAlchemy(app)
 metadata = MetaData()
 
 # Schema definitions:
+
+'''
+These types are the same as are defined in:
+https://developer.android.com/reference/com/google/android/gms/location/DetectedActivity.html
+'''
+activity_types = ('IN_VEHICLE', 'ON_BICYCLE', 'ON_FOOT', 'RUNNING', 'STILL', 'TILTING', 'UNKNOWN', 'WALKING')
+activity_type_enum = Enum(*activity_types, name='activity_type_enum')
+
 devices_table = Table('devices', metadata,
                       Column('id', Integer, primary_key=True),
                       Column('token', UUID, unique=True, nullable=False),
@@ -50,60 +42,15 @@ device_data_table = Table('device_data', metadata,
                           Column('device_id', Integer, ForeignKey('devices.id'), nullable=False),
                           Column('coordinate', ga2.Geography('point', 4326), nullable=False),
                           Column('accuracy', DOUBLE_PRECISION, nullable=False),
-                          Column('time', TIMESTAMP, nullable=False))
+                          Column('time', TIMESTAMP, nullable=False),
+                          Column('activity_1', activity_type_enum),
+                          Column('activity_1_conf', Integer),
+                          Column('activity_2', activity_type_enum),
+                          Column('activity_2_conf', Integer),
+                          Column('activity_3', activity_type_enum),
+                          Column('activity_3_conf', Integer))
 
-activity_type_table = Table('activity_type', metadata,
-                            Column('id', Integer, primary_key=True),
-                            Column('activity_type', String(16), nullable=False))
-
-activity_data_table = Table('activity_data', metadata,
-                            Column('id', Integer, primary_key=True),
-                            Column('activity_type_id', Integer, ForeignKey('activity_type.id'), nullable=False),
-                            Column('device_data_id', Integer, ForeignKey('device_data.id'), nullable=False),
-                            Column('ordinal', Integer, nullable=False),
-                            Column('confidence', Integer))
-
-# Table Creations with initial setup:
-
-if not activity_type_table.exists(bind=db.engine):
-    """
-        Activity type table is created separately to test if data insertion is required
-    """
-    activity_type_table.create(bind=db.engine)
-    ''' Add type values: IN_VEHICLE, ON_BICYCLE, ON_FOOT, RUNNING, WALKING, STILL, TILTING, UNKNOWN
-        These types are the same as are defined in:
-        https://developer.android.com/reference/com/google/android/gms/location/DetectedActivity.html
-    '''
-    activity_types = \
-        [{'id': 0, 'activity_type': 'IN_VEHICLE'},
-         {'id': 1, 'activity_type': 'ON_BICYCLE'},
-         {'id': 2, 'activity_type': 'ON_FOOT'},
-         {'id': 3, 'activity_type': 'RUNNING'},
-         {'id': 4, 'activity_type': 'STILL'},
-         {'id': 5, 'activity_type': 'TILTING'},
-         {'id': 6, 'activity_type': 'UNKNOWN'},
-         {'id': 7, 'activity_type': 'WALKING'}]
-
-    for activity_type in activity_types:
-        stmt = activity_type_table.insert(activity_type)
-        db.engine.execute(stmt)
-
-"""
-    Other schema tables are created at once, if not exists
-"""
 metadata.create_all(bind=db.engine, checkfirst=True)
-
-
-def fetch_activity_types():
-    rows = db.engine.execute(select([activity_type_table]))
-    result = {}
-    for row in rows:
-        id = row[activity_type_table.c.id]
-        activity_type = row[activity_type_table.c.activity_type]
-        result[activity_type] = id
-    return result
-
-activity_types_cache = fetch_activity_types()
 
 # REST interface:
 
@@ -136,11 +83,6 @@ def authenticate_post():
 
 @app.route('/data', methods=['POST'])
 def data_post():
-    """
-     Note: to link activity data to corresponding location data, primary key is returned from single insert.
-           Multi insert does not provide such mean to link data -> for performance improvement, some better
-           approach should be investigated.
-    """
     session_id = request.args['sessionId']
     device_id = session_id
     data_points = request.json['dataPoints']
@@ -153,14 +95,16 @@ def data_post():
     def prepare_point(point):
         location = point['location']
 
-        return {
+        result = {
             'device_id': device_id,
             'coordinate': 'POINT(%f %f)' % (float(location['longitude']), float(location['latitude'])),
             'accuracy': float(location['accuracy']),
             'time': datetime.fromtimestamp(long(point['time']) / 1000.0)
         }
+        result.update(prepare_point_activities(point))
+        return result
 
-    def prepare_point_activities(id, point):
+    def prepare_point_activities(point):
         if not 'activityData' in point or not 'activities' in point['activityData']:
             return
         activities = point['activityData']['activities']
@@ -168,33 +112,30 @@ def data_post():
         def parse_activities():
             for activity in activities:
                 activity_type = activity['activityType']
-                if activity_type in activity_types_cache:
+                if activity_type in activity_types:
                     yield {
-                        'type_id': activity_types_cache[activity_type],
+                        'type': activity_type,
                         'confidence': int(activity['confidence'])
                     }
 
         sorted_activities = sorted(parse_activities(), key=lambda x: x['confidence'], reverse=True)
-        for (i, x) in enumerate(sorted_activities):
-            yield {
-                'activity_type_id': x['type_id'],
-                'device_data_id': id,
-                'confidence': x['confidence'],
-                'ordinal': i + 1
-            }
+        result = {}
+
+        if len(sorted_activities) > 0:
+            result['activity_1'] = sorted_activities[0]['type']
+            result['activity_1_conf'] = sorted_activities[0]['confidence']
+            if len(sorted_activities) > 1:
+                result['activity_2'] = sorted_activities[1]['type']
+                result['activity_2_conf'] = sorted_activities[1]['confidence']
+                if len(sorted_activities) > 2:
+                    result['activity_3'] = sorted_activities[2]['type']
+                    result['activity_3_conf'] = sorted_activities[2]['confidence']
+        return result
 
     for chunk in batch_chunks(data_points):
         batch = [prepare_point(x) for x in chunk]
-        result_ids = [row[0] for row in db.engine.execute(
-                device_data_table.insert(batch).returning(device_data_table.c.id))]
-
-        def prepare_activities():
-            for (id, x) in zip(result_ids, chunk):
-                for point_activity in prepare_point_activities(id, x):
-                    yield point_activity
-
-        activity_batch = list(prepare_activities())
-        db.engine.execute(activity_data_table.insert(activity_batch))
+        db.engine.execute(
+                device_data_table.insert(batch).returning(device_data_table.c.id))
     return jsonify({
     })
 
@@ -236,28 +177,10 @@ massive_advanced_csv_query = """
         ST_Y(coordinate::geometry) as longitude,
         ST_X(coordinate::geometry) as latitude,
         accuracy,
-        activity_types[1] AS activity_guess_1,
-        confidences[1]    AS activity_guess_1_conf,
-        activity_types[2] AS activity_guess_2,
-        confidences[2]    AS activity_guess_2_conf,
-        activity_types[3] AS activity_guess_3,
-        confidences[3]    AS activity_guess_3_conf
+        activity_1, activity_1_conf,
+        activity_2, activity_2_conf,
+        activity_3, activity_3_conf
       FROM device_data
-      LEFT JOIN LATERAL (
-        SELECT DISTINCT ON (device_data_id)
-          device_data_id,
-          array_agg(activity_type) OVER device_data_point AS activity_types,
-          array_agg(confidence)    OVER device_data_point AS confidences
-        FROM
-          activity_data
-        JOIN activity_type
-        ON activity_type.id = activity_type_id
-        WINDOW device_data_point AS (
-          PARTITION BY device_data_id ORDER BY ordinal
-          RANGE BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING
-        )
-      ) AS activity_data
-      ON device_data.id = device_data_id
       ORDER BY time ASC
 """
 
@@ -322,9 +245,14 @@ def visualize_device_geojson(device_id):
     links = set()
     waypoints = set()
     for point in points:
-        device_data_id = point['id']
-        activity_data = get_activity_data(device_data_id)
-        activity_info = 'activities: ' + ', '.join([str(x) for x in activity_data])
+        activity_data = []
+        if point['activity_1']:
+            activity_data.append('{type:%s, conf:%d}' % (str(point['activity_1']), int(point['activity_1_conf'])))
+        if point['activity_2']:
+            activity_data.append('{type:%s, conf:%d}' % (str(point['activity_2']), int(point['activity_2_conf'])))
+        if point['activity_3']:
+            activity_data.append('{type:%s, conf:%d}' % (str(point['activity_3']), int(point['activity_3_conf'])))
+        activity_info = 'activities: ' + ', '.join(activity_data)
 
         point_geo = json.loads(point['geojson'])
         features.append({
@@ -418,43 +346,21 @@ def generate_csv(rows):
 
 
 def data_points(device_id, datetime_start, datetime_end):
-    return db.engine.execute(text(
-        'SELECT id, ST_Y(coordinate::geometry) as longitude, ST_X(coordinate::geometry) as latitude, ST_AsGeoJSON(coordinate) as geojson, coordinate, accuracy, time\
-      FROM device_data\
-      WHERE device_id = :device_id\
-      AND time >= :time_start\
-      AND time < :time_end\
-      ORDER BY time ASC'
-    ), device_id=device_id, time_start=datetime_start, time_end=datetime_end)
-
-
-def get_activity_data(device_data_id):
-    """Get activities linked to device data row, sorted descending by confidence level """
-    activity_data_query_text = 'SELECT id, activity_type_id, confidence FROM activity_data WHERE device_data_id = :device_data_id AND ordinal = :ordinal'
-    activity_type_query_text = 'SELECT activity_type FROM activity_type WHERE id in (SELECT activity_type_id FROM activity_data WHERE id = :activity_data_id)'
-
-    activities = []
-    try:
-        for i in range(1, 4):
-
-            act_data_res = db.engine.execute(text(activity_data_query_text), device_data_id=int(device_data_id),
-                                             ordinal=int(i)).first()
-            if act_data_res is None:
-                break
-            else:
-                act_type_id = int(act_data_res['activity_type_id'])
-                act_type_res = db.engine.execute(text(activity_type_query_text),
-                                                 activity_data_id=act_data_res['id']).first()
-                act_type_str = act_type_res[
-                    'activity_type'] if act_type_res is not None else 'UNKNOWN'
-                confidence = int(act_data_res['confidence'])
-                activities.append(SortableActivityData(act_type_str, act_type_id, confidence))
-    except TypeError as e:
-        print 'Exception: ' + e.message
-
-    activities.sort(reverse=True)
-    return activities
-
+    return db.engine.execute(text('''
+        SELECT id,
+            ST_Y(coordinate::geometry) AS longitude,
+            ST_X(coordinate::geometry) AS latitude,
+            ST_AsGeoJSON(coordinate) AS geojson,
+            coordinate, accuracy, time,
+            activity_1, activity_1_conf,
+            activity_2, activity_2_conf,
+            activity_3, activity_3_conf
+        FROM device_data
+        WHERE device_id = :device_id
+        AND time >= :time_start
+        AND time < :time_end
+        ORDER BY time ASC
+    '''), device_id=device_id, time_start=datetime_start, time_end=datetime_end)
 
 def verify_device_token(token):
     try:
