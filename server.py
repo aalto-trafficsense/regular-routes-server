@@ -6,7 +6,7 @@ import geoalchemy2 as ga2
 from datetime import datetime, date, timedelta
 from flask import Flask, abort, jsonify, request, render_template, Response
 from flask.ext.sqlalchemy import SQLAlchemy
-from sqlalchemy import MetaData, Table, Column, ForeignKey, Enum, Integer, String, desc, subquery
+from sqlalchemy import MetaData, Table, Column, ForeignKey, Enum, Integer, String, Index, desc, subquery
 from sqlalchemy.dialects.postgres import DOUBLE_PRECISION, TIMESTAMP, UUID
 from sqlalchemy.exc import DataError
 from sqlalchemy.sql import text, func, column, table, select
@@ -48,7 +48,9 @@ device_data_table = Table('device_data', metadata,
                           Column('activity_2', activity_type_enum),
                           Column('activity_2_conf', Integer),
                           Column('activity_3', activity_type_enum),
-                          Column('activity_3_conf', Integer))
+                          Column('activity_3_conf', Integer),
+                          Index('idx_device_data_time', 'time'),
+                          Index('idx_device_data_device_id_time', 'device_id', 'time'))
 
 metadata.create_all(bind=db.engine, checkfirst=True)
 
