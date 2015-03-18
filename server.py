@@ -8,7 +8,7 @@ from flask import Flask, abort, jsonify, request, render_template, Response
 from flask.ext.sqlalchemy import SQLAlchemy
 from oauth2client.client import *
 from oauth2client.crypt import AppIdentityError
-from sqlalchemy import MetaData, Table, Column, ForeignKey, Enum, Integer, String, Index
+from sqlalchemy import MetaData, Table, Column, ForeignKey, Enum, BigInteger, Integer, String, Index
 from sqlalchemy.dialects.postgres import DOUBLE_PRECISION, TIMESTAMP, UUID
 from sqlalchemy.exc import DataError
 from sqlalchemy.sql import text, func, column, table, select
@@ -62,6 +62,8 @@ device_data_table = Table('device_data', metadata,
                           Column('activity_2_conf', Integer),
                           Column('activity_3', activity_type_enum),
                           Column('activity_3_conf', Integer),
+                          Column('waypoint_id', BigInteger),
+                          Column('snapping_time', TIMESTAMP),
                           Index('idx_device_data_time', 'time'),
                           Index('idx_device_data_device_id_time', 'device_id', 'time'))
 
@@ -261,7 +263,8 @@ massive_advanced_csv_query = """
         accuracy,
         activity_1, activity_1_conf,
         activity_2, activity_2_conf,
-        activity_3, activity_3_conf
+        activity_3, activity_3_conf,
+        waypoint_id
       FROM device_data
       ORDER BY time ASC
 """
@@ -291,10 +294,10 @@ def export_csv_block(page):
 @app.route('/csv/waypoints')
 def export_csv_waypoints():
     query = text(
-        'SELECT wpt_id,\
-            ST_Y(geom::geometry) as longitude,\
-            ST_X(geom::geometry) as latitude\
-            FROM waypointsclustered')
+        'SELECT id,\
+            ST_Y(geo::geometry) as longitude,\
+            ST_X(geo::geometry) as latitude\
+            FROM waypoints')
     rows = db.engine.execute(query)
     return Response(generate_csv_waypoints(rows), mimetype='text/csv')
 
@@ -315,17 +318,16 @@ def visualize(device_id):
 @app.route('/visualize/<int:device_id>/geojson')
 def visualize_device_geojson(device_id):
     if 'date' in request.args:
-        date_start = datetime.strptime(request.args['date'], '%Y-%m-%d').date()
+        date_start = datetime.datetime.strptime(request.args['date'], '%Y-%m-%d').date()
     else:
         date_start = date.today()
 
     date_end = date_start + timedelta(days=1)
 
-    points = data_points(device_id, datetime.fromordinal(date_start.toordinal()),
-                         datetime.fromordinal(date_end.toordinal()))
+    points = data_points_snapping(device_id, datetime.datetime.fromordinal(date_start.toordinal()),
+                         datetime.datetime.fromordinal(date_end.toordinal()))
 
     features = []
-    links = set()
     waypoints = set()
     for point in points:
         activity_data = []
@@ -347,66 +349,26 @@ def visualize_device_geojson(device_id):
             }
         })
         if point['accuracy'] < 500:
-            link = db.engine.execute(text(
-                'SELECT lnk_id, lnk_1, lnk_2, ST_AsGeoJSON(ST_ShortestLine(lnk_geom, :coordinate ::geometry)) as geojson\
-          FROM links\
-          WHERE lnk_geom && (ST_Buffer(:coordinate ::geography, 500) ::geometry)\
-          ORDER BY ST_Distance(lnk_geom, :coordinate ::geometry) ASC\
-          LIMIT 1'), coordinate=point['coordinate']).first()
-            if link:
-                links.add(link['lnk_id'])
-                waypoints.add(link['lnk_1'])
-                waypoints.add(link['lnk_2'])
-                link_geo = json.loads(link['geojson'])
-                features.append({
-                    'type': 'Feature',
-                    'geometry': link_geo,
-                    'properties': {
-                        'type': 'snap-line'
-                    }
-                })
-    rows = db.engine.execute(text(
-        'SELECT ST_AsGeoJSON(geom), wpt_id\
-      FROM waypointsclustered'
-    ))
-    for row in rows:
-        if row[1] in waypoints:
-            feature_type = 'route-point'
-        else:
-            feature_type = 'link-point'
-        features.append({
-            'type': 'Feature',
-            'geometry': json.loads(row[0]),
-            'properties': {
-                'type': feature_type
-            }
-        })
-    rows = db.engine.execute(text(
-        'SELECT ST_AsGeoJSON(lnk_geom), lnk_id\
-      FROM links'
-    ))
-    for row in rows:
-        if row[1] in links:
-            feature_type = 'route-line'
-        else:
-            feature_type = 'link-line'
-        features.append({
-            'type': 'Feature',
-            'geometry': json.loads(row[0]),
-            'properties': {
-                'type': feature_type
-            }
-        })
+            if point['waypoint_id']:
+                waypoints.add(point['waypoint_id'])
+    if len(waypoints) > 0:
+        for row in db.engine.execute(text('''
+            SELECT DISTINCT ON (id)
+                ST_AsGeoJSON(geo), id
+            FROM waypoints
+            WHERE id = ANY (:waypoints ::bigint[])
+        '''), waypoints=list(waypoints)):
+            features.append({
+                'type': 'Feature',
+                'geometry': json.loads(row[0]),
+                'properties': {
+                    'type': 'route-point'
+                }
+            })
     geojson = {
         'type': 'FeatureCollection',
         'features': features
     }
-    # for query in sorted(get_debug_queries(), key=lambda x: x.duration):
-    # print query.statement
-    # result = db.engine.execute('EXPLAIN ANALYZE %s' % (query.statement), query.parameters)
-    # for row in result:
-    # print row[0]
-    # print '  %s seconds' % (query.duration)
     return jsonify(geojson)
 
 
@@ -417,7 +379,7 @@ def generate_csv(rows):
     # Poor man's CSV generation. Doesn't handle escaping properly.
     # Python's CSV library doesn't handle unicode, and seems to be
     # tricky to wrap as a generator (expected by Flask)
-    yield '"device_id";"time";"longitude";"latitude";"accuracy";"activity_guess_1";"activity_guess_1_conf";"activity_guess_2";"activity_guess_2_conf";"activity_guess_3";"activity_guess_3_conf"\n'
+    yield '"device_id";"time";"longitude";"latitude";"accuracy";"activity_guess_1";"activity_guess_1_conf";"activity_guess_2";"activity_guess_2_conf";"activity_guess_3";"activity_guess_3_conf";"waypoint_id"\n'
 
     def to_str(x):
         if x is None:
@@ -428,16 +390,15 @@ def generate_csv(rows):
         yield ';'.join(['"%s"' % (to_str(x)) for x in row]) + '\n'
 
 
-def data_points(device_id, datetime_start, datetime_end):
+def data_points_snapping(device_id, datetime_start, datetime_end):
     return db.engine.execute(text('''
         SELECT id,
-            ST_Y(coordinate::geometry) AS longitude,
-            ST_X(coordinate::geometry) AS latitude,
             ST_AsGeoJSON(coordinate) AS geojson,
-            coordinate, accuracy, time,
+            accuracy,
             activity_1, activity_1_conf,
             activity_2, activity_2_conf,
-            activity_3, activity_3_conf
+            activity_3, activity_3_conf,
+            waypoint_id
         FROM device_data
         WHERE device_id = :device_id
         AND time >= :time_start

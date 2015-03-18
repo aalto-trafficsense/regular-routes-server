@@ -29,44 +29,27 @@ $(document).ready(function() {
           strokeOpacity: 0.5
         },
         title: title
-      }
-    } else if (type === 'snap-line') {
-      return {
-        strokeColor: 'blue',
-        strokeOpacity: 0.5
       };
-    } else if (type === 'route-line') {
-      return {
-        strokeColor: 'red',
-      }
     } else if (type === 'route-point') {
       return {
         icon: {
-          path: google.maps.SymbolPath.CIRCLE,
+          path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
           scale: 3,
-          strokeColor: 'red',
-        },
-        title: title
-      }
-    } else if (type === 'link-line') {
-      return {
-        strokeColor: 'green',
-        strokeOpacity: 0.5
-      }
-    } else if (type === 'link-point') {
-      return {
-        icon: {
-          path: google.maps.SymbolPath.CIRCLE,
-          scale: 2,
-          strokeColor: 'green',
-          strokeOpacity: 0.5,
+          fillColor: 'red',
+          fillOpacity: 1.0,
+          strokeColor: 'red'
         },
         title: title
       };
     }
   });
 
+  var currentDate;
+
   function update(date) {
+    if (date === currentDate)
+      return;
+    currentDate = date;
     mapCanvas.css('opacity', 0.1);
     map.data.forEach(function(feature) {
       map.data.remove(feature);
