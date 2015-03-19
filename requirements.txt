@@ -2,3 +2,6 @@ Flask==0.10.1
 Flask-SQLAlchemy==2.0
 psycopg2==2.6
 GeoAlchemy2==0.2.4
+Flask-KVSession==0.6.1
+pyOpenSSL==0.14
+google-api-python-client==1.2
