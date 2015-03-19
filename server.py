@@ -14,13 +14,17 @@ from sqlalchemy.exc import DataError
 from sqlalchemy.sql import text, func, column, table, select
 from uuid import uuid4
 
-basedir = os.path.abspath(os.path.dirname(__file__))
-CLIENT_SECRET_FILE = basedir + '/client_secrets.json'
+SETTINGS_FILE_ENV_VAR = 'REGULARROUTES_SETTINGS'
+CLIENT_SECRET_FILE_NAME = 'client_secrets.json'
+
+# set settings dir from env.var for settings file. fallback dir is server.py file's parent dir
+settings_dir_path = os.path.abspath(os.path.dirname(os.getenv(SETTINGS_FILE_ENV_VAR, os.path.abspath(__file__))))
+CLIENT_SECRET_FILE = os.path.join(settings_dir_path, CLIENT_SECRET_FILE_NAME)
 
 app = Flask(__name__)
 #app.config.from_pyfile('regularroutes.cfg')
 #app.debug = True
-app.config.from_envvar('REGULARROUTES_SETTINGS')
+app.config.from_envvar(SETTINGS_FILE_ENV_VAR)
 
 db = SQLAlchemy(app)
 metadata = MetaData()
