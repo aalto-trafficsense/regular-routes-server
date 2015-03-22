@@ -8,7 +8,7 @@ from flask import Flask, abort, jsonify, request, render_template, Response
 from flask.ext.sqlalchemy import SQLAlchemy
 from oauth2client.client import *
 from oauth2client.crypt import AppIdentityError
-from sqlalchemy import MetaData, Table, Column, ForeignKey, Enum, BigInteger, Integer, String, Index
+from sqlalchemy import MetaData, Table, Column, ForeignKey, Enum, BigInteger, Integer, String, Index, UniqueConstraint
 from sqlalchemy.dialects.postgres import DOUBLE_PRECISION, TIMESTAMP, UUID
 from sqlalchemy.exc import DataError
 from sqlalchemy.sql import text, func, column, table, select
@@ -22,9 +22,16 @@ settings_dir_path = os.path.abspath(os.path.dirname(os.getenv(SETTINGS_FILE_ENV_
 CLIENT_SECRET_FILE = os.path.join(settings_dir_path, CLIENT_SECRET_FILE_NAME)
 
 app = Flask(__name__)
-#app.config.from_pyfile('regularroutes.cfg')
-#app.debug = True
-app.config.from_envvar(SETTINGS_FILE_ENV_VAR)
+
+env_var_value = os.getenv(SETTINGS_FILE_ENV_VAR, None)
+if env_var_value is not None:
+    print 'loading settings from: "' + str(env_var_value) + '"'
+    app.config.from_envvar(SETTINGS_FILE_ENV_VAR)
+else:
+    print 'Environment variable "SETTINGS_FILE_ENV_VAR" was not defined -> using debug mode'
+    # assume debug environment
+    app.config.from_pyfile('regularroutes.cfg')
+    app.debug = True
 
 db = SQLAlchemy(app)
 metadata = MetaData()
@@ -37,22 +44,38 @@ activity_types = ('IN_VEHICLE', 'ON_BICYCLE', 'ON_FOOT', 'RUNNING', 'STILL', 'TI
 activity_type_enum = Enum(*activity_types, name='activity_type_enum')
 
 # Schema definitions:
+
+# Table with one entry for each user
+users_table = Table('users', metadata,
+                    Column('id', Integer, primary_key=True),
+                    Column('user_id', String, unique=True, nullable=False),  # hash value of Google Id
+                    Column('google_refresh_token', String),
+                    Column('google_server_access_token', String),
+                    Column('register_timestamp', TIMESTAMP, nullable=False, default=func.current_timestamp(),
+                           server_default=func.current_timestamp()),
+                    Index('idx_users_user_id', 'user_id'))
+
+if not users_table.exists(bind=db.engine):
+    users_table.create(bind=db.engine)
+    """ create legacy user that can be used to link existing data that was added
+        before user objects were added to some user.
+    """
+    db.engine.execute(users_table.insert({'id': 0, 'user_id': 'legacy-user'}))
+
+# Table with one entry for each client device
 devices_table = Table('devices', metadata,
                       Column('id', Integer, primary_key=True),
+                      Column('user_id', Integer, ForeignKey('users.id'), nullable=False, default=0),
+                      Column('device_id', String, nullable=False),
+                      Column('installation_id', UUID, nullable=False),
+                      Column('device_model', String),
                       Column('token', UUID, unique=True, nullable=False),
                       Column('created', TIMESTAMP, nullable=False, default=func.current_timestamp(),
                              server_default=func.current_timestamp()),
                       Column('last_activity', TIMESTAMP, nullable=False, default=func.current_timestamp(),
-                             server_default=func.current_timestamp()))
-
-user_auth_table = Table('user_auth', metadata,
-                        Column('id', Integer, primary_key=True),
-                        Column('device_id', Integer, ForeignKey('devices.id'), nullable=False),
-                        Column('google_refresh_token', String, nullable=False),
-                        Column('google_server_access_token', String),
-                        Column('device_auth_id', String, nullable=False),
-                        Column('register_timestamp', TIMESTAMP, nullable=False, default=func.current_timestamp(),
-                               server_default=func.current_timestamp()))
+                             server_default=func.current_timestamp()),
+                      UniqueConstraint('device_id', 'installation_id', name='uix_device_id_installation_id'),
+                      Index('idx_devices_device_id_inst_id', 'device_id', 'installation_id'))
 
 device_data_table = Table('device_data', metadata,
                           Column('id', Integer, primary_key=True),
@@ -83,9 +106,11 @@ def register_post():
 
     """
     data = request.json
-
     google_one_time_token = data['oneTimeToken']
-    old_device_id = data['oldDeviceId']
+    device_id = data['deviceId']
+    installation_id = data['installationId']
+    device_model = data['deviceModel']
+    print 'deviceModel=' + str(device_model)
 
     # 1. authenticate with Google
     validation_data = authenticate_with_google_oauth(google_one_time_token)
@@ -95,43 +120,59 @@ def register_post():
     account_google_id = validation_data['google_id']
 
     # The following hash value is also generated in client and used in authentication
-    device_auth_id = str(hashlib.sha256(str(account_google_id).encode('utf-8')).hexdigest()).upper()
+    user_id = str(hashlib.sha256(str(account_google_id).encode('utf-8')).hexdigest()).upper()
 
-    device_id = None
-    session_token = None
+    devices_table_id = None
+    users_table_id = None
 
     # 2. Check if user has registered previously
-    ext_device_id = get_device_from_user_auth_id(device_auth_id)
-    if ext_device_id >= 0:
-        device_id = ext_device_id
-        session_token = get_device_token(device_id)
+    ext_users_table_id = get_users_table_id(user_id)
+    if ext_users_table_id >= 0:
+        users_table_id = ext_users_table_id
 
-        # 3. Link to old device id, if available (and not registered yet)
-    elif old_device_id is not None and old_device_id != '':
-        session_token = old_device_id
-        device_id = get_device_id(old_device_id)
+        # 3. Check if same device has registered with same user
+        ext_user_id_for_device = get_users_table_id_for_device(device_id, installation_id)
+        if ext_user_id_for_device >= 0:
+            if ext_user_id_for_device != ext_users_table_id:
+                # same device+installation is registered to other user
+                print 'Re-registration attempt for different user'
+                abort(403)
 
-    if device_id is None:
-        session_token = uuid4().hex
-        device_insertion = devices_table.insert({'token': session_token})
-        db.engine.execute(device_insertion)
-        device_id = get_device_id(session_token)
+            print 'device re-registration detected -> using same device'
+            devices_table_id = get_device_table_id(device_id, installation_id)
 
-    # 4. create authentication row to db
-    if ext_device_id < 0:
-        stmt = user_auth_table.insert({'device_id': int(device_id),
-                                       'google_refresh_token': str(validation_data['refresh_token']),
-                                       'google_server_access_token': str(validation_data['access_token']),
-                                       'device_auth_id': str(device_auth_id)})
-
+    # 4. create/update user to db
+    if users_table_id < 0:
+        stmt = users_table.insert({'google_refresh_token': str(validation_data['refresh_token']),
+                                   'google_server_access_token': str(validation_data['access_token']),
+                                   'user_id': str(user_id)})
+        db.engine.execute(stmt)
+        users_table_id = get_users_table_id(str(user_id))
     else:
-        print 're-registration detected -> using existing account'
-        stmt = user_auth_table.update().values({'google_refresh_token': str(validation_data['refresh_token']),
-                                                'google_server_access_token': str(
-                                                    validation_data['access_token'])}).where(
-            'device_id={0}'.format(str(ext_device_id)))
+        print 're-registration for same user detected -> using existing user account'
+        stmt = users_table.update().values({'google_refresh_token': str(validation_data['refresh_token']),
+                                            'google_server_access_token': str(
+                                                validation_data['access_token'])}).where(
+            'id={0}'.format(str(users_table_id)))
 
-    db.engine.execute(stmt)
+        db.engine.execute(stmt)
+
+
+
+    # 5. Create/update device to db
+    if devices_table_id is None:
+        session_token = uuid4().hex
+        device_insertion = devices_table.insert(
+            {'user_id': users_table_id,
+             'device_id': device_id,
+             'installation_id': installation_id,
+             'device_model': device_model,
+             'token': session_token})
+        db.engine.execute(device_insertion)
+    else:
+        update_last_activity(devices_table_id)
+        session_token = get_session_token_for_device(devices_table_id)
+
     resp = jsonify({'sessionToken': session_token})
     return resp
 
@@ -139,18 +180,20 @@ def register_post():
 @app.route('/authenticate', methods=['POST'])
 def authenticate_post():
     json = request.json
-    device_auth_id = json['deviceAuthId']
-    device_id = verify_device_auth_id(device_auth_id)
+    user_id = json['userId']
+    device_id = json['deviceId']
+    installation_id = json['installationId']
 
-    existing_token = get_device_token(device_id)
-    if existing_token is None:
-        print 'User is not registered. deviceAuthId=' + device_auth_id
+    # 1. check that user exists or abort
+    verify_user_id(user_id)
+
+    devices_table_id = get_device_table_id(device_id, installation_id)
+    session_token = get_session_token_for_device(devices_table_id)
+    if session_token is None:
+        print 'User is not registered. userId=' + user_id
         abort(403)
 
-    update = devices_table.update().values({'last_activity': datetime.datetime.now()}).where("id=" + str(device_id))
-    db.engine.execute(update)
-
-    session_token = get_device_token(device_id)
+    update_last_activity(devices_table_id)
 
     return jsonify({
         'sessionToken': session_token
@@ -163,7 +206,7 @@ def data_post():
     if session_token is None or session_token == '':
         abort(403)  # not authenticated user
 
-    device_id = get_device_id(session_token)
+    device_id = get_device_table_id_for_session(session_token)
     if device_id < 0:
         abort(403)  # not registered user
 
@@ -247,7 +290,7 @@ def devices():
 @app.route('/device/<session_token>')
 def device(session_token):
     try:
-        device_id = get_device_id(session_token)
+        device_id = get_device_table_id_for_session(session_token)
 
     except Exception as e:
         print 'Device-query - exception: ' + e.message
@@ -273,11 +316,13 @@ massive_advanced_csv_query = """
       ORDER BY time ASC
 """
 
+
 @app.route('/csv/')
 def export_csv():
     rows = db.engine.execution_options(
-            stream_results=True).execute(text(massive_advanced_csv_query))
+        stream_results=True).execute(text(massive_advanced_csv_query))
     return Response(generate_csv(rows), mimetype='text/csv')
+
 
 @app.route('/csv/<page>')
 def export_csv_block(page):
@@ -286,12 +331,12 @@ def export_csv_block(page):
     if int(page) == 0:
         offset = int(page) * entry_block_size
     else:
-        offset = (int(page)-1) * entry_block_size
+        offset = (int(page) - 1) * entry_block_size
     limit = entry_block_size
 
     query = text(massive_advanced_csv_query + ' LIMIT :limit OFFSET :offset')
     rows = db.engine.execution_options(
-            stream_results=True).execute(query, limit=limit, offset=offset)
+        stream_results=True).execute(query, limit=limit, offset=offset)
     return Response(generate_csv(rows), mimetype='text/csv')
 
 
@@ -329,7 +374,7 @@ def visualize_device_geojson(device_id):
     date_end = date_start + timedelta(days=1)
 
     points = data_points_snapping(device_id, datetime.datetime.fromordinal(date_start.toordinal()),
-                         datetime.datetime.fromordinal(date_end.toordinal()))
+                                  datetime.datetime.fromordinal(date_end.toordinal()))
 
     features = []
     waypoints = set()
@@ -411,12 +456,12 @@ def data_points_snapping(device_id, datetime_start, datetime_end):
     '''), device_id=device_id, time_start=datetime_start, time_end=datetime_end)
 
 
-def verify_device_auth_id(device_auth_id):
-    if device_auth_id is None or device_auth_id == '':
-        print 'empty device_auth_id'
+def verify_user_id(user_id):
+    if user_id is None or user_id == '':
+        print 'empty user_id'
         abort(403)
     try:
-        query = select([table('user_auth', column('device_id'))]).where("device_auth_id='" + device_auth_id + "'")
+        query = select([table('users', column('id'))]).where("user_id='" + user_id + "'")
         row = db.engine.execute(query).first()
 
         if not row:
@@ -441,9 +486,16 @@ def verify_device_token(token):
         abort(403)
 
 
-def get_device_id(session_id):
+def update_last_activity(devices_table_id):
+    update = devices_table.update().values({'last_activity': datetime.datetime.now()}).where(
+        "id=" + str(devices_table_id))
+    db.engine.execute(update)
+
+
+def get_users_table_id_for_device(device_id, installation_id):
     try:
-        query = select([table('devices', column('id'))]).where("token='" + session_id + "'")
+        query = select([table('devices', column('user_id'))]).where(
+            "device_id='" + device_id + "' AND installation_id='" + installation_id + "'")
         row = db.engine.execute(query).first()
         if not row:
             return -1
@@ -454,9 +506,10 @@ def get_device_id(session_id):
     return -1
 
 
-def get_device_from_user_auth_id(device_auth_id):
+def get_device_table_id(device_id, installation_id):
     try:
-        query = select([table('user_auth', column('device_id'))]).where("device_auth_id='" + device_auth_id + "'")
+        query = select([table('devices', column('id'))]).where(
+            "device_id='" + device_id + "' AND installation_id='" + installation_id + "'")
         row = db.engine.execute(query).first()
         if not row:
             return -1
@@ -467,9 +520,41 @@ def get_device_from_user_auth_id(device_auth_id):
     return -1
 
 
-def get_device_token(device_id):
+def get_device_table_id_for_session(session_token):
     try:
-        query = select([table('devices', column('token'))]).where("id='" + str(device_id) + "'")
+        query = select([table('devices', column('id'))]).where("token='" + session_token + "'")
+        row = db.engine.execute(query).first()
+        if not row:
+            return -1
+        return int(row[0])
+    except DataError as e:
+        print 'Exception: ' + e.message
+
+    return -1
+
+
+def get_users_table_id(user_id):
+    """
+    :param user_id: user_id (hash value)
+    :return: users.id (PK, Integer)
+    """
+    try:
+        query = select([table('users', column('id'))]).where("user_id='" + user_id + "'")
+        row = db.engine.execute(query).first()
+        if not row:
+            return -1
+        return int(row[0])
+    except DataError as e:
+        print 'Exception: ' + e.message
+
+    return -1
+
+
+def get_session_token_for_device(devices_table_id):
+    if devices_table_id is None or devices_table_id < 0:
+        return None
+    try:
+        query = select([table('devices', column('token'))]).where("id='" + str(devices_table_id) + "'")
         row = db.engine.execute(query).first()
         if not row:
             return None
@@ -478,22 +563,6 @@ def get_device_token(device_id):
         print 'Exception: ' + e.message
 
     return None
-
-
-def get_activity_type_id(activity):
-    if activity is None:
-        return -1
-
-    try:
-        query = select([table('activity_type', column('id'))]).where("activity_type='" + activity + "'")
-        row = db.engine.execute(query).first()
-        if not row:
-            return -1
-        return int(row[0])
-    except DataError as e:
-        print 'Exception: ' + e.message
-
-    return -1
 
 
 def authenticate_with_google_oauth(one_time_token):
