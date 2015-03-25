@@ -640,6 +640,6 @@ def verify_and_get_account_id(credentials):
 # App starting point:
 if __name__ == '__main__':
     if app.debug:
-        app.run(host='192.168.1.6')
+        app.run(host='0.0.0.0')
     else:
         app.run()
