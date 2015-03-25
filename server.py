@@ -68,7 +68,7 @@ devices_table = Table('devices', metadata,
                       Column('user_id', Integer, ForeignKey('users.id'), nullable=False, default=0),
                       Column('device_id', String, nullable=False),
                       Column('installation_id', UUID, nullable=False),
-                      Column('device_model', String),
+                      Column('device_model', String, default='(unknown)'),
                       Column('token', UUID, unique=True, nullable=False),
                       Column('created', TIMESTAMP, nullable=False, default=func.current_timestamp(),
                              server_default=func.current_timestamp()),
@@ -529,10 +529,9 @@ def get_device_table_id_for_session(session_token):
         if not row:
             return -1
         return int(row[0])
-    except DataError as e:
-        print 'Exception: ' + e.message
-
-    return -1
+    except DataError:
+        # invalid session token
+        return -1
 
 
 def get_users_table_id(user_id):
@@ -641,6 +640,6 @@ def verify_and_get_account_id(credentials):
 # App starting point:
 if __name__ == '__main__':
     if app.debug:
-        app.run(host='0.0.0.0')
+        app.run(host='192.168.1.6')
     else:
         app.run()
