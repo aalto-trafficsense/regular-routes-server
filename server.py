@@ -94,6 +94,8 @@ device_data_table = Table('device_data', metadata,
                           Index('idx_device_data_time', 'time'),
                           Index('idx_device_data_device_id_time', 'device_id', 'time'))
 
+Index('idx_device_data_snapping_time_null', device_data_table.c.snapping_time, postgresql_where=device_data_table.c.snapping_time == None)
+
 metadata.create_all(bind=db.engine, checkfirst=True)
 
 # REST interface:
