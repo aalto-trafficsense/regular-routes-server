@@ -21,5 +21,7 @@ FROM (
       LIMIT 1
   ) AS waypoint ON true
   WHERE snapping_time IS NULL
+  -- Hack to avoid timeouts
+  LIMIT 20000
 ) AS snapping
 WHERE device_data.id = snapping.id
