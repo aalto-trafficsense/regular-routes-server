@@ -214,6 +214,7 @@ def data_post():
 
     data_points = request.json['dataPoints']
 
+    # Remember, if a single point fails, the whole batch fails
     batch_size = 1024
 
     def batch_chunks(x):
@@ -262,8 +263,7 @@ def data_post():
 
     for chunk in batch_chunks(data_points):
         batch = [prepare_point(x) for x in chunk]
-        db.engine.execute(
-            device_data_table.insert(batch).returning(device_data_table.c.id))
+        db.engine.execute(device_data_table.insert(batch))
     return jsonify({
     })
 
@@ -478,6 +478,7 @@ def verify_user_id(user_id):
         print 'empty user_id'
         abort(403)
     try:
+        # TODO: Fix SQL injection
         query = select([table('users', column('id'))]).where("user_id='" + user_id + "'")
         row = db.engine.execute(query).first()
 
@@ -492,6 +493,7 @@ def verify_user_id(user_id):
 
 def verify_device_token(token):
     try:
+        # TODO: Fix SQL injection
         query = select([table('devices', column('id'))]).where("token='" + token + "'")
         row = db.engine.execute(query).first()
 
@@ -511,6 +513,7 @@ def update_last_activity(devices_table_id):
 
 def get_users_table_id_for_device(device_id, installation_id):
     try:
+        # TODO: Fix SQL injection
         query = select([table('devices', column('user_id'))]).where(
             "device_id='" + device_id + "' AND installation_id='" + installation_id + "'")
         row = db.engine.execute(query).first()
@@ -525,6 +528,7 @@ def get_users_table_id_for_device(device_id, installation_id):
 
 def get_device_table_id(device_id, installation_id):
     try:
+        # TODO: Fix SQL injection
         query = select([table('devices', column('id'))]).where(
             "device_id='" + device_id + "' AND installation_id='" + installation_id + "'")
         row = db.engine.execute(query).first()
@@ -539,6 +543,7 @@ def get_device_table_id(device_id, installation_id):
 
 def get_device_table_id_for_session(session_token):
     try:
+        # TODO: Fix SQL injection
         query = select([table('devices', column('id'))]).where("token='" + session_token + "'")
         row = db.engine.execute(query).first()
         if not row:
@@ -555,6 +560,7 @@ def get_users_table_id(user_id):
     :return: users.id (PK, Integer)
     """
     try:
+        # TODO: Fix SQL injection
         query = select([table('users', column('id'))]).where("user_id='" + user_id + "'")
         row = db.engine.execute(query).first()
         if not row:
@@ -570,6 +576,7 @@ def get_session_token_for_device(devices_table_id):
     if devices_table_id is None or devices_table_id < 0:
         return None
     try:
+        # TODO: Fix SQL injection
         query = select([table('devices', column('token'))]).where("id='" + str(devices_table_id) + "'")
         row = db.engine.execute(query).first()
         if not row:
