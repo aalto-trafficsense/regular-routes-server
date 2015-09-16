@@ -19,7 +19,7 @@ CREATE TABLE averaged_location (
 INSERT INTO averaged_location
       SELECT
         device_id,
-	AVG(CAST(extract(epoch from time) as integer) as time_stamp),
+	AVG(CAST(extract(epoch from time) as integer) as time_stamp) as time_stamp,
 	CAST(date_part('minute',time) as integer) as minute,
 	CAST(date_part('hour',time) as integer) as hour,
 	CAST(date_part('year',time) as integer) as year,
