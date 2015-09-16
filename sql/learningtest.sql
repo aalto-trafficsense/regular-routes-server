@@ -28,16 +28,16 @@ INSERT INTO averaged_location
         CAST(AVG(ST_X(coordinate::geometry)) as float) as latitude,
         CAST(AVG(accuracy) as float) as accuracy,
         waypoint_id
-      FROM device_data
+      FROM test -- device_data
       GROUP BY device_id,year,day_of_year,hour,minute, device_data.time, device_data.waypoint_id
       ORDER BY device_id, time_stamp
 ;
 
-DROP TABLE IF EXISTS cluster_centers;
+-- DROP TABLE IF EXISTS cluster_centers;
 
-CREATE TABLE cluster_centers (
-  device_id int,
-  cluster_id bigint,
-  longitude float,
-  latitude float
-);
+-- CREATE TABLE cluster_centers (
+--   device_id int,
+--   cluster_id bigint,
+--   longitude float,
+--   latitude float
+-- );
