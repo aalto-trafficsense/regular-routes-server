@@ -325,7 +325,7 @@ def learning_test():
         sql = sql_file.read()
         result = db.engine.execute(text(sql))
         # return 'Learning test script returned %d rows' % (result.rowcount)
-        return 'Server PYTHONPATH is %s' % (PYTHONPATH)
+        return 'Server PYTHONPATH is %s' % (__PYTHONPATH__)
         
 @app.route('/learning/make_clusters')
 def make_clusters():
