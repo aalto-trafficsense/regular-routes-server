@@ -30,6 +30,6 @@ INSERT INTO averaged_location
         AVG(accuracy) as accuracy,
         waypoint_id
       FROM device_data
-      GROUP BY device_id,year,day_of_year,hour,minute, device_data.time
+      GROUP BY device_id,year,day_of_year,hour,minute, device_data.time, device_data.waypoint_id
       ORDER BY device_id, time_stamp
 ;
