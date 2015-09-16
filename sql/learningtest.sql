@@ -28,8 +28,9 @@ INSERT INTO averaged_location
         CAST(AVG(ST_X(coordinate::geometry)) as float) as latitude,
         CAST(AVG(accuracy) as float) as accuracy,
         waypoint_id
-      FROM device_data
-      GROUP BY device_id,year,day_of_year,hour,minute, device_data.time, device_data.waypoint_id
+      FROM test_small
+      -- correct one is device_data
+      GROUP BY device_id,year,day_of_year,hour,minute, test_small.time, test_small.waypoint_id
       ORDER BY device_id, time_stamp
 ;
 
