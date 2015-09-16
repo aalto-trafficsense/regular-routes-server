@@ -33,11 +33,11 @@ INSERT INTO averaged_location
       ORDER BY device_id, time_stamp
 ;
 
--- DROP TABLE IF EXISTS cluster_centers;
+DROP TABLE IF EXISTS cluster_centers;
 
--- CREATE TABLE cluster_centers (
---   device_id int,
---   cluster_id bigint,
---   longitude float,
---   latitude float
--- );
+CREATE TABLE cluster_centers (
+  device_id int,
+  cluster_id bigint,
+  longitude float,
+  latitude float
+);
