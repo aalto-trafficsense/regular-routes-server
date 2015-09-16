@@ -41,13 +41,3 @@ CREATE TABLE cluster_centers (
   longitude float,
   latitude float
 );
-
-INSERT INTO cluster_centers
-
-;
-
-for i in range(len(h.cluster_centers_)):
-    print "insert", i
-    c.execute("INSERT INTO nodes values (?,?,?,?)", (45, i, h.cluster_centers_[i,1], h.cluster_centers_[i,0]))
-print "commit"
-conn.commit()
