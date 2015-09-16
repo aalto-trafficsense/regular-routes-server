@@ -324,8 +324,9 @@ def learning_test():
     with open('sql/learningtest.sql', 'r') as sql_file:
         sql = sql_file.read()
         result = db.engine.execute(text(sql))
-        return 'Learning test script returned %d rows' % (result.rowcount)
-
+        # return 'Learning test script returned %d rows' % (result.rowcount)
+        return 'Server PYTHONPATH is %s' % (PYTHONPATH)
+        
 @app.route('/learning/make_clusters')
 def make_clusters():
     from nightly import run_clustering
