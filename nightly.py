@@ -15,7 +15,13 @@ from sqlalchemy.sql import text, func, column, table, select
 from uuid import uuid4
 
 def run_clustering(db):
-    return "test"
+    result = db.engine.execute("SELECT longitude, latitude from averaged_location")
+#X = column_stack([dat['lat'],dat['lon']])
+#dat = array(c.execute('SELECT lon,lat,t,d_id FROM data_averaged WHERE d_id=?', (45,)).fetchall(),dtype={'names':['lon', 'lat', 't', 'd_id'], 'formats':['f4','f4','f4','i4']})
+#    for row in result:
+#            print "username:", row['username']
+#
+    return "test, "+str(result)
 #dat = array(c.execute('SELECT lon,lat,t,d_id FROM data_averaged WHERE d_id=?', (45,)).fetchall(),dtype={'names':['lon', 'lat', 't', 'd_id'], 'formats':['f4','f4','f4','i4']})
 #    with open('sql/learningtest.sql', 'r') as sql_file:
 #        sql = sql_file.read()
