@@ -9,9 +9,9 @@ CREATE TABLE averaged_location (
   year integer,
   day_of_week integer,
   day_of_year integer,
-  longitude double,
-  latitude double,
-  accuracy double,
+  longitude float,
+  latitude float,
+  accuracy float,
   waypoint_id bigint
 );
 
@@ -38,6 +38,6 @@ DROP TABLE IF EXISTS cluster_centers;
 CREATE TABLE cluster_centers (
   device_id int,
   cluster_id bigint,
-  longitude double,
-  latitude double
+  longitude float,
+  latitude float
 );
