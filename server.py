@@ -328,7 +328,8 @@ def learning_test():
 
 @app.route('/learning/make_clusters')
 def make_clusters():
-    result_str = run_make_clusters(db)
+    from nightly import run_clustering
+    result_str = run_clustering(db)
     return 'Result: %s' % (result_str)
 
 massive_advanced_csv_query = """
