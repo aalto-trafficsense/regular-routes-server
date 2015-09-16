@@ -31,5 +31,5 @@ INSERT INTO averaged_location
         waypoint_id
       FROM device_data
       GROUP BY device_id,year,day_of_year,hour,minute
-      ORDER BY device_id,time_stamp
+      ORDER BY device_id
 ;
