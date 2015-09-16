@@ -9,9 +9,9 @@ CREATE TABLE averaged_location (
   year integer,
   day_of_week integer,
   day_of_year integer,
-  longitude float,
-  latitude float,
-  accuracy float,
+  longitude double,
+  latitude double,
+  accuracy double,
   waypoint_id bigint
 );
 
@@ -33,11 +33,11 @@ INSERT INTO averaged_location
       ORDER BY device_id, time_stamp
 ;
 
-DROP TABLE IF EXISTS cluster_centers;
+-- DROP TABLE IF EXISTS cluster_centers;
 
-CREATE TABLE cluster_centers (
-  device_id int,
-  cluster_id bigint,
-  longitude float,
-  latitude float
-);
+-- CREATE TABLE cluster_centers (
+--   device_id int,
+--   cluster_id bigint,
+--   longitude float,
+--   latitude float
+-- );
