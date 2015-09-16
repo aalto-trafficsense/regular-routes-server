@@ -24,9 +24,9 @@ INSERT INTO averaged_location
 	CAST(date_part('year',time) as integer) as year,
 	CAST(date_part('dow',time) as integer) as day_of_week,
 	CAST(date_part('doy',time) as integer) as day_of_year,
-        AVG(ST_Y(coordinate::geometry)) as longitude,
-        AVG(ST_X(coordinate::geometry)) as latitude,
-        AVG(accuracy) as accuracy,
+        CAST(AVG(ST_Y(coordinate::geometry)) as double) as longitude,
+        CAST(AVG(ST_X(coordinate::geometry)) as double) as latitude,
+        CAST(AVG(accuracy) as double) as accuracy,
         waypoint_id
       FROM device_data
       GROUP BY device_id,year,day_of_year,hour,minute, device_data.time, device_data.waypoint_id
