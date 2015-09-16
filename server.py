@@ -326,6 +326,11 @@ def learning_test():
         result = db.engine.execute(text(sql))
         return 'Learning test script returned %d rows' % (result.rowcount)
 
+@app.route('/learning/make_clusters')
+def make_clusters():
+    result_str = run_make_clusters(db)
+    return 'Result: %s' % (result_str)
+
 massive_advanced_csv_query = """
       SELECT
         device_id, time,
