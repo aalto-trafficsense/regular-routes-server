@@ -319,6 +319,13 @@ def maintenance_snapping():
         result = db.engine.execute(text(sql))
         return 'Snapping was done to %d data points' % (result.rowcount)
 
+@app.route('/learning/test')
+def learning_test():
+    with open('sql/learningtest.sql', 'r') as sql_file:
+        sql = sql_file.read()
+        result = db.engine.execute(text(sql))
+        return 'Learning test script returned %d rows' % (result.rowcount)
+
 massive_advanced_csv_query = """
       SELECT
         device_id, time,
