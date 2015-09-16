@@ -2,7 +2,6 @@
 DROP TABLE IF EXISTS averaged_location;
 
 CREATE TABLE averaged_location (
-  -- Comment
   device_id integer,
   time_stamp integer,
   minute integer,
@@ -10,9 +9,9 @@ CREATE TABLE averaged_location (
   year integer,
   day_of_week integer,
   day_of_year integer,
-  longitude FLOAT,
-  latitude FLOAT,
-  accuracy FLOAT,
+  longitude double,
+  latitude double,
+  accuracy double,
   waypoint_id bigint
 );
 
@@ -33,3 +32,22 @@ INSERT INTO averaged_location
       GROUP BY device_id,year,day_of_year,hour,minute, device_data.time, device_data.waypoint_id
       ORDER BY device_id, time_stamp
 ;
+
+DROP TABLE IF EXISTS cluster_centers;
+
+CREATE TABLE cluster_centers (
+  device_id int,
+  cluster_id bigint,
+  longitude float,
+  latitude float
+);
+
+INSERT INTO cluster_centers
+
+;
+
+for i in range(len(h.cluster_centers_)):
+    print "insert", i
+    c.execute("INSERT INTO nodes values (?,?,?,?)", (45, i, h.cluster_centers_[i,1], h.cluster_centers_[i,0]))
+print "commit"
+conn.commit()
