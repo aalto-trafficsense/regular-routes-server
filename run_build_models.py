@@ -137,9 +137,9 @@ print "Build model ..."
 h.train(X,Y)
 
 print "Dump model to disk ..."
-import pickle
+import joblib
 fname = "./dat/model_dev"+str(DEV_ID)+".model"
-pickle.dump( h,  open( fname, "wb" ))
+joblib.dump( h,  fname)
 
 print "Model saved to "+fname+". Done!"
 
