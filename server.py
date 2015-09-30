@@ -387,6 +387,76 @@ def generate_csv_waypoints(rows):
         yield ';'.join(['"%s"' % (str(x)) for x in row]) + '\n'
 
 
+@app.route('/visualize_clusters/<int:device_id>')
+def visualize_clusters(device_id):
+    return render_template('visualize.html',
+                           api_key=app.config['MAPS_API_KEY'],
+                           device_id=device_id)
+
+
+@app.route('/visualize_clusters/<int:device_id>/geojson')
+def visualize_clusters_device_geojson(device_id):
+
+    points =  db.engine.execute(text('''
+        SELECT device_id,
+            ST_AsGeoJSON(coordinate) AS geojson,
+            accuracy,
+            activity_1, activity_1_conf,
+            activity_2, activity_2_conf,
+            activity_3, activity_3_conf,
+            waypoint_id
+        FROM device_data
+        WHERE device_id = :device_id
+        AND time >= :time_start
+        AND time < :time_end
+        ORDER BY time ASC
+    '''), device_id=device_id)
+
+    waypoints = set()
+    for point in points:
+        activity_data = []
+        if point['activity_1']:
+            activity_data.append('{type:%s, conf:%d}' % (str(point['activity_1']), int(point['activity_1_conf'])))
+        if point['activity_2']:
+            activity_data.append('{type:%s, conf:%d}' % (str(point['activity_2']), int(point['activity_2_conf'])))
+        if point['activity_3']:
+            activity_data.append('{type:%s, conf:%d}' % (str(point['activity_3']), int(point['activity_3_conf'])))
+        activity_info = 'activities: ' + ', '.join(activity_data)
+
+        point_geo = json.loads(point['geojson'])
+        features.append({
+            'type': 'Feature',
+            'geometry': point_geo,
+            'properties': {
+                'type': 'raw-point',
+                'title': 'accuracy: %d\n%s' % (point['accuracy'], activity_info)
+            }
+        })
+        if point['accuracy'] < 500:
+            if point['waypoint_id']:
+                waypoints.add(point['waypoint_id'])
+    if len(waypoints) > 0:
+        for row in db.engine.execute(text('''
+            SELECT DISTINCT ON (id)
+                ST_AsGeoJSON(geo), id
+            FROM waypoints
+            WHERE id = ANY (:waypoints ::bigint[])
+        '''), waypoints=list(waypoints)):
+            features.append({
+                'type': 'Feature',
+                'geometry': json.loads(row[0]),
+                'properties': {
+                    'type': 'route-point'
+                }
+            })
+    geojson = {
+        'type': 'FeatureCollection',
+        'features': features
+    }
+    return jsonify(geojson)
+
+
+
 @app.route('/visualize/<int:device_id>')
 def visualize(device_id):
     return render_template('visualize.html',
