@@ -6,7 +6,7 @@
     - turns data from Regular Routes into X/Y.csv datasets.
     - use runPlotAnimation to run an animation based on this.
 
-    Usage: python runCreateDataset.py <win_past> <win_future>
+    Usage: python runCreateDataset.py <win_past> <win_futr>
     defaults:                            (10)        (20)   
 '''
 
@@ -14,7 +14,7 @@ import sys
 
 # Scientific Libraries
 from numpy import *
-set_printoptions(precision=3, suppress=True)
+set_printoptions(precision=5, suppress=True)
 
 # Provides snapping and stacking functionality
 sys.path.append("./src")
@@ -52,7 +52,7 @@ except:
 
 c = conn.cursor()
 
-print "Extracting run"
+print "Extracting trace"
 c.execute('SELECT device_id,hour,day_of_week,longitude,latitude FROM averaged_location WHERE device_id = %s', (str(DEV_ID),))
 dat = array(c.fetchall(),dtype={'names':['d_id', 'H', 'DoW', 'lon', 'lat'], 'formats':['i4', 'i4', 'i4', 'f4','f4']})
 run = column_stack([dat['lon'],dat['lat']])
@@ -64,15 +64,19 @@ X = column_stack([dat['lon'],dat['lat'],dat['H'],dat['DoW']])
 #
 ##################################################################################
 
-print "Extracting nodes"
-nodes = array(c.execute('SELECT longitude, latitude FROM cluster_centers WHERE d_id = %s', (str(DEV_ID),)).fetchall())
+print "Extracting waypoints"
+c.execute('SELECT latitude, longitude FROM cluster_centers WHERE device_id = %s', (str(DEV_ID),))
+rows = c.fetchall()
+nodes = array(rows)
 
+#for i in range(len(nodes)):
+#    print i, nodes[i]
 ##################################################################################
 #
 # Snapping
 #
 ##################################################################################
-print "Snapping"
+print "Snapping to ", len(nodes)," waypoints"
 y = snap(run,nodes)
 
 #for i in range(10):
@@ -115,7 +119,7 @@ y = snap(run,nodes)
 #      distance_from(hour,k)              # i.e., k-oclock - hour
 #   2. day-of-week
 
-print "Filter out non-movement ..."
+print "Filter out non-movement (points which are repeated ",win_past," times) ..."
 X,y = filter(X,y,win_past)
 
 print "Stack into ML dataset ..."
@@ -125,8 +129,8 @@ print "Prepare model ..."
 from sklearn import ensemble
 from ML import *
 
-L = win_future
-_h = ensemble.RandomForestClassifier():
+L = win_futr
+_h = ensemble.RandomForestClassifier()
 h = ML(L,_h)
 
 print "Build model ..."
