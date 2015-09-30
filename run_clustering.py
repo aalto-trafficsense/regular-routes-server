@@ -21,15 +21,19 @@ test = array(rows)
 #.fetchall()
 print test
 
-print "Loading Device IDs ..."
+print "Drop cluster_centers Table...",
+c.execute('DELETE FROM cluster_centers')
+
+print "Loading Device IDs ...",
 c.execute('SELECT DISTINCT device_id FROM averaged_location')
 rows = c.fetchall()
 ids = array(rows ,dtype={'names':['d_id'], 'formats':['i4']})
+print ids
 
 for i in ids:
     d_id = i[0]
-    print "Loading Waypoints for Device ID ", d_id, "..."
-    c.execute('SELECT longitude,latitude,time_stamp,device_id FROM averaged_location WHERE device_id = %s', str(d_id,))
+    print "Loading Waypoints for Device ID _"+str(d_id)+"_ ..."
+    c.execute('SELECT longitude,latitude,time_stamp,device_id FROM averaged_location WHERE device_id = %s', (str(d_id),))
     rows = c.fetchall()
     dat = array(rows, dtype={'names':['lon', 'lat', 't', 'd_id'], 'formats':['f4','f4','f4','i4']})
     X = column_stack([dat['lat'],dat['lon']])
@@ -44,13 +48,17 @@ for i in ids:
         h = KMeans(50, max_iter=100, n_init=1)
         h.fit(X)
         labels = h.labels_
+        clusters = h.cluster_centers_
+        print " ... made ", len(labels), "clusters."
 
         print "Inserting Cluster Centres ..."
-        for k in labels:
-            sql = "INSERT INTO cluster_centers (longitude, latitude, device_id) VALUES (%s, %s, %s)"
-            c.execute(sql, k[0], k[1], i)
+        for k in range(50):
+            sql = "INSERT INTO cluster_centers (longitude, latitude, cluster_id, device_id) VALUES (%s, %s, %s, %s)"
+            #print k, d_id, clusters[k,0], clusters[k,1], clusters.shape, labels[k]
+            c.execute(sql, (str(clusters[k,0]), str(clusters[k,1]), str(k),  str(d_id)))
 
         print "Commit"
         conn.commit()
+
 
 print "Done"
