@@ -43,3 +43,12 @@ CREATE TABLE cluster_centers (
   latitude float,
   location geography(Point,4326)
 );
+
+DROP TABLE IF EXISTS predictions;
+
+CREATE TABLE predictions (
+  device_id int,
+  cluster_id bigint,
+  time_stamp timestamp,
+  time_index integer
+);
