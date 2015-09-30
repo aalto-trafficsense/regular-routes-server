@@ -52,3 +52,7 @@ CREATE TABLE predictions (
   time_stamp timestamp,
   time_index integer
 );
+
+CREATE TABLE pred_temp AS 
+	SELECT p.device_id, c.location FROM predictions as p, cluster_centers as p 
+		WHERE p.device_id = c.device_id AND p.cluster_id = c.cluster_id
