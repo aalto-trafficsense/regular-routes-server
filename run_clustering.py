@@ -53,9 +53,9 @@ for i in ids:
 
         print "Inserting Cluster Centres ..."
         for k in range(50):
-            sql = "INSERT INTO cluster_centers (longitude, latitude, cluster_id, device_id) VALUES (%s, %s, %s, %s)"
+            sql = "INSERT INTO cluster_centers (longitude, latitude, location, cluster_id, device_id) VALUES (%s, %s, ST_MakePoint(%s,%s), %s, %s)"
             #print k, d_id, clusters[k,0], clusters[k,1], clusters.shape, labels[k]
-            c.execute(sql, (str(clusters[k,0]), str(clusters[k,1]), str(k),  str(d_id)))
+            c.execute(sql, (str(clusters[k,0]), str(clusters[k,1]), str(clusters[k,0]), str(clusters[k,1]), str(k),  str(d_id)))
 
         print "Commit"
         conn.commit()
