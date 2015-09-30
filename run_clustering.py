@@ -22,13 +22,18 @@ test = array(rows)
 print test
 
 print "Loading Device IDs ..."
-result = c.execute('SELECT DISTINCT device_id FROM data_averaged').fetchall()
-ids = array(result ,dtype={'names':['d_id'], 'formats':['i4']})
+c.execute('SELECT DISTINCT device_id FROM averaged_location')
+rows = c.fetchall()
+ids = array(rows ,dtype={'names':['d_id'], 'formats':['i4']})
 
 for i in ids:
-    print "Loading Waypoints for Device ID ", i, "..."
-    dat = array(c.execute('SELECT longitude,latitude,time_stamp,device_id FROM data_averaged WHERE device_id=?', (i,)).fetchall(),dtype={'names':['lon', 'lat', 't', 'd_id'], 'formats':['f4','f4','f4','i4']})
+    d_id = i[0]
+    print "Loading Waypoints for Device ID ", d_id, "..."
+    c.execute('SELECT longitude,latitude,time_stamp,device_id FROM averaged_location WHERE device_id = %s', str(d_id,))
+    rows = c.fetchall()
+    dat = array(rows, dtype={'names':['lon', 'lat', 't', 'd_id'], 'formats':['f4','f4','f4','i4']})
     X = column_stack([dat['lat'],dat['lon']])
+    print "This device has", X.shape[0], "entries"
     
     if len(dat) < 50: 
         print "Not enough points for Clustering!"
