@@ -3,6 +3,7 @@
 # Small script to show PostgreSQL and Pyscopg together
 #
 
+from numpy import *
 import psycopg2
 
 try:
@@ -11,10 +12,18 @@ except:
     print "I am unable to connect to the database"
 
 
-cur = conn.cursor()
+c = conn.cursor()
+
+print "Test ..."
+c.execute('SELECT DISTINCT device_id FROM device_data')
+rows = c.fetchall()
+test = array(rows)
+#.fetchall()
+print test
 
 print "Loading Device IDs ..."
-ids = array(c.execute('SELECT UNIQUE device_id FROM data_averaged').fetchall(),dtype={'names':['d_id'], 'formats':['i4']})
+result = c.execute('SELECT DISTINCT device_id FROM data_averaged').fetchall()
+ids = array(result ,dtype={'names':['d_id'], 'formats':['i4']})
 
 for i in ids:
     print "Loading Waypoints for Device ID ", i, "..."
@@ -34,7 +43,7 @@ for i in ids:
         print "Inserting Cluster Centres ..."
         for k in labels:
             sql = "INSERT INTO cluster_centers (longitude, latitude, device_id) VALUES (%s, %s, %s)"
-            cur.execute(sql, k[0], k[1], i)
+            c.execute(sql, k[0], k[1], i)
 
         print "Commit"
         conn.commit()

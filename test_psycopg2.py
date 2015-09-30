@@ -13,7 +13,7 @@ except:
 
 cur = conn.cursor()
 try:
-    cur.execute("""SELECT * from device_data""")
+    cur.execute("""SELECT DISTINCT device_id from device_data LIMIT 10""")
 except:
     print "I can't SELECT from device_data"
 
