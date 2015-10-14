@@ -12,8 +12,10 @@ CAST(AVG(accuracy) as float) as accuracy,
 waypoint_id
 FROM device_data
 -- correct one is device_data
+WHERE (time > current_timestamp - interval '120 minutes') 
 GROUP BY device_id,year,day_of_year,hour,minute, device_data.time, device_data.waypoint_id
 ORDER BY device_id, time_stamp
+LIMIT 10
 ;
 
 
