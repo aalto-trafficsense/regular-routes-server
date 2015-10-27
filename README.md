@@ -1,24 +1,20 @@
-regular-routes-server
-=====================
+#regular-routes-server
 
-#Introduction
-"Learning Regular Routes" -server project contains server side code for learning regular routes project
+##Introduction
 
+"Learning Regular Routes" -server project contains the server-side code for the "learning regular routes"-project.
 
-#Setting up development environment checklist
+##Checklist for setting up a server development environment
 
-- db: Install Chef tools from regular-routes-devops repo
+- server setup: Install and initialize the server as detailed in the [reguler-routes-devops](https://github.com/aalto-trafficsense/regular-routes-devops) readme.
+- client setup: Build a corresponding client as detailed in the [regular-routes-client](https://github.com/aalto-trafficsense/regular-routes-client) readme.
 
-- client: Install JDK8 + Android SDK 
-- client: Install IntelliJ-Idea IDE for android client development 
+- server development: Install [PyCharm IDE](https://www.jetbrains.com/pycharm/) for web server / flask development 
+- server development: Install [Flask-classy](https://pythonhosted.org/Flask-Classy/)  (REST extension package; found from python repo & PyCharm package download list)
 
-- server: Install PyCharm IDE for web server / flask development 
-- server: Install Flask-classy  (REST extension pacakge; found from python repo & PyCharm package download list) 
+##Python virtualenv
 
-
-#Python virtualenv
-Basically virtualenv and pip should be the only global python packages. Virtualenv isolates the site-packages for each separate project, making it 
-easier to maintain them. More info at https://virtualenv.pypa.io/en/latest/virtualenv.html. Here's a guide for OSX.
+Basically [virtualenv](https://virtualenv.pypa.io/en/latest/virtualenv.html) and pip should be the only global python packages. Virtualenv isolates the site-packages for each separate project, making it easier to maintain them. Here's a guide for OSX.
   - install virtualenv
     - e.g. via pip, easy_install, apt-get
     $ sudo easy_install virtual env
@@ -30,4 +26,4 @@ easier to maintain them. More info at https://virtualenv.pypa.io/en/latest/virtu
     - go to the regular-routes-server folder
     $ source venv/bin/activate
 
-note: There is educational license available for Intellij-Idea and PyCharm ultimate versions with aalto email.
+_Note: There is an educational license available for Intellij-Idea and PyCharm ultimate versions with aalto email._
