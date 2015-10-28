@@ -1,6 +1,6 @@
 # Administrative SQL-scripts
 
-These scripts setup empty devices, users and device_data tables and built all related indexes and sequences.
+These scripts setup empty devices, users and device_data tables and build all related indexes and sequences.
 
 Some instructions for running psql scripts are available in the [regular-routes-server repository wiki](https://github.com/aalto-trafficsense/regular-routes-server/wiki/Terminal-commands-HOWTO). 
 
@@ -18,8 +18,8 @@ devices, users, device_data
 
 Expected to be used:
 * after `create_dudd.sql` to complete the setup
-* after restoring data, in case index- and sequence info did not resurrect from the dump.
+* after restoring data, in case index- and sequence info were not restored from the dump.
 
-_Note: The script includes a parameter for setting the current last element of the sequence. This is by default set to work over an empty table. If using `index_dudd.sql` to restore indexes to existing tables, uncomment and modify accordingly. The last number can be found with e.g. `SELECT MAX(id) FROM device_data ;`._
+_Note: The script includes a parameter for setting the last sequence element for all three tables. The script is by default set to work over an empty table, i.e. the number setting entries are commented out. If using `index_dudd.sql` to restore indexes to existing tables, uncomment the command and modify the number accordingly. The last number can be found with e.g. `SELECT MAX(id) FROM device_data ;`._
 
 
