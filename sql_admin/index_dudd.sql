@@ -1,6 +1,9 @@
 -- NOTE: If adding indexes to existing tables, look for "setval" below (users, devices and device_data),
 --       uncomment and set the numbers to match your latest id values. 
 
+CREATE EXTENSION postgis;
+CREATE TYPE activity_type_enum AS ENUM ('IN_VEHICLE', 'ON_BICYCLE', 'ON_FOOT', 'RUNNING', 'STILL', 'TILTING', 'UNKNOWN', 'WALKING');
+
 -- ********** USERS TABLE START ******************
 
 --
