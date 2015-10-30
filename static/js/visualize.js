@@ -20,8 +20,8 @@ $(document).ready(function() {
     map.data.setStyle(function(feature) {
 	var type = feature.getProperty('type');
 	var title = feature.getProperty('title');
-	var pointColor = 'black';
 	if (type === 'raw-point') {
+	    var pointColor = 'magenta';
 	    switch(feature.getProperty('activity')) {
 	    case 'ON_BICYCLE':
 		pointColor = 'green';
@@ -35,12 +35,15 @@ $(document).ready(function() {
 	    case 'TILTING':
 		pointColor = 'blue';
 		break;
+	    case 'STILL':
+		pointColor = 'white';
+		break;
 	    case 'UNKNOWN':
 		pointColor = 'gray';
 		break;
 	    default:
-		pointColor = 'white';
-	    }
+		pointColor = 'black';
+	    } // end-of-switch
 	    return {
 		icon: {
 		    path: google.maps.SymbolPath.CIRCLE,
