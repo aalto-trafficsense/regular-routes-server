@@ -411,6 +411,7 @@ def visualize_device_geojson(device_id):
             'geometry': point_geo,
             'properties': {
                 'type': 'raw-point',
+                'activity': str(point['activity_1']),
                 'title': 'accuracy: %d\n%s' % (point['accuracy'], activity_info)
             }
         })
