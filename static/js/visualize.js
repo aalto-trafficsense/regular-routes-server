@@ -25,7 +25,7 @@ $(document).ready(function() {
         icon: {
           path: google.maps.SymbolPath.CIRCLE,
           scale: 3,
-          strokeColor: '#ff00ff',
+          strokeColor: '#0000ff',
           strokeOpacity: 0.5
         },
         title: title
