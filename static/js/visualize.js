@@ -60,7 +60,7 @@ $(document).ready(function() {
 		    scale: 3,
 		    fillColor: 'red',
 		    fillOpacity: 1.0,
-		    strokeColor: 'red'
+		    strokeColor: 'black'
 		},
 		title: title
 	    };
