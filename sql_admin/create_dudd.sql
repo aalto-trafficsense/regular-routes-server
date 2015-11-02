@@ -1,6 +1,9 @@
 SET client_encoding = 'UTF8';
 SET standard_conforming_strings = on;
 
+CREATE EXTENSION postgis;
+CREATE TYPE activity_type_enum AS ENUM ('IN_VEHICLE', 'ON_BICYCLE', 'ON_FOOT', 'RUNNING', 'STILL', 'TILTING', 'UNKNOWN', 'WALKING');
+
 --
 -- Name: users; Type: TABLE; Schema: public; Owner: regularroutes; Tablespace: 
 --
