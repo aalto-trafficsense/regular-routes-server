@@ -100,6 +100,7 @@ metadata.create_all(bind=db.engine, checkfirst=True)
 
 # REST interface:
 
+
 @app.route('/register', methods=['POST'])
 def register_post():
     """
@@ -447,7 +448,117 @@ def visualize_device_geojson(device_id):
     return jsonify(geojson)
 
 
+
+@app.route("/grade_date/<requested_date>")
+def grade_date(requested_date):
+    date_start = requested_date
+    date_end = str(datetime.datetime.strptime(requested_date, '%Y-%m-%d').date() + timedelta(days=1))
+    return_string = ""
+    device_id_rows = get_distinct_device_ids(date_start, date_end)
+    for row in device_id_rows:
+        device_id = str(row["device_id"])
+        return_string += "DEVICE: " + device_id + "<br>"
+        device_data_rows = data_points_snapping(device_id, str(date_start), str(date_end))
+        return_string += calculate_rating(device_data_rows)
+        return_string += "<br><br><br>"
+
+    if return_string == "":
+        return_string = "No matches found!"
+
+    return return_string
+
+
 # Helper Functions:
+
+"""
+id integer NOT NULL,
+device_id integer NOT NULL,
+coordinate geography(Point,4326) NOT NULL,
+accuracy double precision NOT NULL,
+"time" timestamp without time zone NOT NULL,
+activity_1 activity_type_enum,
+activity_1_conf integer,
+activity_2 activity_type_enum,
+activity_2_conf integer,
+activity_3 activity_type_enum,
+activity_3_conf integer,
+waypoint_id bigint,
+snapping_time timestamp without time zone
+"""
+
+#activity_types = ('IN_VEHICLE', 'ON_BICYCLE', 'ON_FOOT', 'RUNNING', 'STILL', 'TILTING', 'UNKNOWN', 'WALKING')
+#good_activities = ('IN_VEHICLE', 'ON_BICYCLE', 'RUNNING', 'WALKING')
+def calculate_rating(device_data_rows):
+    rows = device_data_rows.fetchall()
+    bad_activities = ("UNKNOWN", "TILTING", "STILL")
+
+    in_vehicle_distance = 0
+    on_bicycle_distance = 0
+    walking_distance = 0
+    running_distance = 0
+    previous_time = rows[0]["time"]
+    current_activity = rows[0]["activity_1"]
+    previous_location = json.loads(rows[0]["geojson"])["coordinates"]
+
+    for row in rows[1:]:
+        if row["activity_1"] in bad_activities and current_activity == "UNKNOWN":
+            continue
+        current_activity = row["activity_1"]
+        current_time = row["time"]
+
+        if (current_time - previous_time).total_seconds() > 300:
+            previous_time = current_time
+            continue
+
+        current_location = json.loads(row["geojson"])["coordinates"]
+
+        distance = ((previous_location[0] - current_location[0]) * (previous_location[0] - current_location[0]) + (previous_location[1] - current_location[1]) * (previous_location[1] - current_location[1]))**0.5
+
+        if current_activity == "IN_VEHICLE":
+            in_vehicle_distance += distance
+        elif current_activity == "ON_BICYCLE":
+            on_bicycle_distance += distance
+        elif current_activity == "RUNNING":
+            running_distance += distance
+        elif current_activity == "WALKING":
+            walking_distance += distance
+
+    total_distance = in_vehicle_distance + on_bicycle_distance + walking_distance + running_distance
+    running_percentage = running_distance / total_distance
+    walking_percentage = walking_distance / total_distance
+    in_vehicle_percentage = in_vehicle_distance / total_distance
+    on_bicycle_percentage = on_bicycle_distance / total_distance
+
+    final_grade = on_bicycle_percentage * 10 + walking_percentage * 9 + running_percentage * 8 + in_vehicle_percentage * 1
+
+    return_string = "\
+    Distances:<br>\
+    In vehicle: {in_vehicle_distance}<br>\
+    On bicycle: {on_bicycle_distance}<br>\
+    Running: {running_distance}<br>\
+    Walking: {walking_distance}<br>\
+    Total: {total_distance}<br>\
+    <br>\
+    Percentages:<br>\
+    In vehicle: {in_vehicle_percentage}<br>\
+    On bicycle: {on_bicycle_percentage}<br>\
+    Running: {running_percentage}<br>\
+    Walking: {walking_percentage}<br>\
+    <br>\
+    GRADE: {final_grade}<br>".format(in_vehicle_distance=in_vehicle_distance,
+                                    on_bicycle_distance=on_bicycle_distance,
+                                    running_distance=running_distance,
+                                    walking_distance=walking_distance,
+                                    total_distance=total_distance,
+                                    in_vehicle_percentage=in_vehicle_percentage,
+                                    on_bicycle_percentage=on_bicycle_percentage,
+                                    running_percentage=running_percentage,
+                                    walking_percentage=walking_percentage,
+                                    final_grade=final_grade)
+    return str(return_string)
+
+
+
 
 
 def generate_csv(rows):
@@ -465,6 +576,15 @@ def generate_csv(rows):
         yield ';'.join(['"%s"' % (to_str(x)) for x in row]) + '\n'
 
 
+def get_distinct_device_ids(datetime_start, datetime_end):
+    return db.engine.execute(text('''
+        SELECT DISTINCT device_id
+        FROM device_data
+        WHERE time >= :date_start
+        AND time < :date_end;
+    '''), date_start=str(datetime_start), date_end=str(datetime_end))
+
+
 def data_points_snapping(device_id, datetime_start, datetime_end):
     qstart = '''
         SELECT id,
@@ -473,7 +593,8 @@ def data_points_snapping(device_id, datetime_start, datetime_end):
             activity_1, activity_1_conf,
             activity_2, activity_2_conf,
             activity_3, activity_3_conf,
-            waypoint_id
+            waypoint_id,
+            time
         FROM device_data
     '''
     if device_id == 0:
