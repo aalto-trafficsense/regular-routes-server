@@ -6,3 +6,5 @@ Flask-KVSession==0.6.1
 pyOpenSSL==0.14
 google-api-python-client==1.2
 numpy==1.6.1
+sklearn==0.10
+joblib==0.5.4
