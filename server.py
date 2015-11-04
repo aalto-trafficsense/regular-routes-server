@@ -13,6 +13,11 @@ from sqlalchemy.dialects.postgres import DOUBLE_PRECISION, TIMESTAMP, UUID
 from sqlalchemy.exc import DataError
 from sqlalchemy.sql import text, func, column, table, select
 from uuid import uuid4
+# for clustering
+from run_clustering import cluster
+from numpy import *
+import psycopg2
+from sklearn.cluster import KMeans
 
 SETTINGS_FILE_ENV_VAR = 'REGULARROUTES_SETTINGS'
 CLIENT_SECRET_FILE_NAME = 'client_secrets.json'
@@ -337,9 +342,10 @@ def learning_test():
 @app.route('/learning/make_clusters')
 def make_clusters():
     print 'Clustering ...'
-    #from run_clustering import cluster
-    #result_str = cluster(45)
-    #print 'Result: %s' % (result_str)
+    A = array([4., 4.])
+    #A = 23
+    result_str = str(A) #cluster(45)
+    return 'Result: %s' % (result_str)
 
 massive_advanced_csv_query = """
       SELECT
