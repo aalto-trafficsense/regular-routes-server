@@ -17,7 +17,7 @@ from uuid import uuid4
 from run_clustering import cluster
 from numpy import *
 import psycopg2
-import sklearn
+#import sklearn
 #from sklearn.cluster import KMeans
 
 SETTINGS_FILE_ENV_VAR = 'REGULARROUTES_SETTINGS'
