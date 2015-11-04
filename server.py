@@ -204,14 +204,17 @@ def authenticate_post():
 
 @app.route('/data', methods=['POST'])
 def data_post():
+    print '/data called'
     session_token = request.args['sessionToken']
     if session_token is None or session_token == '':
         abort(403)  # not authenticated user
 
+    print '/data session token ok'
     device_id = get_device_table_id_for_session(session_token)
     if device_id < 0:
         abort(403)  # not registered user
 
+    print '/data device_id ok'
     data_points = request.json['dataPoints']
 
     # Remember, if a single point fails, the whole batch fails
@@ -264,6 +267,7 @@ def data_post():
     for chunk in batch_chunks(data_points):
         batch = [prepare_point(x) for x in chunk]
         db.engine.execute(device_data_table.insert(batch))
+    print '/data exiting'
     return jsonify({
     })
 
