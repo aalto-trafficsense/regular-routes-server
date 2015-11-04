@@ -5,9 +5,9 @@ GeoAlchemy2==0.2.4
 Flask-KVSession==0.6.1
 pyOpenSSL==0.14
 google-api-python-client==1.2
-numpy==1.6.1
+numpy
 libatlas-dev
 libatlas3gf-base
 scipy
 sklearn
-joblib==0.5.7
+joblib
