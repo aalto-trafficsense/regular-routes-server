@@ -224,6 +224,8 @@ def data_post():
         for i in xrange(0, len(x), batch_size):
             yield x[i:i + batch_size]
 
+    print '/data checkpoint 1'
+
     def prepare_point(point):
         location = point['location']
 
@@ -263,6 +265,8 @@ def data_post():
                     result['activity_3'] = sorted_activities[2]['type']
                     result['activity_3_conf'] = sorted_activities[2]['confidence']
         return result
+
+    print '/data checkpoint 2'
 
     for chunk in batch_chunks(data_points):
         batch = [prepare_point(x) for x in chunk]
