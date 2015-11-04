@@ -553,7 +553,7 @@ def get_device_table_id(device_id, installation_id):
 def get_device_table_id_for_session(session_token):
     try:
         # TODO: Fix SQL injection
-        query = select([table('devices', column('id'))]).where("token='" + session_token + "'")
+        query = select([table('devices', column('id'))]).where(text("token='" + session_token + "'"))
         row = db.engine.execute(query).first()
         if not row:
             return -1
