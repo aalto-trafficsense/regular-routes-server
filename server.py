@@ -17,7 +17,8 @@ from uuid import uuid4
 from run_clustering import cluster
 from numpy import *
 import psycopg2
-from sklearn.cluster import KMeans
+import sklearn
+#from sklearn.cluster import KMeans
 
 SETTINGS_FILE_ENV_VAR = 'REGULARROUTES_SETTINGS'
 CLIENT_SECRET_FILE_NAME = 'client_secrets.json'
@@ -342,9 +343,9 @@ def learning_test():
 @app.route('/learning/make_clusters')
 def make_clusters():
     print 'Clustering ...'
-    A = array([4., 4.])
+    #A = array([4., 4.])
     #A = 23
-    result_str = str(A) #cluster(45)
+    result_str = "blah" #cluster(45)
     return 'Result: %s' % (result_str)
 
 massive_advanced_csv_query = """
