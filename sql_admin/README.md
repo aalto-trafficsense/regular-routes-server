@@ -2,14 +2,18 @@
 
 These scripts setup empty devices, users and device_data tables and build all related indexes and sequences.
 
-Some instructions for running psql scripts are available in the [regular-routes-server repository wiki](https://github.com/aalto-trafficsense/regular-routes-server/wiki/Terminal-commands-HOWTO). 
+Some instructions for running psql scripts are available in the [regular-routes-server repository wiki](https://github.com/aalto-trafficsense/regular-routes-server/wiki/Terminal-commands-HOWTO).
+
+Chef creates the database and default role (regularroutes) when setting up the server. The map-related tables are created in waypoint generation. If setting up the database without chef, start by creating the regularroutes role:
+
+    CREATE ROLE regularroutes WITH LOGIN PASSWORD 'qwerty';
 
 ## create_dudd.sql
 
 Creates the following tables:
 devices, users, device_data
 
-Chef creates the database when setting up the server. The map-related tables are created in waypoint generation. This script should be run after waypoint generation and chef setup scripts, when initiating a new server from scratch.
+This script should be run after waypoint generation and chef setup scripts, when initiating a new server from scratch.
 
 ## index_dudd.sql
 
