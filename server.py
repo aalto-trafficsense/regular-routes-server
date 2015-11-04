@@ -480,7 +480,7 @@ def verify_user_id(user_id):
         abort(403)
     try:
         # TODO: Fix SQL injection
-        query = select([table('users', column('id'))]).where("user_id='" + user_id + "'")
+        query = select([table('users', column('id'))]).where(text("user_id='" + user_id + "'"))
         row = db.engine.execute(query).first()
 
         if not row:
@@ -495,7 +495,7 @@ def verify_user_id(user_id):
 def verify_device_token(token):
     try:
         # TODO: Fix SQL injection
-        query = select([table('devices', column('id'))]).where("token='" + token + "'")
+        query = select([table('devices', column('id'))]).where(text("token='" + token + "'"))
         row = db.engine.execute(query).first()
 
         if not row:
@@ -516,7 +516,7 @@ def get_users_table_id_for_device(device_id, installation_id):
     try:
         # TODO: Fix SQL injection
         query = select([table('devices', column('user_id'))]).where(
-            "device_id='" + device_id + "' AND installation_id='" + installation_id + "'")
+            text("device_id='" + device_id + "' AND installation_id='" + installation_id + "'"))
         row = db.engine.execute(query).first()
         if not row:
             return -1
@@ -531,7 +531,7 @@ def get_device_table_id(device_id, installation_id):
     try:
         # TODO: Fix SQL injection
         query = select([table('devices', column('id'))]).where(
-            "device_id='" + device_id + "' AND installation_id='" + installation_id + "'")
+            text("device_id='" + device_id + "' AND installation_id='" + installation_id + "'"))
         row = db.engine.execute(query).first()
         if not row:
             return -1
@@ -545,7 +545,7 @@ def get_device_table_id(device_id, installation_id):
 def get_device_table_id_for_session(session_token):
     try:
         # TODO: Fix SQL injection
-        query = select([table('devices', column('id'))]).where("token='" + session_token + "'")
+        query = select([table('devices', column('id'))]).where(text("token='" + session_token + "'"))
         row = db.engine.execute(query).first()
         if not row:
             return -1
@@ -562,7 +562,7 @@ def get_users_table_id(user_id):
     """
     try:
         # TODO: Fix SQL injection
-        query = select([table('users', column('id'))]).where("user_id='" + user_id + "'")
+        query = select([table('users', column('id'))]).where(text("user_id='" + user_id + "'"))
         row = db.engine.execute(query).first()
         if not row:
             return -1
