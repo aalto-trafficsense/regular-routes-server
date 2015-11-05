@@ -10,11 +10,9 @@ Chef creates the database and default role (regularroutes) when setting up the s
 
 _Note: This assumes that no database exists, i.e. chef was not run._
 
-1) Run `$ ./initdb_server.sh <path-to-new-database-dir>`. The script creates the directory, initiates the database and starts the postgresql server. Leave running, can be closed later with CTRL-C.
-
-1) Switch to another terminal window.
-
-1) Run the init script on psql: `psql -U postgres -f init_rr.sql`
+1. Run `$ ./initdb_server.sh <path-to-new-database-dir>`. The script creates the directory, initiates the database and starts the postgresql server. Leave running, can be closed later with CTRL-C.
+1. Switch to another terminal window.
+1. Run the init script on psql: `psql -U postgres -f init_rr.sql`
 
 ## Restore user, device and device_data from backups
 
@@ -34,19 +32,16 @@ Check the result:
 
 Setup an empty database as above or DROP the previous tables.
 
-1) Run psql: `$ psql -U postgres`
-
-1) Create the tables: `postgres=# \i create_dudd.sql`
-
-1) Add sequences and indexes: `postgres=# \i index_dudd.sql`
+1. Run psql: `$ psql -U postgres`
+1. Create the tables: `postgres=# \i create_dudd.sql`
+1. Add sequences and indexes: `postgres=# \i index_dudd.sql`
 
 ## Repair indexes and sequences of a a partially restored table
 
 Adds the index and sequence information to the following tables:
 devices, users, device_data
 
-1) Run psql: `$ psql -U postgres`
-
-1) Add sequences and indexes: `postgres=# \i index_dudd.sql`
+1. Run psql: `$ psql -U postgres`
+1. Add sequences and indexes: `postgres=# \i index_dudd.sql`
 
 _Note: `index_dudd.sql` includes a parameter for setting the last sequence element for all three tables. The script is by default set to work over an empty table, i.e. the number setting entries are commented out. If using `index_dudd.sql` to restore indexes to existing tables, uncomment the command and modify the number accordingly. The last number can be found with e.g. `SELECT MAX(id) FROM device_data ;`._
