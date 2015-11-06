@@ -215,12 +215,10 @@ def data_post():
     if session_token is None or session_token == '':
         abort(403)  # not authenticated user
 
-    print '/data session token ok'
     device_id = get_device_table_id_for_session(session_token)
     if device_id < 0:
         abort(403)  # not registered user
 
-    print '/data device_id ok'
     data_points = request.json['dataPoints']
 
     # Remember, if a single point fails, the whole batch fails
@@ -229,8 +227,6 @@ def data_post():
     def batch_chunks(x):
         for i in xrange(0, len(x), batch_size):
             yield x[i:i + batch_size]
-
-    print '/data checkpoint 1'
 
     def prepare_point(point):
         location = point['location']
@@ -272,11 +268,15 @@ def data_post():
                     result['activity_3_conf'] = sorted_activities[2]['confidence']
         return result
 
-    print '/data checkpoint 2'
-
     for chunk in batch_chunks(data_points):
-        batch = [prepare_point(x) for x in chunk]
-        db.engine.execute(device_data_table.insert(batch))
+        try:
+            batch = [prepare_point(x) for x in chunk]
+        except Exception as e:
+            print('/data Prepare_point exception: '+e.message)
+        try:
+            db.engine.execute(device_data_table.insert(batch))
+        except Exception as e:
+            print('/data db.engine.execute exception: '+e.message)
     print '/data exiting'
     return jsonify({
     })
