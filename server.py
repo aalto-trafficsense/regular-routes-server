@@ -14,9 +14,9 @@ from sqlalchemy.exc import DataError
 from sqlalchemy.sql import text, func, column, table, select
 from uuid import uuid4
 # for clustering
-from run_clustering import cluster
-from numpy import *
-import psycopg2
+# from run_clustering import cluster
+# from numpy import *
+# import psycopg2
 #import sklearn
 #from sklearn.cluster import KMeans
 
