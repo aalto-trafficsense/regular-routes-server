@@ -272,6 +272,8 @@ def data_post():
             else:
                 result['activity_2'] = 'UNKNOWN'
                 result['activity_2_conf'] = 0
+                result['activity_3'] = 'UNKNOWN'
+                result['activity_3_conf'] = 0
 
         return result
 
