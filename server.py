@@ -154,8 +154,8 @@ def register_post():
         print 're-registration for same user detected -> using existing user account'
         stmt = users_table.update().values({'google_refresh_token': str(validation_data['refresh_token']),
                                             'google_server_access_token': str(
-                                                validation_data['access_token'])}).where(
-            'id={0}'.format(str(users_table_id)))
+                                                validation_data['access_token'])}).where(text(
+            'id={0}'.format(str(users_table_id))))
 
         db.engine.execute(stmt)
 
@@ -507,8 +507,8 @@ def verify_device_token(token):
 
 
 def update_last_activity(devices_table_id):
-    update = devices_table.update().values({'last_activity': datetime.datetime.now()}).where(
-        "id=" + str(devices_table_id))
+    update = devices_table.update().values({'last_activity': datetime.datetime.now()}).where(text(
+        "id=" + str(devices_table_id)))
     db.engine.execute(update)
 
 
@@ -578,7 +578,7 @@ def get_session_token_for_device(devices_table_id):
         return None
     try:
         # TODO: Fix SQL injection
-        query = select([table('devices', column('token'))]).where("id='" + str(devices_table_id) + "'")
+        query = select([table('devices', column('token'))]).where(text("id='" + str(devices_table_id) + "'"))
         row = db.engine.execute(query).first()
         if not row:
             return None
