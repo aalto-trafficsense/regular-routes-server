@@ -3,6 +3,7 @@
 import json
 import hashlib
 import geoalchemy2 as ga2
+import math
 from datetime import date, timedelta
 from flask import Flask, abort, jsonify, request, render_template, Response
 from flask.ext.sqlalchemy import SQLAlchemy
@@ -13,6 +14,7 @@ from sqlalchemy.dialects.postgres import DOUBLE_PRECISION, TIMESTAMP, UUID
 from sqlalchemy.exc import DataError
 from sqlalchemy.sql import text, func, column, table, select
 from uuid import uuid4
+
 
 SETTINGS_FILE_ENV_VAR = 'REGULARROUTES_SETTINGS'
 CLIENT_SECRET_FILE_NAME = 'client_secrets.json'
@@ -503,7 +505,17 @@ def calculate_rating(device_data_rows):
 
         current_location = json.loads(row["geojson"])["coordinates"]
 
-        distance = ((previous_location[0] - current_location[0]) * (previous_location[0] - current_location[0]) + (previous_location[1] - current_location[1]) * (previous_location[1] - current_location[1]))**0.5
+        # from: http://stackoverflow.com/questions/1253499/simple-calculations-for-working-with-lat-lon-km-distance
+        # The approximate conversions are:
+        # Latitude: 1 deg = 110.574 km
+        # Longitude: 1 deg = 111.320*cos(latitude) km
+
+        xdiff = (previous_location[0] - current_location[0]) * 110.320 * math.cos(current_location[1] / 360 * math.pi)
+        ydiff = (previous_location[1] - current_location[1]) * 110.574
+
+        distance = (xdiff * xdiff + ydiff * ydiff)**0.5
+
+        previous_location = current_location
 
         if current_activity == "IN_VEHICLE":
             in_vehicle_distance += distance
@@ -546,7 +558,7 @@ def calculate_rating(device_data_rows):
                                     running_percentage=running_percentage,
                                     walking_percentage=walking_percentage,
                                     final_grade=final_grade)
-    return str(return_string)
+    return return_string
 
 
 
