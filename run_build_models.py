@@ -10,25 +10,25 @@
     defaults:                            (10)        (20)   
 '''
 
-def train(dev_id,win_past=5,win_futr=5):
+# Scientific Libraries
+from numpy import *
+set_printoptions(precision=5, suppress=True)
 
-	dev_id = int(DEV_ID)
+# Provides snapping and stacking functionality
+import sys
+sys.path.append("./src")
+from utils import *
 
-	# Scientific Libraries
-	from numpy import *
-	set_printoptions(precision=5, suppress=True)
+import joblib
+import psycopg2
 
-	# Provides snapping and stacking functionality
-	import sys
-	sys.path.append("./src")
-	from utils import *
+def train(DEV_ID,win_past=5,win_futr=5):
 
 	##################################################################################
 	#
 	# Load trace
 	#
 	##################################################################################
-	import psycopg2
 
 	try:
 	    conn = psycopg2.connect("dbname='regularroutes' user='regularroutes' host='localhost' password='TdwqStUh5ptMLeNl' port=5432")
@@ -112,7 +112,7 @@ def train(dev_id,win_past=5,win_futr=5):
 
 	print "Prepare model ..."
 	from sklearn import ensemble
-	from ML import *
+	from ML import ML
 
 	L = win_futr
 	_h = ensemble.RandomForestClassifier()
@@ -122,7 +122,6 @@ def train(dev_id,win_past=5,win_futr=5):
 	h.train(X,Y)
 
 	print "Dump model to disk ..."
-	import joblib
 	fname = "./dat/model_dev"+str(DEV_ID)+".model"
 	joblib.dump( h,  fname)
 
@@ -130,6 +129,9 @@ def train(dev_id,win_past=5,win_futr=5):
 
 	return "OK! "+str(DEV_ID)+" Successfully built!"
 
+
+if __name__ == '__main__':
+    train(45)
 
 #import sys
 #

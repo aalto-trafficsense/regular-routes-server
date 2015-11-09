@@ -17,92 +17,94 @@ from utils import *
 
 ##################################################################################
 #
-# Options       
-#
-##################################################################################
-
-DEV_ID = 77
-if len(sys.argv) > 3:
-    DEV_ID = int(sys.argv[3])
-
-# PREDICTION WINDOWS (PAST/FUTURE)
-win_past = 5
-win_futr = 5
-if len(sys.argv) > 1:
-    win_past = int(sys.argv[1])
-if len(sys.argv) > 2:
-    win_futr = int(sys.argv[2])
-
-##################################################################################
-#
 # Load trace
 #
 ##################################################################################
 import psycopg2
 
-try:
-    conn = psycopg2.connect("dbname='regularroutes' user='regularroutes' host='localhost' password='TdwqStUh5ptMLeNl' port=5432")
-except:
-    print "I am unable to connect to the database"
+def predict(DEV_ID,win_past=5,win_futr=5):
 
-c = conn.cursor()
+    try:
+        conn = psycopg2.connect("dbname='regularroutes' user='regularroutes' host='localhost' password='TdwqStUh5ptMLeNl' port=5432")
+    except:
+        print "I am unable to connect to the database"
 
-print "Extracting trace"
-c.execute('SELECT device_id,hour,day_of_week,longitude,latitude FROM averaged_location WHERE device_id = %s ORDER BY time_stamp DESC LIMIT 100', (str(DEV_ID),))
-dat = array(c.fetchall(),dtype={'names':['d_id', 'H', 'DoW', 'lon', 'lat'], 'formats':['i4', 'i4', 'i4', 'f4','f4']})
-run = column_stack([dat['lon'],dat['lat']])
-X = column_stack([dat['lon'],dat['lat'],dat['H'],dat['DoW']])
-print X
+    c = conn.cursor()
 
-##################################################################################
-#
-# Extract nodes
-#
-##################################################################################
+    ##################################################################################
+    #
+    # Extract trace (most recent points)
+    #
+    ##################################################################################
 
-print "Extracting waypoints"
-c.execute('SELECT latitude, longitude FROM cluster_centers WHERE device_id = %s', (str(DEV_ID),))
-rows = c.fetchall()
-nodes = array(rows)
+    print "Extracting trace (previous 100 points)"
+    c.execute('SELECT device_id,hour,day_of_week,longitude,latitude FROM averaged_location WHERE device_id = %s ORDER BY time_stamp DESC LIMIT 100', (str(DEV_ID),))
+    dat = array(c.fetchall(),dtype={'names':['d_id', 'H', 'DoW', 'lon', 'lat'], 'formats':['i4', 'i4', 'i4', 'f4','f4']})
+    run = column_stack([dat['lon'],dat['lat']])
+    X = column_stack([dat['lon'],dat['lat'],dat['H'],dat['DoW']])
+    print X
 
-#for i in range(len(nodes)):
-#    print i, nodes[i]
-##################################################################################
-#
-# Snapping
-#
-##################################################################################
-print "Snapping to ", len(nodes)," waypoints"
-y = snap(run,nodes)
+    ##################################################################################
+    #
+    # Extract nodes
+    #
+    ##################################################################################
 
-print y
+    print "Extracting waypoints"
+    c.execute('SELECT latitude, longitude FROM cluster_centers WHERE device_id = %s', (str(DEV_ID),))
+    rows = c.fetchall()
+    nodes = array(rows)
 
-print "Stack into ML dataset ..."
-X,Y = stack(X,y,win_past,win_futr)
+    ##################################################################################
+    #
+    # Snapping
+    #
+    ##################################################################################
+    print "Snapping to ", len(nodes)," waypoints"
+    y = snap(run,nodes)
 
-#print X.shape
-#print Y.shape
+    print y
 
-print "Load model ..."
-from sklearn import ensemble
-from ML import *
+    print "Stack into ML dataset ..."
+    X,Y = stack(X,y,win_past,win_futr)
 
-import joblib
-fname = "./dat/model_dev"+str(DEV_ID)+".model"
-h = joblib.load( fname)
+    #print X.shape
+    #print Y.shape
 
-print X.shape
-x = X[-1,:]
-print "x=", x.shape
+    print "Load model ..."
+    from sklearn import ensemble
+    from ML import *
 
-print "Prediction: " ,
+    import joblib
+    fname = "./dat/model_dev"+str(DEV_ID)+".model"
+    h = joblib.load( fname)
 
-yp = h.predict(array([x]))[0]
-print yp
+    print X.shape
+    x = X[-1,:]
+    print "x=", x.shape
 
-print "Committing to table ... " ,
-for t in range(len(yp)):
-    sql = "INSERT INTO predictions (device_id, cluster_id, time_stamp, time_index) VALUES (%s, %s, NOW(), %s)"
-    c.execute(sql, (str(DEV_ID), str(yp[t]), str(t+1)))
+    print "Prediction: " ,
 
-conn.commit()
+    yp = h.predict(array([x]))[0]
+    print yp
+
+    print "Committing to table ... " ,
+    for t in range(len(yp)):
+        sql = "INSERT INTO predictions (device_id, cluster_id, time_stamp, time_index) VALUES (%s, %s, NOW(), %s)"
+        c.execute(sql, (str(DEV_ID), str(yp[t]), str(t+1)))
+
+    conn.commit()
+
+    c.execute('SELECT cluster_centers.cluster_id, longitude, latitude, time_stamp, time_index FROM predictions, cluster_centers WHERE cluster_centers.cluster_id = predictions.cluster_id ')
+    return array(c.fetchall())
+
+if __name__ == '__main__':
+    data = predict(45)
+    from run_visualise import plot_trace
+    da = zeros((10,2))
+    da[:,0] = data[0:10,2]
+    da[:,1] = data[0:10,1]
+    print da
+    plot_trace(da)
+
+
