@@ -259,6 +259,14 @@ def data_post():
                 if len(sorted_activities) > 2:
                     result['activity_3'] = sorted_activities[2]['type']
                     result['activity_3_conf'] = sorted_activities[2]['confidence']
+                else:
+                    result['activity_3'] = 'UNKNOWN'
+                    result['activity_3_conf'] = 0
+            else:
+                result['activity_2'] = 'UNKNOWN'
+                result['activity_2_conf'] = 0
+                result['activity_3'] = 'UNKNOWN'
+                result['activity_3_conf'] = 0
         return result
 
     for chunk in batch_chunks(data_points):
