@@ -4,6 +4,7 @@ import json
 import hashlib
 import geoalchemy2 as ga2
 import math
+import svgwrite
 from datetime import date, timedelta
 from flask import Flask, abort, jsonify, request, render_template, Response
 from flask.ext.sqlalchemy import SQLAlchemy
@@ -44,6 +45,12 @@ https://developer.android.com/reference/com/google/android/gms/location/Detected
 '''
 activity_types = ('IN_VEHICLE', 'ON_BICYCLE', 'ON_FOOT', 'RUNNING', 'STILL', 'TILTING', 'UNKNOWN', 'WALKING')
 activity_type_enum = Enum(*activity_types, name='activity_type_enum')
+
+#CO2 emissions per km:
+ON_BICYCLE_CO2 = 21
+WALKING_CO2 = 33
+RUNNING_CO2 = 47
+IN_VEHICLE_CO2 = 150
 
 # Schema definitions:
 
@@ -461,7 +468,7 @@ def grade_date(requested_date):
         device_id = str(row["device_id"])
         return_string += "DEVICE: " + device_id + "<br>"
         device_data_rows = data_points_snapping(device_id, str(date_start), str(date_end))
-        return_string += calculate_rating(device_data_rows)
+        return_string += rating_to_string(calculate_rating(device_data_rows))
         return_string += "<br><br><br>"
 
     if return_string == "":
@@ -469,10 +476,62 @@ def grade_date(requested_date):
 
     return return_string
 
+@app.route("/svg")
+def svg():
+    device_data_rows = data_points_snapping(80, "2015-09-14", "2015-09-15")
+    rating = calculate_rating(device_data_rows)
+    energy_rating = (rating.average_co2 - ON_BICYCLE_CO2) / IN_VEHICLE_CO2 # value becomes 0-1 with 1 being the worst.
+
+    colours = (svgwrite.rgb(0,140,88), svgwrite.rgb(32,172,41), svgwrite.rgb(173,213,0), svgwrite.rgb(247,247,0), svgwrite.rgb(246,189,0), svgwrite.rgb(230,99,19), svgwrite.rgb(221,0,32))
+    letters = "ABCDEFG"
+    svg_drawing = svgwrite.Drawing(profile="full")
+    for i in range(len(colours)):
+        #Draw the energy rating bars
+        x_left = 5
+        x_right = 155 + 10 * i
+        x_arrow_tip = x_right + 15
+        y_top = 5 + 30 * i
+        y_bottom = y_top + 26 #height is 26 units + 5 units gap between bars
+        y_arrow_tip = (y_top + y_bottom) / 2
+        svg_drawing.add(svg_drawing.polygon(((x_left, y_top), (x_right, y_top), (x_arrow_tip, y_arrow_tip), (x_right, y_bottom), (x_left, y_bottom)), fill=colours[i], stroke=colours[i]))
+        svg_drawing.add(svg_drawing.text(letters[i], insert=(x_right - 17, y_bottom - 3), fill=svgwrite.rgb(255,255,255), stroke=svgwrite.rgb(50,50,50), stroke_width=0.5, font_size=26, font_family="Helvetica", font_weight="bold"))
+
+    #Draw pointer
+    x_arrow_tip = (len(colours) - 1) * 10 * energy_rating + 175
+    x_right = x_arrow_tip + 20
+    y_top = 5 + energy_rating * (len(colours) - 1) * 30
+    y_bottom = y_top + 26
+    y_arrow_tip = (y_top + y_bottom) / 2
+    svg_drawing.add(svg_drawing.polygon(((x_arrow_tip, y_arrow_tip), (x_right, y_top), (x_right, y_bottom)), fill=svgwrite.rgb(0,0,0), stroke=svgwrite.rgb(0,0,0)))
+
+    svg_drawing.add(svg_drawing.text("Average CO2 emission (g): " + str(rating.average_co2), insert=(5, len(colours) * 30 + 25), fill=svgwrite.rgb(0,0,0), stroke=svgwrite.rgb(0,0,0), stroke_width=1, font_size=16, font_family="Helvetica"))
+    svg_drawing.add(svg_drawing.text("Total CO2 emission (g): " + str(rating.total_co2), insert=(5, len(colours) * 30 + 45), fill=svgwrite.rgb(0,0,0), stroke=svgwrite.rgb(0,0,0), stroke_width=1, font_size=16, font_family="Helvetica"))
+    return svg_drawing.tostring()
+
+
+
 
 # Helper Functions:
 
-"""
+
+class EnergyRating:
+    def __init__(self, in_vehicle_distance, on_bicycle_distance, running_distance, walking_distance):
+        self.in_vehicle_distance = in_vehicle_distance
+        self.on_bicycle_distance = on_bicycle_distance
+        self.running_distance = running_distance
+        self.walking_distance = walking_distance
+        self.total_distance = in_vehicle_distance + on_bicycle_distance + walking_distance + running_distance
+        self.running_percentage = running_distance / self.total_distance
+        self.walking_percentage = walking_distance / self.total_distance
+        self.in_vehicle_percentage = in_vehicle_distance / self.total_distance
+        self.on_bicycle_percentage = on_bicycle_distance / self.total_distance
+        self.average_co2 = self.on_bicycle_percentage * ON_BICYCLE_CO2 + self.walking_percentage * WALKING_CO2 + self.running_percentage * RUNNING_CO2 + self.in_vehicle_percentage * IN_VEHICLE_CO2
+        self.total_co2 = self.on_bicycle_distance * ON_BICYCLE_CO2 + self.walking_distance * WALKING_CO2 + self.running_distance * RUNNING_CO2 + self.in_vehicle_distance * IN_VEHICLE_CO2
+
+
+
+
+'''
 id integer NOT NULL,
 device_id integer NOT NULL,
 coordinate geography(Point,4326) NOT NULL,
@@ -486,7 +545,7 @@ activity_3 activity_type_enum,
 activity_3_conf integer,
 waypoint_id bigint,
 snapping_time timestamp without time zone
-"""
+'''
 
 #activity_types = ('IN_VEHICLE', 'ON_BICYCLE', 'ON_FOOT', 'RUNNING', 'STILL', 'TILTING', 'UNKNOWN', 'WALKING')
 #good_activities = ('IN_VEHICLE', 'ON_BICYCLE', 'RUNNING', 'WALKING')
@@ -535,14 +594,11 @@ def calculate_rating(device_data_rows):
         elif current_activity == "WALKING":
             walking_distance += distance
 
-    total_distance = in_vehicle_distance + on_bicycle_distance + walking_distance + running_distance
-    running_percentage = running_distance / total_distance
-    walking_percentage = walking_distance / total_distance
-    in_vehicle_percentage = in_vehicle_distance / total_distance
-    on_bicycle_percentage = on_bicycle_distance / total_distance
 
-    final_grade = on_bicycle_percentage * 10 + walking_percentage * 9 + running_percentage * 8 + in_vehicle_percentage * 1
 
+    return EnergyRating(in_vehicle_distance, on_bicycle_distance, running_distance, walking_distance)
+
+def rating_to_string(energy_rating):
     return_string = "\
     Distances:<br>\
     In vehicle: {in_vehicle_distance}<br>\
@@ -557,16 +613,18 @@ def calculate_rating(device_data_rows):
     Running: {running_percentage}<br>\
     Walking: {walking_percentage}<br>\
     <br>\
-    GRADE: {final_grade}<br>".format(in_vehicle_distance=in_vehicle_distance,
-                                    on_bicycle_distance=on_bicycle_distance,
-                                    running_distance=running_distance,
-                                    walking_distance=walking_distance,
-                                    total_distance=total_distance,
-                                    in_vehicle_percentage=in_vehicle_percentage,
-                                    on_bicycle_percentage=on_bicycle_percentage,
-                                    running_percentage=running_percentage,
-                                    walking_percentage=walking_percentage,
-                                    final_grade=final_grade)
+    Average CO2 emission (g): {average_co2}<br>\
+    Total CO2 emission (g): {total_co2}<br>".format(in_vehicle_distance=energy_rating.in_vehicle_distance,
+                                    on_bicycle_distance=energy_rating.on_bicycle_distance,
+                                    running_distance=energy_rating.running_distance,
+                                    walking_distance=energy_rating.walking_distance,
+                                    total_distance=energy_rating.total_distance,
+                                    in_vehicle_percentage=energy_rating.in_vehicle_percentage,
+                                    on_bicycle_percentage=energy_rating.on_bicycle_percentage,
+                                    running_percentage=energy_rating.running_percentage,
+                                    walking_percentage=energy_rating.walking_percentage,
+                                    average_co2=energy_rating.average_co2,
+                                    total_co2=energy_rating.total_co2)
     return return_string
 
 
