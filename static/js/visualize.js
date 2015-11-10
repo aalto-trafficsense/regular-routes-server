@@ -27,7 +27,13 @@ $(document).ready(function() {
 		pointColor = 'green';
 		break;
 	    case 'ON_FOOT':
-		pointColor = 'lime';
+		pointColor = 'limegreen';
+		break;
+	    case 'WALKING':
+		pointColor = 'limegreen';
+		break;
+	    case 'RUNNING':
+		pointColor = 'greenyellow';
 		break;
 	    case 'IN_VEHICLE':
 		pointColor = 'red';
