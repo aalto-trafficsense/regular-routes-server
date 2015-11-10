@@ -476,6 +476,8 @@ def svg():
     colours = (svgwrite.rgb(0,140,88), svgwrite.rgb(32,172,41), svgwrite.rgb(173,213,0), svgwrite.rgb(247,247,0), svgwrite.rgb(246,189,0), svgwrite.rgb(230,99,19), svgwrite.rgb(221,0,32))
     letters = "ABCDEFG"
     svg_drawing = svgwrite.Drawing(profile="full")
+    svg_drawing.fit(horiz="left", vert="top")
+    #vg_drawing.add.viewbox(minx=0, miny=0, width=170 + 10 * (len(colours) - 1))
     for i in range(len(colours)):
         #Draw the energy rating bars
         x_left = 5
@@ -495,8 +497,10 @@ def svg():
     y_arrow_tip = (y_top + y_bottom) / 2
     svg_drawing.add(svg_drawing.polygon(((x_arrow_tip, y_arrow_tip), (x_right, y_top), (x_right, y_bottom)), fill=svgwrite.rgb(0,0,0), stroke=svgwrite.rgb(0,0,0)))
 
-    svg_drawing.add(svg_drawing.text("Average CO2 emission (g): " + str(rating.average_co2), insert=(5, len(colours) * 30 + 25), fill=svgwrite.rgb(0,0,0), stroke=svgwrite.rgb(0,0,0), stroke_width=1, font_size=16, font_family="Helvetica"))
-    svg_drawing.add(svg_drawing.text("Total CO2 emission (g): " + str(rating.total_co2), insert=(5, len(colours) * 30 + 45), fill=svgwrite.rgb(0,0,0), stroke=svgwrite.rgb(0,0,0), stroke_width=1, font_size=16, font_family="Helvetica"))
+    svg_drawing.viewbox(0,0,x_right + 150, y_bottom + 160)
+
+    svg_drawing.add(svg_drawing.text("Average CO2 emission (g/km): " + str(rating.average_co2), insert=(5, y_bottom + 70), fill=svgwrite.rgb(0,0,0), stroke=svgwrite.rgb(0,0,0), stroke_width=1, font_size=16, font_family="Helvetica"))
+    svg_drawing.add(svg_drawing.text("Total CO2 emission (g): " + str(rating.total_co2), insert=(5, y_bottom + 90), fill=svgwrite.rgb(0,0,0), stroke=svgwrite.rgb(0,0,0), stroke_width=1, font_size=16, font_family="Helvetica"))
     return svg_drawing.tostring()
 
 
