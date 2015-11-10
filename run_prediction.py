@@ -15,6 +15,10 @@ set_printoptions(precision=5, suppress=True)
 sys.path.append("./src")
 from utils import *
 
+from sklearn import ensemble
+from ML import *
+
+import joblib
 ##################################################################################
 #
 # Load trace
@@ -22,7 +26,15 @@ from utils import *
 ##################################################################################
 import psycopg2
 
-def predict(DEV_ID,win_past=5,win_futr=5):
+def predict(DEV_ID,win_past=5,win_futr=5,mod="EML",lim=0,commit_result=True):
+    '''
+        1. obtain full trace AFTER 'lim' (or else the most recent readings)
+        consider that points are new and haven't been snapped yet, so
+            2. fetch clusters from cluster_centers
+            3. snap full trace to clusters
+        4. load a model from disk
+        5. stack and TEST a model
+    '''
 
     try:
         conn = psycopg2.connect("dbname='regularroutes' user='regularroutes' host='localhost' password='TdwqStUh5ptMLeNl' port=5432")
@@ -37,12 +49,16 @@ def predict(DEV_ID,win_past=5,win_futr=5):
     #
     ##################################################################################
 
-    print "Extracting trace (previous 100 points)"
-    c.execute('SELECT device_id,hour,day_of_week,longitude,latitude FROM averaged_location WHERE device_id = %s ORDER BY time_stamp DESC LIMIT 100', (str(DEV_ID),))
+    if lim <= 0:
+        print "Extracting trace (previous 100 points)"
+        c.execute('SELECT device_id,hour,day_of_week,longitude,latitude FROM averaged_location WHERE device_id = %s ORDER BY time_stamp DESC LIMIT 100', (str(DEV_ID),))
+    else:
+        print "Extracting trace (points from timestamp %d onwards)" % (lim)
+        c.execute('SELECT device_id,hour,day_of_week,longitude,latitude FROM averaged_location WHERE device_id = %s AND time_stamp < %s ORDER BY time_stamp DESC', (str(DEV_ID),str(lim),))
     dat = array(c.fetchall(),dtype={'names':['d_id', 'H', 'DoW', 'lon', 'lat'], 'formats':['i4', 'i4', 'i4', 'f4','f4']})
     run = column_stack([dat['lon'],dat['lat']])
     X = column_stack([dat['lon'],dat['lat'],dat['H'],dat['DoW']])
-    print X
+    print "Extracted trace of ", len(run), "points."
 
     ##################################################################################
     #
@@ -60,43 +76,44 @@ def predict(DEV_ID,win_past=5,win_futr=5):
     # Snapping
     #
     ##################################################################################
-    print "Snapping to ", len(nodes)," waypoints"
+    print "Snapping past to these ", len(nodes)," waypoints"
     y = snap(run,nodes)
 
     print y
 
-    print "Stack into ML dataset ..."
-    X,Y = stack(X,y,win_past,win_futr)
+    print "Stack the ", y.shape, "points into an ML dataset ..."
+    X,Y = stack_stream(X,y,win_past,win_futr)
 
     #print X.shape
     #print Y.shape
 
-    print "Load model ..."
-    from sklearn import ensemble
-    from ML import *
-
-    import joblib
+    print "Load model from disk ..."
     fname = "./dat/model_dev"+str(DEV_ID)+".model"
     h = joblib.load( fname)
+    print "return ",  y.shape, "points into an ML dataset ..."
 
     print X.shape
-    x = X[-1,:]
-    print "x=", x.shape
+    # IF THIS IS A SINGLE ENTRY, WE WILL NEED TO RECUT IT WITH x = X[-1,:] AND THEN DO predict(x)[0]
+    #print "x=", x.shape
 
     print "Prediction: " ,
 
-    yp = h.predict(array([x]))[0]
-    print yp
+    yp = h.predict(X)
 
-    print "Committing to table ... " ,
-    for t in range(len(yp)):
-        sql = "INSERT INTO predictions (device_id, cluster_id, time_stamp, time_index) VALUES (%s, %s, NOW(), %s)"
-        c.execute(sql, (str(DEV_ID), str(yp[t]), str(t+1)))
+    if commit_result:
 
-    conn.commit()
+        print "Committing to table ... " ,
+        for t in range(len(yp)):
+            sql = "INSERT INTO predictions (device_id, cluster_id, time_stamp, time_index) VALUES (%s, %s, NOW(), %s)"
+            c.execute(sql, (str(DEV_ID), str(yp[t]), str(t+1)))
 
-    c.execute('SELECT cluster_centers.cluster_id, longitude, latitude, time_stamp, time_index FROM predictions, cluster_centers WHERE cluster_centers.cluster_id = predictions.cluster_id ')
-    return array(c.fetchall())
+        conn.commit()
+
+        c.execute('SELECT cluster_centers.cluster_id, longitude, latitude, predictions.time_stamp, time_index FROM predictions, cluster_centers WHERE cluster_centers.cluster_id = predictions.cluster_id ')
+        return array(c.fetchall()),None
+
+    else: 
+        return yp, y
 
 if __name__ == '__main__':
     data = predict(45)

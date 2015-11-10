@@ -88,7 +88,7 @@ def shufl(X,Y):
     random.shuffle(indices)
     return X[indices,:], Y[indices,:]
 
-def stack(X,y,win_past=5,win_futr=5):
+def stack_stream(X,y,win_past=5,win_futr=5):
     '''
         Stack
         -----
@@ -119,7 +119,7 @@ def stack(X,y,win_past=5,win_futr=5):
 #print XX
 #print YY
 
-def filter(X,y,n):
+def filter_stream(X,y,n):
     '''
         filter out all instances, where y[t] is the same for n timepoints in a row.
     '''

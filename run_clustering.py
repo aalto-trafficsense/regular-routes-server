@@ -8,6 +8,11 @@ from sklearn.cluster import KMeans
 import psycopg2
 
 def cluster(device_id):
+    '''
+        1. obtain full trace
+        2. make up clusters
+        3. inpute clusters into table cluster_centers
+    '''
     d_id = str(device_id)
 
     try:
@@ -51,11 +56,11 @@ def cluster(device_id):
         h.fit(X)
         labels = h.labels_
         clusters = h.cluster_centers_
-        print " ... made ", len(labels), "clusters."
+        print " ... made ", len(clusters), "clusters."
 
         print "Inserting Cluster Centres ..."
         for k in range(50):
-            sql = "INSERT INTO cluster_centers (longitude, latitude, location, cluster_id, device_id) VALUES (%s, %s, ST_MakePoint(%s,%s), %s, %s)"
+            sql = "INSERT INTO cluster_centers (longitude, latitude, location, cluster_id, device_id, time_stamp) VALUES (%s, %s, ST_MakePoint(%s,%s), %s, %s, NOW())"
             #print k, d_id, clusters[k,0], clusters[k,1], clusters.shape, labels[k]
             c.execute(sql, (str(clusters[k,0]), str(clusters[k,1]), str(clusters[k,0]), str(clusters[k,1]), str(k),  str(d_id)))
 
