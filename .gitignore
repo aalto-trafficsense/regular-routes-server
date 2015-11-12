@@ -1,3 +1,7 @@
+# Local configurations and secrets:
+regularroutes.cfg
+client_secrets.json
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
