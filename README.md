@@ -39,6 +39,7 @@ This is the procedure to set up an environment for developing server software on
 1. `File` `Open` your regular-routes-repository root folder. Some package installations should proceed based on the `requirements.txt` file in the folder.
 1. Install [Flask-classy](https://pythonhosted.org/Flask-Classy/)  (REST extension package; found from python repo & PyCharm package download list). Under PyCharm installations are done under `Preferences` `Project` `Project Interpreter`.
 1. Install any other packages, which might be missing (MJR: In my case psycopg2 refused to install from the `requirements.txt`, so installed it manually from PyCharm).
+1. Under `Run` `Edit configurations` set the working directory to point to your repository root.
 1. `Run 'regular-routes-server'`
 1. If no major problems occurred in startup, open a browser window and test. E.g. `http://localhost:5000/maintenance/duplicates` should receive a `0 duplicate data points were deleted` response. Other commands in the [command reference](https://github.com/aalto-trafficsense/regular-routes-server/wiki/Command-Reference).
 
