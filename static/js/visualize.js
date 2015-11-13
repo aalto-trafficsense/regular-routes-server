@@ -14,7 +14,7 @@ $(document).ready(function() {
     var mapCanvas = $('#map-canvas');
     var mapOptions = {
 	center: { lat: 60.1841396, lng: 24.8300838 },
-	zoom: 16
+	zoom: 12
     };
     var map = new google.maps.Map(mapCanvas[0], mapOptions);
     map.data.setStyle(function(feature) {
@@ -26,10 +26,8 @@ $(document).ready(function() {
 	    case 'ON_BICYCLE':
 		pointColor = 'green';
 		break;
-	    case 'ON_FOOT':
-		pointColor = 'limegreen';
-		break;
 	    case 'WALKING':
+	    case 'ON_FOOT':
 		pointColor = 'limegreen';
 		break;
 	    case 'RUNNING':
@@ -86,6 +84,14 @@ $(document).ready(function() {
 	$.getJSON('../visualize/' + device_id + '/geojson?date=' + date, function(response) {
 	    map.data.addGeoJson(response);
 	    mapCanvas.css('opacity', '');
+		if (response.features.length > 1) {
+			var bounds = new google.maps.LatLngBounds();
+			response.features.forEach(function (feature) {
+				var coords = feature.geometry.coordinates;
+		    	bounds.extend(new google.maps.LatLng(coords[1],coords[0]));
+			});
+			map.fitBounds(bounds);
+		}
 	});
     }
 });
