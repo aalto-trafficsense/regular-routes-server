@@ -24,17 +24,17 @@ $(document).ready(function() {
 	    var pointColor = 'magenta';
 	    switch(feature.getProperty('activity')) {
 	    case 'ON_BICYCLE':
-		pointColor = 'green';
+		pointColor = '#008c58';
 		break;
 	    case 'WALKING':
 	    case 'ON_FOOT':
-		pointColor = 'limegreen';
+		pointColor = '#20ac29';
 		break;
 	    case 'RUNNING':
-		pointColor = 'greenyellow';
+		pointColor = '#add500';
 		break;
 	    case 'IN_VEHICLE':
-		pointColor = 'red';
+		pointColor = '#dd0020';
 		break;
 	    case 'TILTING':
 		pointColor = 'blue';
