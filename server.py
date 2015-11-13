@@ -466,7 +466,7 @@ def generate_csv(rows):
 
 
 def data_points_snapping(device_id, datetime_start, datetime_end):
-    return db.engine.execute(text('''
+    qstart = '''
         SELECT id,
             ST_AsGeoJSON(coordinate) AS geojson,
             accuracy,
@@ -475,12 +475,23 @@ def data_points_snapping(device_id, datetime_start, datetime_end):
             activity_3, activity_3_conf,
             waypoint_id
         FROM device_data
+    '''
+    if device_id == 0:
+        qstring = qstart + '''
+        WHERE time >= :time_start
+        AND time < :time_end
+        ORDER BY time ASC
+    '''
+        points = db.engine.execute(text(qstring), time_start=datetime_start, time_end=datetime_end)
+    else:
+        qstring = qstart + '''
         WHERE device_id = :device_id
         AND time >= :time_start
         AND time < :time_end
         ORDER BY time ASC
-    '''), device_id=device_id, time_start=datetime_start, time_end=datetime_end)
-
+    '''
+        points =  db.engine.execute(text(qstring), device_id=device_id, time_start=datetime_start, time_end=datetime_end)
+    return points
 
 def verify_user_id(user_id):
     if user_id is None or user_id == '':
