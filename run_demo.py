@@ -9,6 +9,25 @@ import copy
 
 ##################################################################################
 #
+# Important Functions
+#
+##################################################################################
+
+def center(x,min_x,max_x):
+    return (x - min_x) / (max_x - min_x)
+
+def uncenter(x,min_x,max_x):
+    return x * ( max_x - min_x ) + min_x
+
+def coord_center(xy, mins, maxs):
+    c_xy = zeros(2)
+    for j in range(2):
+        c_xy[j] = center(xy[j],mins[j],maxs[j])
+    return c_xy
+
+
+##################################################################################
+#
 # Parameters
 #
 ##################################################################################
@@ -17,7 +36,7 @@ DEV_ID = 45
 bx = (60.1442, 24.6351, 60.3190, 25.1741)
 b = 10              # majic window parameter
 thres = 0.001       # relative movement threshold for not-filtering
-win_pred = 10       # how far to predict into the future
+T_p = 10       # how far to predict into the future
 
 ##################################################################################
 #
@@ -68,16 +87,17 @@ if False:
     c.execute('SELECT latitude, longitude FROM cluster_centers WHERE device_id = %s', (str(DEV_ID),))
     rows = c.fetchall()
     nodes = array(rows)
-    print nodes.shape
 
     print "Snapping past to these ", len(nodes)," waypoints"
     import sys
     sys.path.append("src/")
     from utils import snap
-    Y = snap(X[:,0:2],nodes)
+    Y = snap(X[:,0:2],nodes).astype(int)
 
+    savetxt('./dat/'+str(DEV_ID)+'_stream_nodes.csv', nodes, delimiter=',')
     savetxt('./dat/'+str(DEV_ID)+'_stream_Y.csv', Y, delimiter=',')
 
+nodes = genfromtxt('./dat/'+str(DEV_ID)+'_stream_nodes.csv', skip_header=0, delimiter=',')
 Y = genfromtxt('./dat/'+str(DEV_ID)+'_stream_Y.csv', skip_header=0, delimiter=',')
 
 ##################################################################################
@@ -85,12 +105,6 @@ Y = genfromtxt('./dat/'+str(DEV_ID)+'_stream_Y.csv', skip_header=0, delimiter=',
 # Transforming data
 #
 ##################################################################################
-
-def center(x,min_x,max_x):
-    return (x - min_x) / (max_x - min_x)
-
-def uncenter(x,min_x,max_x):
-    return x * ( max_x - min_x ) + min_x
 
 mins = zeros(4)
 maxs = zeros(4)
@@ -100,6 +114,7 @@ for j in range(4):
     maxs[j] = max(X[:,j])
 
 # Center the data
+X_raw = ones(X.shape) * X
 for j in range(4):
     X[:,j] = center(X[:,j],mins[j],maxs[j])
 
@@ -132,14 +147,18 @@ T,D = X.shape
 
 X_ = zeros(X.shape)
 X_[0:b,:] = X[0:b,:]
+y_ = zeros(Y.shape)
+y_[:] = Y[:]
 i = b
 for t in range(b,T):
     ee = X[t-b:t-1,0:2] - X[t,0:2]
     d = sqrt(max(ee[:,0])**2 + max(ee[:,1])**2)
     if d > thres:
         X_[i,:] = X[t,:]
+        y_[i] = Y[t]
         i = i + 1
 X = X_[0:i,:]
+Y = y_[0:i]
 print "... from ", T, "examples to", i
 
 T,D = X.shape
@@ -151,12 +170,18 @@ from sklearn.kernel_approximation import RBFSampler
 rbf = RBFSampler(gamma=1, random_state=1)
 sys.path.append("/home/jesse/Dropbox/Projects/ALife/mad")
 from RTF import RTF
+from STF import STF
 from MOP import linear
-H=100
-rtf = RTF(D,H,f=tanh,density=0.1)
+from MLP import sigmoid
+H=D*2+1 #20
+
+#rtf = RTF(D,H,f=linear,density=0.1)
+rtf = STF(D,H,f=sigmoid,fade_factor=0.9)
 Z = zeros((T,H))
 for t in range(T):
+    #print X[t,0:2], Y[t+1]
     Z[t] = rtf.phi(X[t])
+
 print "... turned ", X.shape, "into", Z.shape
 
 ##################################################################################
@@ -199,15 +224,26 @@ show()
 print "Setup"
 
 # Multi-output Regressior
-from MOR import MOR
-from sklearn.linear_model import SGDRegressor
+from sklearn.linear_model import SGDRegressor, SGDClassifier
 from sklearn.neighbors import KNeighborsRegressor
-h = MOR(2,SGDRegressor())
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.svm import SVC
+from sklearn import tree
+h = SVC()
+h = KNeighborsClassifier(n_neighbors=10)
+h = SGDClassifier()
+h = tree.DecisionTreeClassifier()
+#print Z[0:T-1].shape
+#print Y[1:T].shape
+h.fit(Z[0:T-1],Y[1:T])
+#h.fit(Z[0:b],Y[1:b+1])
+#h.partial_fit(Z[0:T-1],Y[1:T],classes=range(len(nodes)))
 #h.partial_fit(Z[0:b],X[1:b+1,0:2])
-h.fit(Z[0:T-1],X[1:T,0:2])
+g = tree.DecisionTreeClassifier()
+g.fit(Z[0:T-10],Y[10:T])
 
 # With init. batch of b, until T.
-window = zeros((b,2))
+window = zeros(b)
 history = zeros((T))
 
 fig = figure()
@@ -226,10 +262,13 @@ ax1.set_xlim([0,img.shape[1]]) #
 ax1.set_ylim([img.shape[0],0]) #
 #ax1.set_xlim([-0.1,+1.1])
 #ax1.set_ylim([-0.1,+1.1])
+mg, = ax1.plot(0,0,'go',markersize=10,linewidth=3)
 mp, = ax1.plot(0,0,'ro-',markersize=2,linewidth=3)
 m, = ax1.plot(0,0,'bo-',markersize=1,linewidth=3)
+node_pxs = map.to_pixels(nodes)
+n_, = ax1.plot(node_pxs[:,0],node_pxs[:,1],'mo',markersize=5)
 gs.tight_layout(fig)
-
+#fig.tight_layout()
 
 show()
 
@@ -237,43 +276,73 @@ def tick(xc,xp):
     return ""
 
 print "Go"
+yp = 0
 for t in range(b,T-1):
 
+    #######################
     # Plot the trace
+    #######################
     t0 = max(0,t-b)
-    MM = array(map.to_pixels(uncenter(X[t0:t,0],mins[0],maxs[0]),uncenter(X[t0:t,1],mins[1],maxs[1]))).T
-    #px, py = scaled2pixels(X[t0:t,0], X[t0:t,1], img.shape[1], img.shape[0], bx)
-    #print "PXY\n", px, py, MM.shape
-    m.set_xdata(MM[:,0])
-    m.set_ydata(MM[:,1])
-    #m.set_xdata(X[max(t-10000,t-b):t,0]*img.shape[1])
-    #m.set_ydata(X[max(t-10000,t-b):t,1]*img.shape[0])
+    XX = array(map.to_pixels(uncenter(X[t0:t,0],mins[0],maxs[0]),uncenter(X[t0:t,1],mins[1],maxs[1]))).T
+    m.set_xdata(XX[:,0])
+    m.set_ydata(XX[:,1])
 
-    # Plot the error window
+    #######################
+    # Predict into the future, P(y[t+1]|X[t])
+    #######################
+    yp = h.predict(Z[t].reshape(1,-1)).astype(int)
+    print yp,
+    yp_g = g.predict(Z[t].reshape(1,-1)).astype(int)
+    gnp = node_pxs[yp_g]
+    mg.set_xdata(gnp[:,0])
+    mg.set_ydata(gnp[:,1])
+    mg.set_data(gnp[0])
+
+    #######################
+    # Predict a full trace
+    #######################
+    YP = zeros((T_p,2))
+    YP[0] = XX[-1,:]            # end of present trace
+    rtf2 = copy.deepcopy(rtf)
+    xp = copy.deepcopy(X[t+1])
+    for i in range(1,T_p):
+        #zp = xp
+        zp = rtf2.phi(xp)
+        ypp = h.predict(zp.reshape(1,-1)).astype(int)[0]       # predict coordinates
+        print ypp,
+        #print "%d = argmax_y p(y[%d] | %s) " % (ypp, i, zp)
+        #print "nodes: ", nodes[ypp]                            # GEO-coords
+        YP[i] = node_pxs[ypp]                                  # MIG-coords
+        cpp = coord_center(nodes[ypp],mins,maxs)               # ML-coords
+        #print "codes: ", cpp
+        xp[0:2] = cpp
+        xp[2] = xp[2] + 1.#0.01 #33
+
+    print ""
+
+    mp.set_xdata(YP[:,0])
+    mp.set_ydata(YP[:,1])
+
+    #######################
+    # Evaluate and plot the error
+    #######################
     b_ = t % b
-    yp = h.predict(Z[t-1].reshape(1,-1))
-    window[b_,0] = sqrt((X[t,0] - yp[0,0])**2)
-    window[b_,1] = sqrt((X[t,1] - yp[0,1])**2)
-    history[t-b] = mean(mean(window,axis=0))
-    print "AVG", history[t-b], X[t], " LEARN:", array([Z[t]]), "->", X[t+1,0:2]
-    h.partial_fit(array([Z[t]]),X[t+1,0:2].reshape(1,-1))
+    #window[b_] = sqrt((Y[t] - yp)**2)
+    window[b_] = (Y[t] == yp)*1.
+    history[t-b] = mean(window)
+    print "AVG", history[t-b], Y[t], " LEARN:", array([Z[t]]), "->", X[t+1,0:2], Y[t]
     l.set_data(range(0,t-b),history[0:t-b])
     ax0.set_xlim([0,t-b])
     ax0.set_ylim([0,max(history)])
 
-    # Predict into the future
-    xp = copy.deepcopy(X[t])
-    XP = zeros((win_pred,2))
-    rtf2 = copy.deepcopy(rtf)
-    for i in range(0,win_pred):
-        zp = rtf2.phi(xp)
-        XP[i,:] = h.predict(zp.reshape(1,-1))       # predict coordinates
-        xp[0:2] = XP[i,:]
-        print " PRED", xp
-        #xp = tick(xc,xp)    # plug in a fake time-increment with the predicted coordinates, and proceed ...
-    MMM = array(map.to_pixels(uncenter(XP[:,0],mins[0],maxs[0]),uncenter(XP[:,1],mins[1],maxs[1]))).T
-    mp.set_xdata(MMM[:,0])
-    mp.set_ydata(MMM[:,1])
+    #######################
+    # Update classifier
+    #######################
+    #h.partial_fit(array([Z[t-1]]),X[t+1,0:2].reshape(1,-1))
+    #h.partial_fit(array([Z[t-1]]),Y[t].reshape(1,-1))
+    if t % 100 == 0:
+        print "TRAINING"
+        #h.fit(Z[0:t-1],Y[1:t])
 
     pause(0.001)
 
