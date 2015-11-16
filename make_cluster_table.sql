@@ -5,6 +5,7 @@ CREATE TABLE cluster_centers (
   cluster_id bigint,
   longitude float,
   latitude float,
+  time_stamp timestamp, -- the time when the clustering was last carried out
   location geography(Point,4326)
 );
 
