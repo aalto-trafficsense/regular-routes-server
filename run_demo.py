@@ -32,7 +32,11 @@ def coord_center(xy, mins, maxs):
 #
 ##################################################################################
 
-DEV_ID = 45
+DEV_ID = 69
+import sys
+if len(sys.argv) > 1:
+    DEV_ID = int(sys.argv[1])
+
 bx = (60.1442, 24.6351, 60.3190, 25.1741)
 b = 10              # majic window parameter
 thres = 0.001       # relative movement threshold for not-filtering
@@ -46,14 +50,18 @@ T_p = 10       # how far to predict into the future
 
 X = None
 
-if False:
+import os.path
+FILE_X = './dat/'+str(DEV_ID)+'_stream_X.csv'
+ 
+if not os.path.isfile(FILE_X):
 
     import psycopg2
 
     try:
         conn = psycopg2.connect("dbname='regularroutes' user='regularroutes' host='localhost' password='TdwqStUh5ptMLeNl' port=5432")
     except:
-        print "I am unable to connect to the database"
+        print "[ERROR] I am unable to connect to the database"
+        exit(1)
 
     c = conn.cursor()
 
@@ -62,9 +70,9 @@ if False:
     dat = array(c.fetchall(),dtype={'names':['H', 'DoW', 'lon', 'lat'], 'formats':['i4', 'i4', 'f4','f4']})
     run = column_stack([dat['lon'],dat['lat']])
     X = column_stack([dat['lon'],dat['lat'],dat['H'],dat['DoW']])
-    savetxt('./dat/'+str(DEV_ID)+'_stream_X.csv', X, delimiter=',')
+    savetxt(FILE_X, X, delimiter=',')
 
-X = genfromtxt('./dat/'+str(DEV_ID)+'_stream_X.csv', skip_header=0, delimiter=',')
+X = genfromtxt(FILE_X, skip_header=0, delimiter=',')
 
 ##################################################################################
 #
@@ -72,14 +80,18 @@ X = genfromtxt('./dat/'+str(DEV_ID)+'_stream_X.csv', skip_header=0, delimiter=',
 #
 ##################################################################################
 
-if False:
+FILE_Y = './dat/'+str(DEV_ID)+'_stream_Y.csv'
+FILE_N = './dat/'+str(DEV_ID)+'_stream_nodes.csv'
+
+if not os.path.isfile(FILE_Y) or not os.path.isfile(FILE_N):
 
     import psycopg2
 
     try:
         conn = psycopg2.connect("dbname='regularroutes' user='regularroutes' host='localhost' password='TdwqStUh5ptMLeNl' port=5432")
     except:
-        print "I am unable to connect to the database"
+        print "[ERROR] I am unable to connect to the database"
+        exit(1)
 
     c = conn.cursor()
 
@@ -87,6 +99,13 @@ if False:
     c.execute('SELECT latitude, longitude FROM cluster_centers WHERE device_id = %s', (str(DEV_ID),))
     rows = c.fetchall()
     nodes = array(rows)
+    if len(nodes) <= 0:
+        print "[WARNING] No nodes available, we will create them now ..."
+        from run_clustering import cluster
+        cluster(DEV_ID)
+        c.execute('SELECT latitude, longitude FROM cluster_centers WHERE device_id = %s', (str(DEV_ID),))
+        rows = c.fetchall()
+        nodes = array(rows)
 
     print "Snapping past to these ", len(nodes)," waypoints"
     import sys
@@ -94,11 +113,11 @@ if False:
     from utils import snap
     Y = snap(X[:,0:2],nodes).astype(int)
 
-    savetxt('./dat/'+str(DEV_ID)+'_stream_nodes.csv', nodes, delimiter=',')
-    savetxt('./dat/'+str(DEV_ID)+'_stream_Y.csv', Y, delimiter=',')
+    savetxt(FILE_N, nodes, delimiter=',')
+    savetxt(FILE_Y, Y, delimiter=',')
 
-nodes = genfromtxt('./dat/'+str(DEV_ID)+'_stream_nodes.csv', skip_header=0, delimiter=',')
-Y = genfromtxt('./dat/'+str(DEV_ID)+'_stream_Y.csv', skip_header=0, delimiter=',')
+nodes = genfromtxt(FILE_N, skip_header=0, delimiter=',')
+Y = genfromtxt(FILE_Y, skip_header=0, delimiter=',')
 
 ##################################################################################
 #
@@ -255,7 +274,7 @@ grid(True)
 ax0.set_title("error / "+str(len(X)))
 
 ax1 = fig.add_subplot(gs[1])
-ax1.set_title("map")
+ax1.set_title("Map, device ID "+str(DEV_ID))
 img = imread('Helsinki.png') #
 ax1.imshow(img)
 ax1.set_xlim([0,img.shape[1]]) #

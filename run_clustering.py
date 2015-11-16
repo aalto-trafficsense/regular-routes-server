@@ -29,8 +29,8 @@ def cluster(device_id):
     #.fetchall()
     print test
 
-    print "Drop cluster_centers Table...",
-    c.execute('DELETE FROM cluster_centers')
+    print "Drop entries of device", str(device_id), "from cluster_centers Table...",
+    c.execute('DELETE FROM cluster_centers WHERE device_id = %s', (str(device_id),))
 
 #   print "Loading Device IDs ...",
 #   c.execute('SELECT DISTINCT device_id FROM averaged_location')
@@ -71,4 +71,4 @@ def cluster(device_id):
     return "Done! Clustered 50 nodes for device "+str(d_id)
 
 if __name__ == '__main__':
-    cluster(45)
+    cluster(5)
