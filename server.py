@@ -4,7 +4,8 @@ import json
 import hashlib
 import geoalchemy2 as ga2
 import math
-import svgwrite
+import svg_generation
+from constants import *
 from datetime import date, timedelta
 from flask import Flask, abort, jsonify, request, render_template, Response
 from flask.ext.sqlalchemy import SQLAlchemy
@@ -15,6 +16,8 @@ from sqlalchemy.dialects.postgres import DOUBLE_PRECISION, TIMESTAMP, UUID
 from sqlalchemy.exc import DataError
 from sqlalchemy.sql import text, func, column, table, select
 from uuid import uuid4
+
+
 
 
 SETTINGS_FILE_ENV_VAR = 'REGULARROUTES_SETTINGS'
@@ -46,11 +49,6 @@ https://developer.android.com/reference/com/google/android/gms/location/Detected
 activity_types = ('IN_VEHICLE', 'ON_BICYCLE', 'ON_FOOT', 'RUNNING', 'STILL', 'TILTING', 'UNKNOWN', 'WALKING')
 activity_type_enum = Enum(*activity_types, name='activity_type_enum')
 
-#CO2 emissions per km:
-ON_BICYCLE_CO2 = 21
-WALKING_CO2 = 33
-RUNNING_CO2 = 47
-IN_VEHICLE_CO2 = 150
 
 # Schema definitions:
 
@@ -467,7 +465,7 @@ def grade_date(requested_date):
     for row in device_id_rows:
         device_id = str(row["device_id"])
         return_string += "DEVICE: " + device_id + "<br>"
-        device_data_rows = data_points_snapping(device_id, str(date_start), str(date_end))
+        device_data_rows = data_points_snapping(device_id, date_start, date_end)
         return_string += rating_to_string(calculate_rating(device_data_rows))
         return_string += "<br><br><br>"
 
@@ -478,39 +476,17 @@ def grade_date(requested_date):
 
 @app.route("/svg")
 def svg():
-    device_data_rows = data_points_snapping(80, "2015-09-14", "2015-09-15")
+    #end_time = datetime.datetime.now()
+    end_time = datetime.datetime.strptime("2015-09-17", '%Y-%m-%d')
+    start_time = end_time.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=7)
+    end_time_string = end_time.strftime("%Y-%m-%d")
+    start_time_string = start_time.strftime("%Y-%m-%d")
+    TEMP_FIXED_DEVICE_ID = 80
+
+    device_data_rows = data_points_snapping(TEMP_FIXED_DEVICE_ID, start_time_string, end_time_string)
     rating = calculate_rating(device_data_rows)
-    energy_rating = (rating.average_co2 - ON_BICYCLE_CO2) / IN_VEHICLE_CO2 # value becomes 0-1 with 1 being the worst.
+    return svg_generation.generate_energy_rating_svg(rating, start_time_string, end_time_string)
 
-    colours = (svgwrite.rgb(0,140,88), svgwrite.rgb(32,172,41), svgwrite.rgb(173,213,0), svgwrite.rgb(247,247,0), svgwrite.rgb(246,189,0), svgwrite.rgb(230,99,19), svgwrite.rgb(221,0,32))
-    letters = "ABCDEFG"
-    svg_drawing = svgwrite.Drawing(profile="full")
-    svg_drawing.fit(horiz="left", vert="top")
-    #vg_drawing.add.viewbox(minx=0, miny=0, width=170 + 10 * (len(colours) - 1))
-    for i in range(len(colours)):
-        #Draw the energy rating bars
-        x_left = 5
-        x_right = 155 + 10 * i
-        x_arrow_tip = x_right + 15
-        y_top = 5 + 30 * i
-        y_bottom = y_top + 26 #height is 26 units + 5 units gap between bars
-        y_arrow_tip = (y_top + y_bottom) / 2
-        svg_drawing.add(svg_drawing.polygon(((x_left, y_top), (x_right, y_top), (x_arrow_tip, y_arrow_tip), (x_right, y_bottom), (x_left, y_bottom)), fill=colours[i], stroke=colours[i]))
-        svg_drawing.add(svg_drawing.text(letters[i], insert=(x_right - 17, y_bottom - 3), fill=svgwrite.rgb(255,255,255), stroke=svgwrite.rgb(50,50,50), stroke_width=0.5, font_size=26, font_family="Helvetica", font_weight="bold"))
-
-    #Draw pointer
-    x_arrow_tip = (len(colours) - 1) * 10 * energy_rating + 175
-    x_right = x_arrow_tip + 20
-    y_top = 5 + energy_rating * (len(colours) - 1) * 30
-    y_bottom = y_top + 26
-    y_arrow_tip = (y_top + y_bottom) / 2
-    svg_drawing.add(svg_drawing.polygon(((x_arrow_tip, y_arrow_tip), (x_right, y_top), (x_right, y_bottom)), fill=svgwrite.rgb(0,0,0), stroke=svgwrite.rgb(0,0,0)))
-
-    svg_drawing.viewbox(0,0,x_right + 150, y_bottom + 160)
-
-    svg_drawing.add(svg_drawing.text("Average CO2 emission (g/km): " + str(rating.average_co2), insert=(5, y_bottom + 70), fill=svgwrite.rgb(0,0,0), stroke=svgwrite.rgb(0,0,0), stroke_width=1, font_size=16, font_family="Helvetica"))
-    svg_drawing.add(svg_drawing.text("Total CO2 emission (g): " + str(rating.total_co2), insert=(5, y_bottom + 90), fill=svgwrite.rgb(0,0,0), stroke=svgwrite.rgb(0,0,0), stroke_width=1, font_size=16, font_family="Helvetica"))
-    return svg_drawing.tostring()
 
 
 
@@ -519,18 +495,43 @@ def svg():
 
 
 class EnergyRating:
-    def __init__(self, in_vehicle_distance, on_bicycle_distance, running_distance, walking_distance):
+    def __init__(self, in_vehicle_distance, in_mass_transit_A_distance, in_mass_transit_B_distance, in_mass_transit_C_distance, on_bicycle_distance, running_distance, walking_distance):
         self.in_vehicle_distance = in_vehicle_distance
         self.on_bicycle_distance = on_bicycle_distance
         self.running_distance = running_distance
         self.walking_distance = walking_distance
-        self.total_distance = in_vehicle_distance + on_bicycle_distance + walking_distance + running_distance
-        self.running_percentage = running_distance / self.total_distance
-        self.walking_percentage = walking_distance / self.total_distance
-        self.in_vehicle_percentage = in_vehicle_distance / self.total_distance
-        self.on_bicycle_percentage = on_bicycle_distance / self.total_distance
-        self.average_co2 = self.on_bicycle_percentage * ON_BICYCLE_CO2 + self.walking_percentage * WALKING_CO2 + self.running_percentage * RUNNING_CO2 + self.in_vehicle_percentage * IN_VEHICLE_CO2
-        self.total_co2 = self.on_bicycle_distance * ON_BICYCLE_CO2 + self.walking_distance * WALKING_CO2 + self.running_distance * RUNNING_CO2 + self.in_vehicle_distance * IN_VEHICLE_CO2
+        self.in_mass_transit_A_distance = in_mass_transit_A_distance
+        self.in_mass_transit_B_distance = in_mass_transit_B_distance
+        self.in_mass_transit_C_distance = in_mass_transit_C_distance
+        self.total_distance = in_vehicle_distance + on_bicycle_distance + walking_distance + running_distance + in_mass_transit_A_distance + in_mass_transit_B_distance + in_mass_transit_C_distance
+        if self.total_distance == 0:
+            self.running_percentage = 0
+            self.walking_percentage = 0
+            self.in_vehicle_percentage = 0
+            self.on_bicycle_percentage = 0
+            self.in_mass_transit_A_percentage = 0
+            self.in_mass_transit_B_percentage = 0
+            self.in_mass_transit_C_percentage = 0
+        else:
+            self.running_percentage = running_distance / self.total_distance
+            self.walking_percentage = walking_distance / self.total_distance
+            self.in_vehicle_percentage = in_vehicle_distance / self.total_distance
+            self.on_bicycle_percentage = on_bicycle_distance / self.total_distance
+            self.in_mass_transit_A_percentage = in_mass_transit_A_distance / self.total_distance
+            self.in_mass_transit_B_percentage = in_mass_transit_B_distance / self.total_distance
+            self.in_mass_transit_C_percentage = in_mass_transit_C_distance / self.total_distance
+
+        self.average_co2 = self.on_bicycle_percentage * ON_BICYCLE_CO2 + \
+                           self.walking_percentage * WALKING_CO2 + \
+                           self.running_percentage * RUNNING_CO2 + \
+                           self.in_vehicle_percentage * IN_VEHICLE_CO2 + \
+                           self.in_mass_transit_A_percentage * MASS_TRANSIT_A_CO2 + \
+                           self.in_mass_transit_B_percentage * MASS_TRANSIT_B_CO2 + \
+                           self.in_mass_transit_C_percentage * MASS_TRANSIT_C_CO2
+
+        self.total_co2 = self.average_co2 * self.total_distance
+
+        self.final_rating = (self.average_co2 - ON_BICYCLE_CO2) / IN_VEHICLE_CO2 # value becomes 0-1 with 1 being the worst.
 
 
 
@@ -556,7 +557,8 @@ snapping_time timestamp without time zone
 def calculate_rating(device_data_rows):
     rows = device_data_rows.fetchall()
     bad_activities = ("UNKNOWN", "TILTING", "STILL")
-
+    if len(rows) == 0:
+        return EnergyRating(0, 0, 0, 0)
     in_vehicle_distance = 0
     on_bicycle_distance = 0
     walking_distance = 0
@@ -600,7 +602,7 @@ def calculate_rating(device_data_rows):
 
 
 
-    return EnergyRating(in_vehicle_distance, on_bicycle_distance, running_distance, walking_distance)
+    return EnergyRating(in_vehicle_distance, 0, 0, 0, on_bicycle_distance, running_distance, walking_distance)
 
 def rating_to_string(energy_rating):
     return_string = "\
