@@ -1,9 +1,8 @@
 import svgwrite
 from constants import *
 
-LABEL_FONT_SIZE = 30
+LABEL_FONT_SIZE = 34
 INFO_FONT_SIZE = 26
-INFO_FONT_SUPER_SIZE = 16
 
 BAR_HEIGHT = 70
 BAR_GAP = 10
@@ -50,25 +49,19 @@ def generate_energy_rating_svg(energy_rating, start_time_string, end_time_string
     svg_drawing.viewbox(0,0, 1000, 1000)
 
     svg_drawing.add(svg_drawing.text(start_time_string + " - " + end_time_string,
-                                     insert=(200, 5),
+                                     insert=(200, 40),
                                      fill=svgwrite.rgb(0,0,0),
                                      stroke=svgwrite.rgb(0,0,0),
                                      stroke_width=1,
                                      font_size=INFO_FONT_SIZE,
-                                     font_family="Helvetica",
-                                     dominant_baseline="hanging"))
-    CO2_text = svg_drawing.text("CO",
+                                     font_family="Helvetica"))
+    CO2_text = svg_drawing.text("CO2 g/km",
                                      insert=(5, 40),
                                      fill=svgwrite.rgb(0,0,0),
                                      stroke=svgwrite.rgb(0,0,0),
                                      stroke_width=1,
                                      font_size=INFO_FONT_SIZE,
-                                     font_family="Helvetica",
-                                     dominant_baseline="hanging")
-    CO2_text.add(svg_drawing.tspan("2",
-                                   baseline_shift="super",
-                                   font_size=INFO_FONT_SUPER_SIZE))
-    CO2_text.add(svg_drawing.tspan(" g/km"))
+                                     font_family="Helvetica")
     svg_drawing.add(CO2_text)
 
     #svg_drawing.add.viewbox(minx=0, miny=0, width=170 + 10 * (len(colours) - 1))
@@ -92,34 +85,31 @@ def generate_energy_rating_svg(energy_rating, start_time_string, end_time_string
                                             stroke_width=3))
 
         svg_drawing.add(svg_drawing.text(labels[i],
-                                         insert=(x_left + 5, y_middle),
-                                         fill=svgwrite.rgb(255,255,255),
+                                         insert=(x_left + 5, y_middle + LABEL_FONT_SIZE / 2),
+                                         fill=svgwrite.rgb(50,50,50),
                                          stroke=svgwrite.rgb(50,50,50),
-                                         stroke_width=0.5,
+                                         stroke_width=2,
                                          font_size=LABEL_FONT_SIZE,
                                          font_family="Helvetica",
-                                         font_weight="bold",
-                                         dominant_baseline="central"))
+                                         font_weight="bold"))
 
         svg_drawing.add(svg_drawing.text("{:.1f} km".format(distances[i]),
-                                         insert=(x_right, y_middle),
-                                         fill=svgwrite.rgb(255,255,255),
+                                         insert=(x_right, y_middle + LABEL_FONT_SIZE / 2),
+                                         fill=svgwrite.rgb(50,50,50),
                                          stroke=svgwrite.rgb(50,50,50),
-                                         stroke_width=0.5,
+                                         stroke_width=2,
                                          font_size=LABEL_FONT_SIZE,
                                          font_family="Helvetica",
                                          font_weight="bold",
-                                         dominant_baseline="central",
                                          text_anchor="end"))
 
         svg_drawing.add(svg_drawing.text(CO2_amounts[i],
-                                         insert=(x_left - 25, y_middle),
+                                         insert=(x_left - 25, y_middle + LABEL_FONT_SIZE / 2),
                                          fill=svgwrite.rgb(0,0,0),
                                          stroke=svgwrite.rgb(0,0,0),
                                          stroke_width=0.5,
                                          font_size=LABEL_FONT_SIZE,
                                          font_family="Helvetica",
-                                         dominant_baseline="central",
                                          text_anchor="end"))
 
 
@@ -148,14 +138,13 @@ def generate_energy_rating_svg(energy_rating, start_time_string, end_time_string
                                          stroke_width=2))
 
         svg_drawing.add(svg_drawing.text(bottom_bar_amounts[i],
-                                 insert=(i * STEP_LENGTH + BAR_MIN, BAR_Y + BAR_TICK_SIZE),
+                                 insert=(i * STEP_LENGTH + BAR_MIN, BAR_Y + BAR_TICK_SIZE + INFO_FONT_SIZE),
                                  fill=svgwrite.rgb(0,0,0),
                                  stroke=svgwrite.rgb(0,0,0),
                                  stroke_width=1,
                                  font_size=INFO_FONT_SIZE,
                                  font_family="Helvetica",
-                                 text_anchor="middle",
-                                 dominant_baseline="hanging"))
+                                 text_anchor="middle"))
 
     svg_drawing.add(svg_drawing.text("Average:",
                                  insert=(10, BAR_Y),
@@ -169,18 +158,13 @@ def generate_energy_rating_svg(energy_rating, start_time_string, end_time_string
                                         fill="black",
                                         stroke="black",
                                         stroke_width=3))
-    CO2_text = svg_drawing.text("CO",
-                                insert=(BAR_MAX + 40, BAR_Y + BAR_TICK_SIZE),
+    CO2_text = svg_drawing.text("CO2 g/km",
+                                insert=(BAR_MAX + 40, BAR_Y + BAR_TICK_SIZE + INFO_FONT_SIZE),
                                 fill=svgwrite.rgb(0,0,0),
                                 stroke=svgwrite.rgb(0,0,0),
                                 stroke_width=1,
                                 font_size=INFO_FONT_SIZE,
-                                font_family="Helvetica",
-                                dominant_baseline="hanging")
-    CO2_text.add(svg_drawing.tspan("2",
-                                   baseline_shift="super",
-                                   font_size=INFO_FONT_SUPER_SIZE))
-    CO2_text.add(svg_drawing.tspan(" g/km"))
+                                font_family="Helvetica")
     svg_drawing.add(CO2_text)
 
     #Draw pointer
