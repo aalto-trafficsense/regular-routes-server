@@ -41,6 +41,7 @@ bx = (60.1442, 24.6351, 60.3190, 25.1741)
 b = 10              # majic window parameter
 thres = 0.001       # relative movement threshold for not-filtering
 T_p = 10       # how far to predict into the future
+t_0 = 7100      # initial chunk of training
 
 ##################################################################################
 #
@@ -187,11 +188,9 @@ print "Pass thorugh ESN filter"
 import sys
 from sklearn.kernel_approximation import RBFSampler
 rbf = RBFSampler(gamma=1, random_state=1)
-sys.path.append("/home/jesse/Dropbox/Projects/ALife/mad")
-from RTF import RTF
-from STF import STF
-from MOP import linear
-from MLP import sigmoid
+from cerebro.RTF import RTF
+from cerebro.STF import STF
+from cerebro.functions import linear, sigmoid
 H=D*2+1 #20
 
 #rtf = RTF(D,H,f=linear,density=0.1)
@@ -254,12 +253,12 @@ h = SGDClassifier()
 h = tree.DecisionTreeClassifier()
 #print Z[0:T-1].shape
 #print Y[1:T].shape
-h.fit(Z[0:T-1],Y[1:T])
+h.fit(Z[0:t_0-1],Y[1:t_0])       # <--- train on a significant chunk at a time (sklearn's tree not incremental)
 #h.fit(Z[0:b],Y[1:b+1])
 #h.partial_fit(Z[0:T-1],Y[1:T],classes=range(len(nodes)))
 #h.partial_fit(Z[0:b],X[1:b+1,0:2])
 g = tree.DecisionTreeClassifier()
-g.fit(Z[0:T-10],Y[10:T])
+g.fit(Z[0:t_0-10],Y[10:t_0])     # <--- train on a significant chunk at a time (sklearn's tree not incremental)
 
 # With init. batch of b, until T.
 window = zeros(b)
@@ -281,13 +280,14 @@ ax1.set_xlim([0,img.shape[1]]) #
 ax1.set_ylim([img.shape[0],0]) #
 #ax1.set_xlim([-0.1,+1.1])
 #ax1.set_ylim([-0.1,+1.1])
-mg, = ax1.plot(0,0,'go',markersize=10,linewidth=3)
-mp, = ax1.plot(0,0,'ro-',markersize=2,linewidth=3)
-m, = ax1.plot(0,0,'bo-',markersize=1,linewidth=3)
+mg, = ax1.plot(0,0,'go',markersize=10,linewidth=3,label="10-min destination pred.")
+mp, = ax1.plot(0,0,'ro-',markersize=2,linewidth=3,label="5-min route pred.")
+m, = ax1.plot(0,0,'bo-',markersize=1,linewidth=3,label="recent trajectory up to current")
 node_pxs = map.to_pixels(nodes)
 n_, = ax1.plot(node_pxs[:,0],node_pxs[:,1],'mo',markersize=5)
-gs.tight_layout(fig)
+gs.tight_layout(fig,h_pad=0.1)
 #fig.tight_layout()
+legend()
 
 show()
 
@@ -296,7 +296,7 @@ def tick(xc,xp):
 
 print "Go"
 yp = 0
-for t in range(b,T-1):
+for t in range(t_0,T-1):
 
     #######################
     # Plot the trace
@@ -310,6 +310,7 @@ for t in range(b,T-1):
     # Predict into the future, P(y[t+1]|X[t])
     #######################
     yp = h.predict(Z[t].reshape(1,-1)).astype(int)
+    print "[t=%d, DOW=%d]" % (t,X[t,3]*7.),
     print yp,
     yp_g = g.predict(Z[t].reshape(1,-1)).astype(int)
     gnp = node_pxs[yp_g]
@@ -349,7 +350,7 @@ for t in range(b,T-1):
     #window[b_] = sqrt((Y[t] - yp)**2)
     window[b_] = (Y[t] == yp)*1.
     history[t-b] = mean(window)
-    print "AVG", history[t-b], Y[t], " LEARN:", array([Z[t]]), "->", X[t+1,0:2], Y[t]
+    #print "AVG", history[t-b], Y[t], " LEARN:", array([Z[t]]), "->", X[t+1,0:2], Y[t]
     l.set_data(range(0,t-b),history[0:t-b])
     ax0.set_xlim([0,t-b])
     ax0.set_ylim([0,max(history)])
@@ -359,9 +360,11 @@ for t in range(b,T-1):
     #######################
     #h.partial_fit(array([Z[t-1]]),X[t+1,0:2].reshape(1,-1))
     #h.partial_fit(array([Z[t-1]]),Y[t].reshape(1,-1))
-    if t % 100 == 0:
-        print "TRAINING"
-        #h.fit(Z[0:t-1],Y[1:t])
+    #if (t+1) % t_0 == 0:
+    if X[t+1,3] != X[t,3]:
+        print "---TRAINING--- (end of day ",(X[t,3]*7),")"
+        h.fit(Z[0:t-1],Y[1:t])
+        g.fit(Z[0:t-10],Y[10:t])     # <--- train on a significant chunk at a time (sklearn's tree not incremental)
 
     pause(0.001)
 
