@@ -46,7 +46,7 @@ def generate_energy_rating_svg(energy_rating, start_time_string, end_time_string
 
     svg_drawing = svgwrite.Drawing(profile="full")
     svg_drawing.fit(horiz="left", vert="top")
-    svg_drawing.viewbox(0,0, 1000, 1000)
+    svg_drawing.viewbox(0,0, 1000, 800)
 
     svg_drawing.add(svg_drawing.text(start_time_string + " - " + end_time_string,
                                      insert=(200, 40),
