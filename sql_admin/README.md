@@ -4,7 +4,10 @@ These scripts setup empty devices, users and device_data tables and build all re
 
 Some instructions for running psql scripts are available in the [regular-routes-server repository wiki](https://github.com/aalto-trafficsense/regular-routes-server/wiki/Terminal-commands-HOWTO).
 
-Chef creates the database and default role (regularroutes) when setting up the server. The map-related tables are created in waypoint generation.
+Chef creates the database and default role (regularroutes) when
+setting up the server. The map-related tables are created in waypoint
+generation, but a script for creating an empty waypoints-table is also
+available.
 
 ## Init a new empty database, run server, setup for regularroutes
 
@@ -45,3 +48,11 @@ devices, users, device_data
 1. Add sequences and indexes: `postgres=# \i index_dudd.sql`
 
 _Note: `index_dudd.sql` includes a parameter for setting the last sequence element for all three tables. The script is by default set to work over an empty table, i.e. the number setting entries are commented out. If using `index_dudd.sql` to restore indexes to existing tables, uncomment the command and modify the number accordingly. The last number can be found with e.g. `SELECT MAX(id) FROM device_data ;`._
+
+## Create a blank waypoints table (with indexes)
+
+Setup an empty database as documented above or DROP the previous
+waypoints table.
+
+`$ psql -U postgres -f create_waypoints.sql`
+
