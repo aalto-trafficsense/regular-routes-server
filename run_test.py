@@ -25,7 +25,7 @@ def num_trace(cur, d_id):
 	return cur.fetchall()[0]
 
 
-cur = get_cursor(False)
+cur = get_cursor(True)
 IDs = dev_ids(cur)
 print str(IDs)
 

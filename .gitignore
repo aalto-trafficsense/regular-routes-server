@@ -62,3 +62,6 @@ target/
 
 *.swp
 *~
+
+# Mac
+*.npy

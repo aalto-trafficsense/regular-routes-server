@@ -15,7 +15,7 @@ def cluster(device_id):
     '''
     d_id = str(device_id)
 
-    conn = get_conn()
+    conn = get_conn(True)
     c = conn.cursor()
 
     print "Test ..."
