@@ -25,6 +25,7 @@ def coord_center(xy, mins, maxs):
         c_xy[j] = center(xy[j],mins[j],maxs[j])
     return c_xy
 
+from db_utils import get_cursor
 
 ##################################################################################
 #
@@ -41,7 +42,6 @@ bx = (60.1442, 24.6351, 60.3190, 25.1741)
 b = 10              # majic window parameter
 thres = 0.001       # relative movement threshold for not-filtering
 T_p = 10       # how far to predict into the future
-t_0 = 7100      # initial chunk of training
 
 ##################################################################################
 #
@@ -56,15 +56,7 @@ FILE_X = './dat/'+str(DEV_ID)+'_stream_X.csv'
  
 if not os.path.isfile(FILE_X):
 
-    import psycopg2
-
-    try:
-        conn = psycopg2.connect("dbname='regularroutes' user='regularroutes' host='localhost' password='TdwqStUh5ptMLeNl' port=5432")
-    except:
-        print "[ERROR] I am unable to connect to the database"
-        exit(1)
-
-    c = conn.cursor()
+    c = get_cursor() 
 
     print "Extracting trace"
     c.execute('SELECT hour,day_of_week,longitude,latitude FROM averaged_location WHERE device_id = %s', (str(DEV_ID),))
@@ -86,15 +78,7 @@ FILE_N = './dat/'+str(DEV_ID)+'_stream_nodes.csv'
 
 if not os.path.isfile(FILE_Y) or not os.path.isfile(FILE_N):
 
-    import psycopg2
-
-    try:
-        conn = psycopg2.connect("dbname='regularroutes' user='regularroutes' host='localhost' password='TdwqStUh5ptMLeNl' port=5432")
-    except:
-        print "[ERROR] I am unable to connect to the database"
-        exit(1)
-
-    c = conn.cursor()
+    c = get_cursor() 
 
     print "Extracting waypoints"
     c.execute('SELECT latitude, longitude FROM cluster_centers WHERE device_id = %s', (str(DEV_ID),))
@@ -107,11 +91,13 @@ if not os.path.isfile(FILE_Y) or not os.path.isfile(FILE_N):
         c.execute('SELECT latitude, longitude FROM cluster_centers WHERE device_id = %s', (str(DEV_ID),))
         rows = c.fetchall()
         nodes = array(rows)
+        print "... created ", len(nodes)," waypoints"
 
-    print "Snapping past to these ", len(nodes)," waypoints"
+    print "Snapping trace to these ", len(nodes)," waypoints"
     import sys
     sys.path.append("src/")
     from utils import snap
+    print X.shape,nodes.shape
     Y = snap(X[:,0:2],nodes).astype(int)
 
     savetxt(FILE_N, nodes, delimiter=',')
@@ -183,6 +169,11 @@ print "... from ", T, "examples to", i
 
 T,D = X.shape
 
+FILE_F = './dat/'+str(DEV_ID)+'_stream_F.csv'
+if not os.path.isfile(FILE_F):
+    print "Saving filtered data (could use this directly in the future)"
+    savetxt(FILE_F, X, delimiter=',')
+
 # Pass through an ESN filter
 print "Pass thorugh ESN filter"
 import sys
@@ -253,6 +244,7 @@ h = SGDClassifier()
 h = tree.DecisionTreeClassifier()
 #print Z[0:T-1].shape
 #print Y[1:T].shape
+t_0 = int(T * 0.75)      # initial chunk of training
 h.fit(Z[0:t_0-1],Y[1:t_0])       # <--- train on a significant chunk at a time (sklearn's tree not incremental)
 #h.fit(Z[0:b],Y[1:b+1])
 #h.partial_fit(Z[0:T-1],Y[1:T],classes=range(len(nodes)))
@@ -266,13 +258,16 @@ history = zeros((T))
 
 fig = figure()
 from matplotlib import gridspec
-gs = gridspec.GridSpec(2, 1, height_ratios=[1, 6]) 
+#gs = gridspec.GridSpec(2, 1, height_ratios=[1, 6]) 
+gs = gridspec.GridSpec(1, 1)
+'''
 ax0 = fig.add_subplot(gs[0])
 l, = ax0.plot(0,0,'k-',markersize=10,linewidth=1)
 grid(True)
 ax0.set_title("error / "+str(len(X)))
+'''
 
-ax1 = fig.add_subplot(gs[1])
+ax1 = fig.add_subplot(gs[0]) # was: [1]
 ax1.set_title("Map, device ID "+str(DEV_ID))
 img = imread('Helsinki.png') #
 ax1.imshow(img)
@@ -280,11 +275,11 @@ ax1.set_xlim([0,img.shape[1]]) #
 ax1.set_ylim([img.shape[0],0]) #
 #ax1.set_xlim([-0.1,+1.1])
 #ax1.set_ylim([-0.1,+1.1])
-mg, = ax1.plot(0,0,'go',markersize=10,linewidth=3,label="10-min destination pred.")
-mp, = ax1.plot(0,0,'ro-',markersize=2,linewidth=3,label="5-min route pred.")
-m, = ax1.plot(0,0,'bo-',markersize=1,linewidth=3,label="recent trajectory up to current")
+mg, = ax1.plot(0,0,'ro',markersize=10,linewidth=3,label="10-min destination pred.")
+mp, = ax1.plot(0,0,'mo-',markersize=2,linewidth=4,label="5-min route prediction")
+m, = ax1.plot(0,0,'ro-',markersize=1,linewidth=2,label="recent trajectory (true)")
 node_pxs = map.to_pixels(nodes)
-n_, = ax1.plot(node_pxs[:,0],node_pxs[:,1],'mo',markersize=5)
+n_, = ax1.plot(node_pxs[:,0],node_pxs[:,1],'bo',markersize=5,label="node")
 gs.tight_layout(fig,h_pad=0.1)
 #fig.tight_layout()
 legend()
@@ -296,76 +291,89 @@ def tick(xc,xp):
 
 print "Go"
 yp = 0
-for t in range(t_0,T-1):
+images = []
 
-    #######################
-    # Plot the trace
-    #######################
-    t0 = max(0,t-b)
-    XX = array(map.to_pixels(uncenter(X[t0:t,0],mins[0],maxs[0]),uncenter(X[t0:t,1],mins[1],maxs[1]))).T
-    m.set_xdata(XX[:,0])
-    m.set_ydata(XX[:,1])
+import matplotlib.animation as animation
+FFMpegWriter = animation.writers['ffmpeg']
+metadata = dict(title='Simulation Device '+str(DEV_ID), artist='Jesse', comment='Demo')
+writer = FFMpegWriter(fps=15, bitrate=5000, metadata=metadata)
 
-    #######################
-    # Predict into the future, P(y[t+1]|X[t])
-    #######################
-    yp = h.predict(Z[t].reshape(1,-1)).astype(int)
-    print "[t=%d, DOW=%d]" % (t,X[t,3]*7.),
-    print yp,
-    yp_g = g.predict(Z[t].reshape(1,-1)).astype(int)
-    gnp = node_pxs[yp_g]
-    mg.set_xdata(gnp[:,0])
-    mg.set_ydata(gnp[:,1])
-    mg.set_data(gnp[0])
+with writer.saving(fig, "Regular_Routes_NEW_Dev_"+str(DEV_ID)+".mp4", 100):
+    for t in range(t_0,T-1):
 
-    #######################
-    # Predict a full trace
-    #######################
-    YP = zeros((T_p,2))
-    YP[0] = XX[-1,:]            # end of present trace
-    rtf2 = copy.deepcopy(rtf)
-    xp = copy.deepcopy(X[t+1])
-    for i in range(1,T_p):
-        #zp = xp
-        zp = rtf2.phi(xp)
-        ypp = h.predict(zp.reshape(1,-1)).astype(int)[0]       # predict coordinates
-        print ypp,
-        #print "%d = argmax_y p(y[%d] | %s) " % (ypp, i, zp)
-        #print "nodes: ", nodes[ypp]                            # GEO-coords
-        YP[i] = node_pxs[ypp]                                  # MIG-coords
-        cpp = coord_center(nodes[ypp],mins,maxs)               # ML-coords
-        #print "codes: ", cpp
-        xp[0:2] = cpp
-        xp[2] = xp[2] + 1.#0.01 #33
+        #######################
+        # Plot the trace
+        #######################
+        t0 = max(0,t-b)
+        XX = array(map.to_pixels(uncenter(X[t0:t,0],mins[0],maxs[0]),uncenter(X[t0:t,1],mins[1],maxs[1]))).T
+        m.set_xdata(XX[:,0])
+        m.set_ydata(XX[:,1])
 
-    print ""
+        #######################
+        # Predict into the future, P(y[t+1]|X[t])
+        #######################
+        yp = h.predict(Z[t].reshape(1,-1)).astype(int)
+        print "[t=%d, DOW=%d]" % (t,X[t,3]*7.),
+        print yp,
+        yp_g = g.predict(Z[t].reshape(1,-1)).astype(int)
+        gnp = node_pxs[yp_g]
+        mg.set_xdata(gnp[:,0])
+        mg.set_ydata(gnp[:,1])
+        mg.set_data(gnp[0])
 
-    mp.set_xdata(YP[:,0])
-    mp.set_ydata(YP[:,1])
+        #######################
+        # Predict a full trace
+        #######################
+        YP = zeros((T_p,2))
+        YP[0] = XX[-1,:]            # end of present trace
+        rtf2 = copy.deepcopy(rtf)
+        xp = copy.deepcopy(X[t+1])
+        for i in range(1,T_p):
+            #zp = xp
+            zp = rtf2.phi(xp)
+            ypp = h.predict(zp.reshape(1,-1)).astype(int)[0]       # predict coordinates
+            print ypp,
+            #print "%d = argmax_y p(y[%d] | %s) " % (ypp, i, zp)
+            #print "nodes: ", nodes[ypp]                            # GEO-coords
+            YP[i] = node_pxs[ypp]                                  # MIG-coords
+            cpp = coord_center(nodes[ypp],mins,maxs)               # ML-coords
+            #print "codes: ", cpp
+            xp[0:2] = cpp
+            xp[2] = xp[2] + 1.#0.01 #33
 
-    #######################
-    # Evaluate and plot the error
-    #######################
-    b_ = t % b
-    #window[b_] = sqrt((Y[t] - yp)**2)
-    window[b_] = (Y[t] == yp)*1.
-    history[t-b] = mean(window)
-    #print "AVG", history[t-b], Y[t], " LEARN:", array([Z[t]]), "->", X[t+1,0:2], Y[t]
-    l.set_data(range(0,t-b),history[0:t-b])
-    ax0.set_xlim([0,t-b])
-    ax0.set_ylim([0,max(history)])
+        print ""
 
-    #######################
-    # Update classifier
-    #######################
-    #h.partial_fit(array([Z[t-1]]),X[t+1,0:2].reshape(1,-1))
-    #h.partial_fit(array([Z[t-1]]),Y[t].reshape(1,-1))
-    #if (t+1) % t_0 == 0:
-    if X[t+1,3] != X[t,3]:
-        print "---TRAINING--- (end of day ",(X[t,3]*7),")"
-        h.fit(Z[0:t-1],Y[1:t])
-        g.fit(Z[0:t-10],Y[10:t])     # <--- train on a significant chunk at a time (sklearn's tree not incremental)
+        mp.set_xdata(YP[:,0])
+        mp.set_ydata(YP[:,1])
 
-    pause(0.001)
+        #######################
+        # Evaluate and plot the error
+        #######################
+        b_ = t % b
+        #window[b_] = sqrt((Y[t] - yp)**2)
+        window[b_] = (Y[t] == yp)*1.
+        history[t-b] = mean(window)
+        #print "AVG", history[t-b], Y[t], " LEARN:", array([Z[t]]), "->", X[t+1,0:2], Y[t]
+        '''
+        l.set_data(range(0,t-b),history[0:t-b])
+        ax0.set_xlim([0,t-b])
+        ax0.set_ylim([0,max(history)])
+        '''
+
+        #######################
+        # Update classifier
+        #######################
+        #h.partial_fit(array([Z[t-1]]),X[t+1,0:2].reshape(1,-1))
+        #h.partial_fit(array([Z[t-1]]),Y[t].reshape(1,-1))
+        #if (t+1) % t_0 == 0:
+        if X[t+1,3] != X[t,3]:
+            print "---TRAINING--- (end of day ",(X[t,3]*7),")"
+            h.fit(Z[0:t-1],Y[1:t])
+            g.fit(Z[0:t-10],Y[10:t])     # <--- train on a significant chunk at a time (sklearn's tree not incremental)
+
+        ax1.set_title("Device ID "+str(DEV_ID)+". Day="+str(int(X[t,3]*7))+", "+str(int(X[t,2]*24))+"h")
+        #images.append([copy.deepcopy(m),copy.deepcopy(mp)])
+        pause(0.001)
+        writer.grab_frame()
 
 ioff()

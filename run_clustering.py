@@ -5,7 +5,7 @@
 
 from numpy import *
 from sklearn.cluster import KMeans
-import psycopg2
+from db_utils import get_conn, get_cursor
 
 def cluster(device_id):
     '''
@@ -15,11 +15,7 @@ def cluster(device_id):
     '''
     d_id = str(device_id)
 
-    try:
-        conn = psycopg2.connect("dbname='regularroutes' user='regularroutes' host='localhost' password='TdwqStUh5ptMLeNl' port=5432")
-    except:
-        return "I am unable to connect to the database"
-
+    conn = get_conn()
     c = conn.cursor()
 
     print "Test ..."
