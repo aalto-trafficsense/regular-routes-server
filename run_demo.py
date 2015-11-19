@@ -56,13 +56,12 @@ FILE_X = './dat/'+str(DEV_ID)+'_stream_X.csv'
  
 if not os.path.isfile(FILE_X):
 
-    c = get_cursor() 
+    c = get_cursor(True) 
 
     print "Extracting trace"
-    c.execute('SELECT hour,day_of_week,longitude,latitude FROM averaged_location WHERE device_id = %s', (str(DEV_ID),))
-    dat = array(c.fetchall(),dtype={'names':['H', 'DoW', 'lon', 'lat'], 'formats':['i4', 'i4', 'f4','f4']})
-    run = column_stack([dat['lon'],dat['lat']])
-    X = column_stack([dat['lon'],dat['lat'],dat['H'],dat['DoW']])
+    c.execute('SELECT hour,minute,day_of_week,longitude,latitude FROM averaged_location WHERE device_id = %s', (str(DEV_ID),))
+    dat = array(c.fetchall(),dtype={'names':['H', 'M', 'DoW', 'lon', 'lat'], 'formats':['i4', 'i4', 'i4', 'f4','f4']})
+    X = column_stack([dat['lon'],dat['lat'],dat['H']+(dat['M']/60.),dat['DoW']])
     savetxt(FILE_X, X, delimiter=',')
 
 X = genfromtxt(FILE_X, skip_header=0, delimiter=',')
@@ -78,7 +77,7 @@ FILE_N = './dat/'+str(DEV_ID)+'_stream_nodes.csv'
 
 if not os.path.isfile(FILE_Y) or not os.path.isfile(FILE_N):
 
-    c = get_cursor() 
+    c = get_cursor(True) 
 
     print "Extracting waypoints"
     c.execute('SELECT latitude, longitude FROM cluster_centers WHERE device_id = %s', (str(DEV_ID),))
@@ -280,6 +279,9 @@ mp, = ax1.plot(0,0,'mo-',markersize=2,linewidth=4,label="5-min route prediction"
 m, = ax1.plot(0,0,'ro-',markersize=1,linewidth=2,label="recent trajectory (true)")
 node_pxs = map.to_pixels(nodes)
 n_, = ax1.plot(node_pxs[:,0],node_pxs[:,1],'bo',markersize=5,label="node")
+ax1.set_yticklabels([])
+ax1.set_xticklabels([])
+ax1.grid(False)
 gs.tight_layout(fig,h_pad=0.1)
 #fig.tight_layout()
 legend()
@@ -298,7 +300,7 @@ FFMpegWriter = animation.writers['ffmpeg']
 metadata = dict(title='Simulation Device '+str(DEV_ID), artist='Jesse', comment='Demo')
 writer = FFMpegWriter(fps=15, bitrate=5000, metadata=metadata)
 
-with writer.saving(fig, "Regular_Routes_NEW_Dev_"+str(DEV_ID)+".mp4", 100):
+with writer.saving(fig, "dat/Regular_Routes_OLD_Dev_"+str(DEV_ID)+".mp4", 100):
     for t in range(t_0,T-1):
 
         #######################
@@ -371,7 +373,7 @@ with writer.saving(fig, "Regular_Routes_NEW_Dev_"+str(DEV_ID)+".mp4", 100):
             h.fit(Z[0:t-1],Y[1:t])
             g.fit(Z[0:t-10],Y[10:t])     # <--- train on a significant chunk at a time (sklearn's tree not incremental)
 
-        ax1.set_title("Device ID "+str(DEV_ID)+". Day="+str(int(X[t,3]*7))+", "+str(int(X[t,2]*24))+"h")
+        ax1.set_title("Device ID "+str(DEV_ID)+". DoW="+str(int(X[t,3]*7)+1)+"(/7), "+str(int(X[t,2]*24))+"h")
         #images.append([copy.deepcopy(m),copy.deepcopy(mp)])
         pause(0.001)
         writer.grab_frame()
