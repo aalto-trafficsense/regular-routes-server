@@ -60,7 +60,7 @@ if not os.path.isfile(FILE_X):
 
     print "Extracting trace"
     c.execute('SELECT hour,minute,day_of_week,longitude,latitude FROM averaged_location WHERE device_id = %s', (str(DEV_ID),))
-    dat = array(c.fetchall(),dtype={'names':['H', 'M', 'DoW', 'lon', 'lat'], 'formats':['i4', 'i4', 'i4', 'f4','f4']})
+    dat = array(c.fetchall(),dtype={'names':['H', 'M', 'DoW', 'lon', 'lat'], 'formats':['f4', 'f4', 'i4', 'f4','f4']})
     X = column_stack([dat['lon'],dat['lat'],dat['H']+(dat['M']/60.),dat['DoW']])
     savetxt(FILE_X, X, delimiter=',')
 
@@ -176,19 +176,19 @@ if not os.path.isfile(FILE_F):
 # Pass through an ESN filter
 print "Pass thorugh ESN filter"
 import sys
-from sklearn.kernel_approximation import RBFSampler
-rbf = RBFSampler(gamma=1, random_state=1)
-from cerebro.RTF import RTF
-from cerebro.STF import STF
-from cerebro.functions import linear, sigmoid
-H=D*2+1 #20
-
-#rtf = RTF(D,H,f=linear,density=0.1)
-rtf = STF(D,H,f=sigmoid,fade_factor=0.9)
+#from sklearn.kernel_approximation import RBFSampler
+#rbf = RBFSampler(gamma=1, random_state=1)
+from FF import FF
+#H=D*2+1 #20
+H = 11
+rtf = FF(D,10)
 Z = zeros((T,H))
 for t in range(T):
     #print X[t,0:2], Y[t+1]
+    print X[t,0:2], "->",
     Z[t] = rtf.phi(X[t])
+    print Z[t]
+exit(1)
 
 print "... turned ", X.shape, "into", Z.shape
 
