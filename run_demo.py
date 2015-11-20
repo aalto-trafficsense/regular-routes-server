@@ -321,6 +321,8 @@ with writer.saving(fig, "dat/Regular_Routes_OLD_Dev_"+str(DEV_ID)+".mp4", 100):
         mg.set_xdata(gnp[:,0])
         mg.set_ydata(gnp[:,1])
         mg.set_data(gnp[0])
+        if yp_g == 0:
+            print "GEOFENCE: Message to user: Hey ... if you stop in at the K-Market at XXX, you get a discount. Discount code: 333"
 
         #######################
         # Predict a full trace

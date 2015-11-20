@@ -55,8 +55,12 @@ class FF():
         z = zeros(self.N_h)    # nodes
         z[BIAS] = 1.         # output bias node
 
-        print x,"-->",
         _z = self.Z[0]
+
+        if abs(x[TOD] - _z[XSTAT][TOD]) > 0.034722:
+            print " THERE WAS A BIG GAP OF > 5 MIN SINCE THE LAST MEASUREMENT, WE PROBABLY WANT TO IGNORE THIS PREVIOUS Z"
+            _z[XSTAT] = x[:]
+            _z[XSTAT][TOD] = x[TOD] - 0.034722
 
         z[XSTAT] = x[:]                                               # x
         z_DIR = x[POS] - _z[ZPOS]                                     # direction vector
