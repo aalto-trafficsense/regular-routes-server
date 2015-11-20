@@ -11,13 +11,13 @@ BAR_GAP = 10
 
 def generate_energy_rating_svg(energy_rating, start_time_string, end_time_string):
 
-    colours = (svgwrite.rgb(0,140,88),
+    colours = [svgwrite.rgb(0,140,88),
                svgwrite.rgb(32,172,41),
                svgwrite.rgb(173,213,0),
                svgwrite.rgb(247,247,0),
                svgwrite.rgb(246,189,0),
                svgwrite.rgb(230,99,19),
-               svgwrite.rgb(221,0,32))
+               svgwrite.rgb(221,0,32)]
 
     labels = ("Bicycle",
               "Walking",
@@ -55,7 +55,14 @@ def generate_energy_rating_svg(energy_rating, start_time_string, end_time_string
                                      stroke_width=1,
                                      font_size=INFO_FONT_SIZE,
                                      font_family="Helvetica"))
-    CO2_text = svg_drawing.text("CO2 g/km",
+    svg_drawing.add(svg_drawing.text("{:.1f} CO2 g/km".format(energy_rating.average_co2),
+                                     insert=(550, 250),
+                                     fill=svgwrite.rgb(0,0,0),
+                                     stroke=svgwrite.rgb(0,0,0),
+                                     stroke_width=1,
+                                     font_size=70,
+                                     font_family="Helvetica"))
+    CO2_text = svg_drawing.text("km",
                                      insert=(5, 40),
                                      fill=svgwrite.rgb(0,0,0),
                                      stroke=svgwrite.rgb(0,0,0),
@@ -68,7 +75,7 @@ def generate_energy_rating_svg(energy_rating, start_time_string, end_time_string
     for i in range(len(colours)):
         #Draw the energy rating bars
         x_left = 100
-        x_right = x_left + 200 + CO2_amounts[i] * 3
+        x_right = x_left + CO2_amounts[i] * 5
         x_arrow_tip = x_right + 30
         y_top = 80 + (BAR_HEIGHT + BAR_GAP) * i
         y_bottom = y_top + BAR_HEIGHT #height is 26 units + 5 units gap between bars
@@ -77,32 +84,29 @@ def generate_energy_rating_svg(energy_rating, start_time_string, end_time_string
             opacity = 1
         else:
             opacity = 0.4
+            colours[i] = svgwrite.rgb(50,50,50)
 
         svg_drawing.add(svg_drawing.polygon(((x_left, y_top), (x_right, y_top), (x_arrow_tip, y_middle), (x_right, y_bottom), (x_left, y_bottom)),
                                             fill=colours[i],
                                             stroke=colours[i],
                                             fill_opacity=opacity,
                                             stroke_width=3))
-
         svg_drawing.add(svg_drawing.text(labels[i],
                                          insert=(x_left + 5, y_middle + LABEL_FONT_SIZE / 2),
                                          fill=svgwrite.rgb(50,50,50),
                                          stroke=svgwrite.rgb(50,50,50),
                                          stroke_width=2,
                                          font_size=LABEL_FONT_SIZE,
-                                         font_family="Helvetica",
-                                         font_weight="bold"))
-
-        svg_drawing.add(svg_drawing.text("{:.1f} km".format(distances[i]),
-                                         insert=(x_right, y_middle + LABEL_FONT_SIZE / 2),
+                                         font_family="Helvetica"))
+        svg_drawing.add(svg_drawing.text("{:.1f}".format(distances[i]),
+                                         insert=(x_left - 5, y_middle + LABEL_FONT_SIZE / 2),
                                          fill=svgwrite.rgb(50,50,50),
                                          stroke=svgwrite.rgb(50,50,50),
                                          stroke_width=2,
                                          font_size=LABEL_FONT_SIZE,
                                          font_family="Helvetica",
-                                         font_weight="bold",
                                          text_anchor="end"))
-
+        """
         svg_drawing.add(svg_drawing.text(CO2_amounts[i],
                                          insert=(x_left - 25, y_middle + LABEL_FONT_SIZE / 2),
                                          fill=svgwrite.rgb(0,0,0),
@@ -111,12 +115,12 @@ def generate_energy_rating_svg(energy_rating, start_time_string, end_time_string
                                          font_size=LABEL_FONT_SIZE,
                                          font_family="Helvetica",
                                          text_anchor="end"))
-
+        """
 
 
     bottom_bar_amounts = (0, 25, 50, 75, 100, 125, 150)
 
-    BAR_MIN = 150
+    BAR_MIN = 100
     BAR_MAX = 800
     BAR_Y = 700
     BAR_TICK_SIZE = 20
@@ -147,7 +151,7 @@ def generate_energy_rating_svg(energy_rating, start_time_string, end_time_string
                                  text_anchor="middle"))
 
     svg_drawing.add(svg_drawing.text("Average:",
-                                 insert=(10, BAR_Y),
+                                 insert=(10, BAR_Y - 30),
                                  fill=svgwrite.rgb(0,0,0),
                                  stroke=svgwrite.rgb(0,0,0),
                                  stroke_width=1,
