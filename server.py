@@ -661,6 +661,7 @@ def get_distinct_device_ids(datetime_start, datetime_end):
     '''), date_start=str(datetime_start), date_end=str(datetime_end))
 
 
+
 def data_points_snapping(device_id, datetime_start, datetime_end):
     qstart = '''
         SELECT id,
