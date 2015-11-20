@@ -185,10 +185,9 @@ rtf = FF(D,10)
 Z = zeros((T,H))
 for t in range(T):
     #print X[t,0:2], Y[t+1]
-    print X[t,0:2], "->",
+    #print X[t,0:2], "->",
     Z[t] = rtf.phi(X[t])
-    print Z[t]
-exit(1)
+    #print Z[t]
 
 print "... turned ", X.shape, "into", Z.shape
 
