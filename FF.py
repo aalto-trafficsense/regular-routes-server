@@ -51,6 +51,7 @@ class FF():
     def phi(self,x):
         ##### TODO: WILL ALSO WANT TO CHECK TOD COMPARED TO THE LAST TOD
         ##### IF THERE IS A BIG GAP, THEN WE ARE FILTERING .. AND ASSUME PREVIOUS POINTS WERE STATIONARY (MAY WORK ANYWAY?)
+        #print x, "->",
 
         z = zeros(self.N_h)    # nodes
         z[BIAS] = 1.         # output bias node
@@ -58,7 +59,9 @@ class FF():
         _z = self.Z[0]
 
         if abs(x[TOD] - _z[XSTAT][TOD]) > 0.034722:
-            print " THERE WAS A BIG GAP OF > 5 MIN SINCE THE LAST MEASUREMENT, WE PROBABLY WANT TO IGNORE THIS PREVIOUS Z"
+            print " THERE WAS A GAP OF ",abs(x[TOD] - _z[XSTAT][TOD])*24.," HRS SINCE THE LAST MEASUREMENT, IGNORE THIS PREVIOUS Z"
+            print "_x", _z[XSTAT]
+            print " x", x
             _z[XSTAT] = x[:]
             _z[XSTAT][TOD] = x[TOD] - 0.034722
 
@@ -77,6 +80,7 @@ class FF():
         #### NOTE: FOR NOW, JUST STORE THE PREVIOUS Z (NOT A WHOLE HISTORY -- CAN DO THAT LATER)
         #self.b = (self.b + 1) % self.Z.shape[0]
         self.Z[0] = z[:]
+        #print z, "(", x
         return z
 
     def reset(self):
