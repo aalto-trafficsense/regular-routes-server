@@ -3,10 +3,12 @@
 import json
 import hashlib
 import re
+import urllib2
 import geoalchemy2 as ga2
 import math
 import svg_generation
 from constants import *
+from apscheduler.schedulers.background import BackgroundScheduler
 from datetime import date, timedelta
 from flask import Flask, abort, jsonify, request, render_template, Response
 from flask.ext.sqlalchemy import SQLAlchemy
@@ -18,7 +20,8 @@ from sqlalchemy.dialects.postgres import DOUBLE_PRECISION, TIMESTAMP, UUID
 from sqlalchemy.exc import DataError
 from sqlalchemy.sql import text, func, column, table, select
 from uuid import uuid4
-
+import logging
+logging.basicConfig()
 
 
 
@@ -50,6 +53,14 @@ https://developer.android.com/reference/com/google/android/gms/location/Detected
 '''
 activity_types = ('IN_VEHICLE', 'ON_BICYCLE', 'ON_FOOT', 'RUNNING', 'STILL', 'TILTING', 'UNKNOWN', 'WALKING')
 activity_type_enum = Enum(*activity_types, name='activity_type_enum')
+
+'''
+These types are the same as here:
+https://github.com/HSLdevcom/navigator-proto/blob/master/src/routing.coffee#L43
+'''
+mass_transit_types = ("FERRY", "SUBWAY", "TRAIN", "TRAM", "BUS")
+mass_transit_type_enum = Enum(*mass_transit_types, name='mass_transit_type_enum')
+
 
 
 # Schema definitions:
@@ -110,11 +121,9 @@ filtered_device_data_table = Table('device_data_filtered', metadata,
                           Column('id', Integer, primary_key=True),
                           Column('device_id', Integer, ForeignKey('devices.id'), nullable=False),
                           Column('coordinate', ga2.Geography('point', 4326, spatial_index=False), nullable=False),
-                          Column('accuracy', DOUBLE_PRECISION, nullable=False),
                           Column('time', TIMESTAMP, nullable=False),
                           Column('activity', activity_type_enum),
                           Column('waypoint_id', BigInteger),
-                          Column('snapping_time', TIMESTAMP),
                           Index('idx_device_data_filtered_time', 'time'),
                           Index('idx_device_data_filtered_device_id_time', 'device_id', 'time'))
 
@@ -136,11 +145,40 @@ travelled_distances_table = Table('travelled_distances', metadata,
                           Index('idx_travelled_distances_device_id_time', 'device_id', 'time'))
 travelled_distances_table.create(bind=db.engine, checkfirst=True)
 
+# HSL mass transit vehicle locations.
+mass_transit_data_table = Table('mass_transit_data', metadata,
+                          Column('id', Integer, primary_key=True),
+                          Column('coordinate', ga2.Geography('point', 4326, spatial_index=True), nullable=False),
+                          Column('time', TIMESTAMP, nullable=False),
+                          Column('line_type', mass_transit_type_enum, nullable=False),
+                          Column('line_name', String, nullable=False),
+                          Column('vehicle_ref', String, nullable=False),
+                          UniqueConstraint('time', 'vehicle_ref', name="unique_vehicle_and_timestamp"),
+                          Index('idx_mass_transit_data_time', 'time'),
+                          Index('idx_mass_transit_data_vehicle_ref_time', 'vehicle_ref', 'time'))
+
+
+if not mass_transit_data_table.exists(bind=db.engine):
+    mass_transit_data_table.create(bind=db.engine, checkfirst=True)
+    db.engine.execute(text('''
+        CREATE RULE "mass_transit_data_table_duplicate_ignore" AS ON INSERT TO "mass_transit_data"
+        WHERE EXISTS(SELECT 1 FROM mass_transit_data
+                    WHERE (vehicle_ref, time)=(NEW.vehicle_ref, NEW.time))
+        DO INSTEAD NOTHING;
+        '''))
+
 
 metadata.create_all(bind=db.engine, checkfirst=True)
 
-# REST interface:
+scheduler = BackgroundScheduler()
 
+def initialize():
+    scheduler.add_job(retrieve_hsl_data, "cron", second="*/28", coalesce=True)
+    scheduler.start()
+
+
+
+# REST interface:
 
 @app.route('/register', methods=['POST'])
 def register_post():
@@ -652,6 +690,32 @@ def filter_device_data(date_str):
     if return_string == "":
         return_string = "No matches found!"
 
+def retrieve_hsl_data():
+    url = "http://dev.hsl.fi/siriaccess/vm/json"
+    response = urllib2.urlopen(url)
+    json_data = json.loads(response.read())
+    vehicle_data = json_data["Siri"]["ServiceDelivery"]["VehicleMonitoringDelivery"][0]["VehicleActivity"]
+
+    all_vehicles = []
+
+    for vehicle in vehicle_data:
+        timestamp = datetime.datetime.fromtimestamp(vehicle["RecordedAtTime"] / 1000) #datetime doesn't like millisecond accuracy
+        line_name, line_type = interpret_jore(vehicle["MonitoredVehicleJourney"]["LineRef"]["value"])
+        longitude = vehicle["MonitoredVehicleJourney"]["VehicleLocation"]["Longitude"]
+        latitude = vehicle["MonitoredVehicleJourney"]["VehicleLocation"]["Latitude"]
+        coordinate = 'POINT(%f %f)' % (longitude, latitude)
+        vehicle_ref = vehicle["MonitoredVehicleJourney"]["VehicleRef"]["value"]
+
+        vehicle_item = {
+            'coordinate': coordinate,
+            'line_name': line_name,
+            'line_type': line_type,
+            'time': timestamp,
+            'vehicle_ref': vehicle_ref
+        }
+        all_vehicles.append(vehicle_item)
+
+    db.engine.execute(mass_transit_data_table.insert(all_vehicles))
 
 def rating_to_string(energy_rating):
     return_string = "\
@@ -737,7 +801,6 @@ def get_distinct_device_ids(datetime_start, datetime_end):
         WHERE time >= :date_start
         AND time < :date_end;
     '''), date_start=str(datetime_start), date_end=str(datetime_end))
-
 
 
 def data_points_snapping(device_id, datetime_start, datetime_end):
@@ -957,9 +1020,8 @@ def verify_and_get_account_id(credentials):
 
 # App starting point:
 if __name__ == '__main__':
-    print interpret_jore("3001K")
-    exit()
+    initialize()
     if app.debug:
-        app.run(host='0.0.0.0')
+        app.run(host='0.0.0.0', use_reloader=False)
     else:
         app.run()
