@@ -2,6 +2,7 @@
 
 import json
 import hashlib
+import re
 import geoalchemy2 as ga2
 import math
 import svg_generation
@@ -11,7 +12,8 @@ from flask import Flask, abort, jsonify, request, render_template, Response
 from flask.ext.sqlalchemy import SQLAlchemy
 from oauth2client.client import *
 from oauth2client.crypt import AppIdentityError
-from sqlalchemy import MetaData, Table, Column, ForeignKey, Enum, BigInteger, Integer, String, Index, UniqueConstraint
+from sqlalchemy import MetaData, Table, Column, ForeignKey, Enum, BigInteger, Integer, String, Index, UniqueConstraint, Date, \
+    Float
 from sqlalchemy.dialects.postgres import DOUBLE_PRECISION, TIMESTAMP, UUID
 from sqlalchemy.exc import DataError
 from sqlalchemy.sql import text, func, column, table, select
@@ -102,6 +104,38 @@ device_data_table = Table('device_data', metadata,
                           Index('idx_device_data_device_id_time', 'device_id', 'time'))
 
 Index('idx_device_data_snapping_time_null', device_data_table.c.snapping_time, postgresql_where=device_data_table.c.snapping_time == None)
+
+# device_data_table after filtering activities.
+filtered_device_data_table = Table('device_data_filtered', metadata,
+                          Column('id', Integer, primary_key=True),
+                          Column('device_id', Integer, ForeignKey('devices.id'), nullable=False),
+                          Column('coordinate', ga2.Geography('point', 4326, spatial_index=False), nullable=False),
+                          Column('accuracy', DOUBLE_PRECISION, nullable=False),
+                          Column('time', TIMESTAMP, nullable=False),
+                          Column('activity', activity_type_enum),
+                          Column('waypoint_id', BigInteger),
+                          Column('snapping_time', TIMESTAMP),
+                          Index('idx_device_data_filtered_time', 'time'),
+                          Index('idx_device_data_filtered_device_id_time', 'device_id', 'time'))
+
+filtered_device_data_table.create(bind=db.engine, checkfirst=True)
+
+# travelled distances per day per device
+travelled_distances_table = Table('travelled_distances', metadata,
+                          Column('id', Integer, primary_key=True),
+                          Column('device_id', Integer, ForeignKey('devices.id'), nullable=False),
+                          Column('time', Date, nullable=False),
+                          Column('cycling', Float),
+                          Column('walking', Float),
+                          Column('running', Float),
+                          Column('mass_transit_a', Float),
+                          Column('mass_transit_b', Float),
+                          Column('mass_transit_c', Float),
+                          Column('car', Float),
+                          Index('idx_travelled_distances_time', 'time'),
+                          Index('idx_travelled_distances_device_id_time', 'device_id', 'time'))
+travelled_distances_table.create(bind=db.engine, checkfirst=True)
+
 
 metadata.create_all(bind=db.engine, checkfirst=True)
 
@@ -558,7 +592,7 @@ def calculate_rating(device_data_rows):
     rows = device_data_rows.fetchall()
     bad_activities = ("UNKNOWN", "TILTING", "STILL")
     if len(rows) == 0:
-        return EnergyRating(0, 0, 0, 0)
+        return EnergyRating(0, 0, 0, 0, 0, 0, 0)
     in_vehicle_distance = 0
     on_bicycle_distance = 0
     walking_distance = 0
@@ -584,7 +618,7 @@ def calculate_rating(device_data_rows):
         # Latitude: 1 deg = 110.574 km
         # Longitude: 1 deg = 111.320*cos(latitude) km
 
-        xdiff = (previous_location[0] - current_location[0]) * 110.320 * math.cos(current_location[1] / 360 * math.pi)
+        xdiff = (previous_location[0] - current_location[0]) * 110.320 * math.cos((current_location[1] / 360) * math.pi)
         ydiff = (previous_location[1] - current_location[1]) * 110.574
 
         distance = (xdiff * xdiff + ydiff * ydiff)**0.5
@@ -600,9 +634,24 @@ def calculate_rating(device_data_rows):
         elif current_activity == "WALKING":
             walking_distance += distance
 
-
-
     return EnergyRating(in_vehicle_distance, 0, 0, 0, on_bicycle_distance, running_distance, walking_distance)
+
+
+def filter_device_data(date_str):
+    date_start = requested_date
+    date_end = str(datetime.datetime.strptime(requested_date, '%Y-%m-%d').date() + timedelta(days=1))
+    return_string = ""
+    device_id_rows = get_distinct_device_ids(date_start, date_end)
+    for row in device_id_rows:
+        device_id = str(row["device_id"])
+        return_string += "DEVICE: " + device_id + "<br>"
+        device_data_rows = data_points_snapping(device_id, date_start, date_end)
+        return_string += rating_to_string(calculate_rating(device_data_rows))
+        return_string += "<br><br><br>"
+
+    if return_string == "":
+        return_string = "No matches found!"
+
 
 def rating_to_string(energy_rating):
     return_string = "\
@@ -634,7 +683,36 @@ def rating_to_string(energy_rating):
     return return_string
 
 
+jore_ferry_regex = re.compile("^1019")
+jore_subway_regex = re.compile("^1300")
+jore_rail_regex = re.compile("^300")
+jore_tram_regex = re.compile("^10(0|10)")
+jore_bus_regex = re.compile("^(1|2|4)...")
 
+jore_tram_replace_regex = re.compile("^.0*")
+jore_bus_replace_regex = re.compile("^.0*")
+
+def interpret_jore(jore_code):
+    if re.search(jore_ferry_regex, jore_code):
+        line_name = "Ferry"
+        line_type = "FERRY"
+    elif re.search(jore_subway_regex, jore_code):
+        line_name = jore_code[4:5]
+        line_type = "SUBWAY"
+    elif re.search(jore_rail_regex, jore_code):
+        line_name = jore_code[4:5]
+        line_type = "TRAIN"
+    elif re.search(jore_tram_regex, jore_code):
+        line_name = re.sub(jore_tram_replace_regex, "", jore_code)
+        line_type = "TRAM"
+    elif re.search(jore_bus_regex, jore_code):
+        line_name = re.sub(jore_tram_replace_regex, "", jore_code)
+        line_type = "BUS"
+    else:
+        # unknown, assume bus
+        line_name = jore_code
+        line_type = "BUS"
+    return line_name, line_type
 
 
 def generate_csv(rows):
@@ -879,6 +957,8 @@ def verify_and_get_account_id(credentials):
 
 # App starting point:
 if __name__ == '__main__':
+    print interpret_jore("3001K")
+    exit()
     if app.debug:
         app.run(host='0.0.0.0')
     else:
