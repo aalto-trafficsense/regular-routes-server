@@ -173,7 +173,9 @@ metadata.create_all(bind=db.engine, checkfirst=True)
 scheduler = BackgroundScheduler()
 
 def initialize():
-    scheduler.add_job(retrieve_hsl_data, "cron", second="*/28", coalesce=True)
+    scheduler.add_job(retrieve_hsl_data, "cron", second="*/28")
+    #scheduler.add_job(filter_device_data, "cron", hour="3")
+    #filter_device_data()
     scheduler.start()
 
 
@@ -675,20 +677,122 @@ def calculate_rating(device_data_rows):
     return EnergyRating(in_vehicle_distance, 0, 0, 0, on_bicycle_distance, running_distance, walking_distance)
 
 
-def filter_device_data(date_str):
-    date_start = requested_date
-    date_end = str(datetime.datetime.strptime(requested_date, '%Y-%m-%d').date() + timedelta(days=1))
-    return_string = ""
-    device_id_rows = get_distinct_device_ids(date_start, date_end)
-    for row in device_id_rows:
-        device_id = str(row["device_id"])
-        return_string += "DEVICE: " + device_id + "<br>"
-        device_data_rows = data_points_snapping(device_id, date_start, date_end)
-        return_string += rating_to_string(calculate_rating(device_data_rows))
-        return_string += "<br><br><br>"
+def filter_device_data():
+    #date_end = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    #date_start = date_end - timedelta(days=1)
 
-    if return_string == "":
-        return_string = "No matches found!"
+    end_time = datetime.datetime.strptime("2015-09-17", '%Y-%m-%d')
+    start_time = end_time.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=7)
+    end_time_string = end_time.strftime("%Y-%m-%d")
+    start_time_string = start_time.strftime("%Y-%m-%d")
+
+    device_id_rows = get_distinct_device_ids(start_time_string, end_time_string)
+
+    DEVICE_ID_TEMP = 80
+    device_data_rows = data_points_snapping_raw(DEVICE_ID_TEMP, start_time_string, end_time_string)
+    analyse_unfiltered_data(device_data_rows, DEVICE_ID_TEMP)
+
+    #for row in device_id_rows:
+    #    device_id = str(row["device_id"])
+    #    device_data_rows = data_points_snapping(device_id, start_time_string, end_time_string)
+    #    analyse_unfiltered_data(device_data_rows, device_id)
+
+
+def reset_activity_weights(weights):
+    for activity in weights:
+        weights[activity] = 0
+
+def get_best_activity(weights):
+    max = 0
+    best_activity = "NOT_SET" #default
+    weights["WALKING"] += weights["ON_FOOT"]
+    for activity in weights:
+        if weights[activity] > max:
+            max = weights[activity]
+            best_activity = activity
+    return best_activity
+
+def flush_device_data_queue(device_data_queue, activity, device_id):
+    if len(device_data_queue) == 0:
+        return
+    filtered_device_data = []
+    for device_data_row in device_data_queue:
+        filtered_device_data.append({"activity" : activity,
+                                     "device_id" : device_id,
+                                     "coordinate" : device_data_row["coordinate"],
+                                     "time" : device_data_row["time"],
+                                     "waypoint_id" : device_data_row["waypoint_id"]})
+    db.engine.execute(filtered_device_data_table.insert(filtered_device_data))
+
+
+def analyse_row_activities(row, current_weights):
+    current_activity = "NOT_SET"
+    if row["activity_3"] in current_weights:
+        current_weights[row["activity_3"]] += 1
+        current_activity = row["activity_3"]
+    if row["activity_2"] in current_weights:
+        current_weights[row["activity_2"]] += 2
+        current_activity = row["activity_2"]
+    if row["activity_1"] in current_weights:
+        current_weights[row["activity_1"]] += 4
+        current_activity = row["activity_1"]
+    if current_activity == "ON_FOOT": #The dictionary performs this check in get_best_activity
+        current_activity = "WALKING"
+    return current_activity
+
+def analyse_unfiltered_data(device_data_rows, device_id):
+    print datetime.datetime.now()
+    rows = device_data_rows.fetchall()
+    if len(rows) == 0:
+        return
+    device_data_queue = []
+    current_weights = {'IN_VEHICLE' : 0,
+                       'ON_BICYCLE' : 0,
+                       'RUNNING' : 0,
+                       'WALKING' : 0,
+                       'ON_FOOT' : 0}
+    time_previous = rows[0]["time"]
+    best_activity = "NOT_SET"
+    previous_best_activity = "NOT_SET"
+    consecutive_differences = 0
+
+    for i in xrange(len(rows)):
+        current_row = rows[i]
+        if (current_row["time"] - time_previous).total_seconds() > MAX_POINT_TIME_DIFFERENCE:
+            best_activity = get_best_activity(current_weights)
+            if best_activity != "NOT_SET": #if false, no good activity was found
+                flush_device_data_queue(device_data_queue, best_activity, device_id)
+                previous_best_activity = best_activity
+            reset_activity_weights(current_weights)
+            device_data_queue = []
+
+
+        time_previous = current_row["time"]
+        current_activity = analyse_row_activities(current_row, current_weights)
+        device_data_queue.append(current_row)
+
+        best_activity = get_best_activity(current_weights)
+        if best_activity != "NOT_SET" and current_activity != "NOT_SET" and current_activity != best_activity:
+            consecutive_differences += 1
+            if consecutive_differences >= CONSECUTIVE_DIFFERENCE_LIMIT:
+                #Flush all but the last CONSECUTIVE_DIFFERENCE_LIMIT items
+                flush_device_data_queue(device_data_queue[:-CONSECUTIVE_DIFFERENCE_LIMIT], best_activity, device_id)
+                previous_best_activity = best_activity
+                reset_activity_weights(current_weights)
+                device_data_queue = device_data_queue[-CONSECUTIVE_DIFFERENCE_LIMIT:]
+                consecutive_differences = 0
+                #set the current weights to correspond with the remaining items
+                for j in range(CONSECUTIVE_DIFFERENCE_LIMIT):
+                    analyse_row_activities(rows[i-j], current_weights)
+        else:
+            consecutive_differences = 0
+
+    if best_activity not in current_weights:
+        best_activity = previous_best_activity
+    if best_activity in current_weights:
+        flush_device_data_queue(device_data_queue, best_activity, device_id)
+    print datetime.datetime.now()
+
 
 def retrieve_hsl_data():
     url = "http://dev.hsl.fi/siriaccess/vm/json"
@@ -831,6 +935,38 @@ def data_points_snapping(device_id, datetime_start, datetime_end):
     '''
         points =  db.engine.execute(text(qstring), device_id=device_id, time_start=datetime_start, time_end=datetime_end)
     return points
+
+
+def data_points_snapping_raw(device_id, datetime_start, datetime_end):
+    #Same as above but coordinate is not converted to json
+    qstart = '''
+        SELECT id,
+            ST_AsText(coordinate) AS coordinate,
+            accuracy,
+            activity_1, activity_1_conf,
+            activity_2, activity_2_conf,
+            activity_3, activity_3_conf,
+            waypoint_id,
+            time
+        FROM device_data
+    '''
+    if device_id == 0:
+        qstring = qstart + '''
+        WHERE time >= :time_start
+        AND time < :time_end
+        ORDER BY time ASC
+    '''
+        points = db.engine.execute(text(qstring), time_start=datetime_start, time_end=datetime_end)
+    else:
+        qstring = qstart + '''
+        WHERE device_id = :device_id
+        AND time >= :time_start
+        AND time < :time_end
+        ORDER BY time ASC
+    '''
+        points =  db.engine.execute(text(qstring), device_id=device_id, time_start=datetime_start, time_end=datetime_end)
+    return points
+
 
 def verify_user_id(user_id):
     if user_id is None or user_id == '':
