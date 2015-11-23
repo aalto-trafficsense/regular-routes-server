@@ -689,7 +689,7 @@ def filter_device_data():
     device_id_rows = get_distinct_device_ids(start_time_string, end_time_string)
 
     DEVICE_ID_TEMP = 80
-    device_data_rows = data_points_snapping_raw(DEVICE_ID_TEMP, start_time_string, end_time_string)
+    device_data_rows = data_points_snapping(DEVICE_ID_TEMP, start_time_string, end_time_string)
     analyse_unfiltered_data(device_data_rows, DEVICE_ID_TEMP)
 
     #for row in device_id_rows:
@@ -717,9 +717,10 @@ def flush_device_data_queue(device_data_queue, activity, device_id):
         return
     filtered_device_data = []
     for device_data_row in device_data_queue:
+        current_location = json.loads(device_data_row["geojson"])["coordinates"]
         filtered_device_data.append({"activity" : activity,
                                      "device_id" : device_id,
-                                     "coordinate" : device_data_row["coordinate"],
+                                     'coordinate': 'POINT(%f %f)' % (float(current_location[0]), float(current_location[1])),
                                      "time" : device_data_row["time"],
                                      "waypoint_id" : device_data_row["waypoint_id"]})
     db.engine.execute(filtered_device_data_table.insert(filtered_device_data))
@@ -937,37 +938,6 @@ def data_points_snapping(device_id, datetime_start, datetime_end):
     return points
 
 
-def data_points_snapping_raw(device_id, datetime_start, datetime_end):
-    #Same as above but coordinate is not converted to json
-    qstart = '''
-        SELECT id,
-            ST_AsText(coordinate) AS coordinate,
-            accuracy,
-            activity_1, activity_1_conf,
-            activity_2, activity_2_conf,
-            activity_3, activity_3_conf,
-            waypoint_id,
-            time
-        FROM device_data
-    '''
-    if device_id == 0:
-        qstring = qstart + '''
-        WHERE time >= :time_start
-        AND time < :time_end
-        ORDER BY time ASC
-    '''
-        points = db.engine.execute(text(qstring), time_start=datetime_start, time_end=datetime_end)
-    else:
-        qstring = qstart + '''
-        WHERE device_id = :device_id
-        AND time >= :time_start
-        AND time < :time_end
-        ORDER BY time ASC
-    '''
-        points =  db.engine.execute(text(qstring), device_id=device_id, time_start=datetime_start, time_end=datetime_end)
-    return points
-
-
 def verify_user_id(user_id):
     if user_id is None or user_id == '':
         print 'empty user_id'
@@ -1152,7 +1122,6 @@ def verify_and_get_account_id(credentials):
     credentials.authorize(http)
 
     return data
-
 
 # App starting point:
 if __name__ == '__main__':
