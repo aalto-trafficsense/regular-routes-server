@@ -7,6 +7,7 @@ import urllib2
 import geoalchemy2 as ga2
 import math
 import svg_generation
+from device_data_filterer import DeviceDataFilterer
 from constants import *
 from apscheduler.schedulers.background import BackgroundScheduler
 from datetime import date, timedelta
@@ -690,7 +691,9 @@ def filter_device_data():
 
     DEVICE_ID_TEMP = 80
     device_data_rows = data_points_snapping(DEVICE_ID_TEMP, start_time_string, end_time_string)
-    analyse_unfiltered_data(device_data_rows, DEVICE_ID_TEMP)
+
+    device_data_filterer = DeviceDataFilterer(db, filtered_device_data_table)
+    device_data_filterer.analyse_unfiltered_data(device_data_rows, DEVICE_ID_TEMP)
 
     #for row in device_id_rows:
     #    device_id = str(row["device_id"])
@@ -698,101 +701,6 @@ def filter_device_data():
     #    analyse_unfiltered_data(device_data_rows, device_id)
 
 
-def reset_activity_weights(weights):
-    for activity in weights:
-        weights[activity] = 0
-
-def get_best_activity(weights):
-    max = 0
-    best_activity = "NOT_SET" #default
-    weights["WALKING"] += weights["ON_FOOT"]
-    for activity in weights:
-        if weights[activity] > max:
-            max = weights[activity]
-            best_activity = activity
-    return best_activity
-
-def flush_device_data_queue(device_data_queue, activity, device_id):
-    if len(device_data_queue) == 0:
-        return
-    filtered_device_data = []
-    for device_data_row in device_data_queue:
-        current_location = json.loads(device_data_row["geojson"])["coordinates"]
-        filtered_device_data.append({"activity" : activity,
-                                     "device_id" : device_id,
-                                     'coordinate': 'POINT(%f %f)' % (float(current_location[0]), float(current_location[1])),
-                                     "time" : device_data_row["time"],
-                                     "waypoint_id" : device_data_row["waypoint_id"]})
-    db.engine.execute(filtered_device_data_table.insert(filtered_device_data))
-
-
-def analyse_row_activities(row, current_weights):
-    current_activity = "NOT_SET"
-    if row["activity_3"] in current_weights:
-        current_weights[row["activity_3"]] += 1
-        current_activity = row["activity_3"]
-    if row["activity_2"] in current_weights:
-        current_weights[row["activity_2"]] += 2
-        current_activity = row["activity_2"]
-    if row["activity_1"] in current_weights:
-        current_weights[row["activity_1"]] += 4
-        current_activity = row["activity_1"]
-    if current_activity == "ON_FOOT": #The dictionary performs this check in get_best_activity
-        current_activity = "WALKING"
-    return current_activity
-
-def analyse_unfiltered_data(device_data_rows, device_id):
-    print datetime.datetime.now()
-    rows = device_data_rows.fetchall()
-    if len(rows) == 0:
-        return
-    device_data_queue = []
-    current_weights = {'IN_VEHICLE' : 0,
-                       'ON_BICYCLE' : 0,
-                       'RUNNING' : 0,
-                       'WALKING' : 0,
-                       'ON_FOOT' : 0}
-    time_previous = rows[0]["time"]
-    best_activity = "NOT_SET"
-    previous_best_activity = "NOT_SET"
-    consecutive_differences = 0
-
-    for i in xrange(len(rows)):
-        current_row = rows[i]
-        if (current_row["time"] - time_previous).total_seconds() > MAX_POINT_TIME_DIFFERENCE:
-            best_activity = get_best_activity(current_weights)
-            if best_activity != "NOT_SET": #if false, no good activity was found
-                flush_device_data_queue(device_data_queue, best_activity, device_id)
-                previous_best_activity = best_activity
-            reset_activity_weights(current_weights)
-            device_data_queue = []
-
-
-        time_previous = current_row["time"]
-        current_activity = analyse_row_activities(current_row, current_weights)
-        device_data_queue.append(current_row)
-
-        best_activity = get_best_activity(current_weights)
-        if best_activity != "NOT_SET" and current_activity != "NOT_SET" and current_activity != best_activity:
-            consecutive_differences += 1
-            if consecutive_differences >= CONSECUTIVE_DIFFERENCE_LIMIT:
-                #Flush all but the last CONSECUTIVE_DIFFERENCE_LIMIT items
-                flush_device_data_queue(device_data_queue[:-CONSECUTIVE_DIFFERENCE_LIMIT], best_activity, device_id)
-                previous_best_activity = best_activity
-                reset_activity_weights(current_weights)
-                device_data_queue = device_data_queue[-CONSECUTIVE_DIFFERENCE_LIMIT:]
-                consecutive_differences = 0
-                #set the current weights to correspond with the remaining items
-                for j in range(CONSECUTIVE_DIFFERENCE_LIMIT):
-                    analyse_row_activities(rows[i-j], current_weights)
-        else:
-            consecutive_differences = 0
-
-    if best_activity not in current_weights:
-        best_activity = previous_best_activity
-    if best_activity in current_weights:
-        flush_device_data_queue(device_data_queue, best_activity, device_id)
-    print datetime.datetime.now()
 
 
 def retrieve_hsl_data():
