@@ -1,3 +1,5 @@
+import re
+
 #CO2 emissions per km:
 ON_BICYCLE_CO2 = 21
 WALKING_CO2 = 33
@@ -13,3 +15,14 @@ MAX_POINT_TIME_DIFFERENCE = 300
 
 #Maximum number of different
 CONSECUTIVE_DIFFERENCE_LIMIT = 10
+
+
+#Regexes for the HSL api
+jore_ferry_regex = re.compile("^1019")
+jore_subway_regex = re.compile("^1300")
+jore_rail_regex = re.compile("^300")
+jore_tram_regex = re.compile("^10(0|10)")
+jore_bus_regex = re.compile("^(1|2|4)...")
+
+jore_tram_replace_regex = re.compile("^.0*")
+jore_bus_replace_regex = re.compile("^.0*")

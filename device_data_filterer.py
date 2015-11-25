@@ -90,7 +90,6 @@ class DeviceDataFilterer:
             current_row = rows[i]
             if (current_row["time"] - time_previous).total_seconds() > MAX_POINT_TIME_DIFFERENCE:
                 if chosen_activity != "NOT_SET": #if false, no good activity was found
-                    pass
                     self.flush_device_data_queue(device_data_queue, chosen_activity, device_id)
                 device_data_queue = []
                 chosen_activity = "NOT_SET"
