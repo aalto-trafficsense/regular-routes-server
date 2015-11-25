@@ -142,6 +142,8 @@ travelled_distances_table = Table('travelled_distances', metadata,
                           Column('mass_transit_b', Float),
                           Column('mass_transit_c', Float),
                           Column('car', Float),
+                          Column('average_CO2', Float),
+                          Column('ranking', Integer),
                           Index('idx_travelled_distances_time', 'time'),
                           Index('idx_travelled_distances_device_id_time', 'device_id', 'time'))
 travelled_distances_table.create(bind=db.engine, checkfirst=True)
@@ -168,6 +170,15 @@ if not mass_transit_data_table.exists(bind=db.engine):
         DO INSTEAD NOTHING;
         '''))
 
+global_statistics_table = Table('global_statistics', metadata,
+                          Column('id', Integer, primary_key=True),
+                          Column('time', Date, nullable=False),
+                          Column('average_co2_usage', Float),
+                          Column('number_of_certificates', Integer, nullable=False),
+                          Column('total_distance', Float, nullable=False),
+                          Index('idx_global_statistics_time', 'time'),)
+global_statistics_table.create(bind=db.engine, checkfirst=True)
+
 
 metadata.create_all(bind=db.engine, checkfirst=True)
 
@@ -175,8 +186,8 @@ scheduler = BackgroundScheduler()
 
 def initialize():
     scheduler.add_job(retrieve_hsl_data, "cron", second="*/28")
-    #scheduler.add_job(filter_device_data, "cron", hour="3")
-    #filter_device_data()
+    scheduler.add_job(filter_device_data, "cron", hour="3")
+    filter_device_data()
     scheduler.start()
 
 
@@ -679,27 +690,23 @@ def calculate_rating(device_data_rows):
 
 
 def filter_device_data():
-    #date_end = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-    #date_start = date_end - timedelta(days=1)
+    ids =  db.engine.execute(text("SELECT DISTINCT device_id FROM device_data;"))
+    for id_row in ids:
+        query = '''
+            SELECT MAX(time) as time
+            FROM device_data_filtered
+            GROUP BY device_id
+            HAVING device_id = :id;
+        '''
+        time_row = db.engine.execute(text(query), id=id_row["device_id"]).fetchone()
+        if time_row is None:
+            time = datetime.datetime.strptime("1971-01-01", '%Y-%m-%d')
+        else:
+            time = time_row["time"]
+        device_data_rows = data_points_snapping(id_row["device_id"], time, datetime.datetime.now())
 
-    end_time = datetime.datetime.strptime("2015-09-17", '%Y-%m-%d')
-    start_time = end_time.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=7)
-    end_time_string = end_time.strftime("%Y-%m-%d")
-    start_time_string = start_time.strftime("%Y-%m-%d")
-
-    device_id_rows = get_distinct_device_ids(start_time_string, end_time_string)
-
-    DEVICE_ID_TEMP = 80
-    device_data_rows = data_points_snapping(DEVICE_ID_TEMP, start_time_string, end_time_string)
-
-    device_data_filterer = DeviceDataFilterer(db, filtered_device_data_table)
-    device_data_filterer.analyse_unfiltered_data(device_data_rows, DEVICE_ID_TEMP)
-
-    #for row in device_id_rows:
-    #    device_id = str(row["device_id"])
-    #    device_data_rows = data_points_snapping(device_id, start_time_string, end_time_string)
-    #    analyse_unfiltered_data(device_data_rows, device_id)
-
+        device_data_filterer = DeviceDataFilterer(db, filtered_device_data_table)
+        device_data_filterer.analyse_unfiltered_data(device_data_rows, id_row["device_id"])
 
 
 
