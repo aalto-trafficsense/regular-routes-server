@@ -133,5 +133,5 @@ class DeviceDataFilterer:
             previous_activity = current_activity
 
         if chosen_activity != "NOT_SET":
-            #self.flush_device_data_queue(device_data_queue, chosen_activity, device_id)
+            self.flush_device_data_queue(device_data_queue, chosen_activity, device_id)
             pass
