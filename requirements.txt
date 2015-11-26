@@ -5,5 +5,5 @@ GeoAlchemy2==0.2.4
 Flask-KVSession==0.6.1
 pyOpenSSL==0.14
 google-api-python-client==1.2
-APScheduler=3.0.4
-svgwrite=1.1.6
+APScheduler==3.0.4
+svgwrite==1.1.6
