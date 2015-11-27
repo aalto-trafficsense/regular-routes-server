@@ -541,6 +541,41 @@ def visualize_device_geojson(device_id):
     }
     return jsonify(geojson)
 
+@app.route('/energy/<int:device_id>')
+def energy(device_id):
+    return render_template('energy.html',
+                           api_key=app.config['MAPS_API_KEY'],
+                           device_id=device_id)
+
+
+@app.route('/energy/<int:device_id>/geojson')
+def energy_device_geojson(device_id):
+    if 'date' in request.args:
+        date_start = datetime.datetime.strptime(request.args['date'], '%Y-%m-%d').date()
+    else:
+        date_start = date.today()
+
+    date_end = date_start + timedelta(days=1)
+
+    points = data_points_filtered(device_id, datetime.datetime.fromordinal(date_start.toordinal()),
+                                  datetime.datetime.fromordinal(date_end.toordinal()))
+
+    features = []
+    for point in points:
+        point_geo = json.loads(point['geojson'])
+        features.append({
+            'type': 'Feature',
+            'geometry': point_geo,
+            'properties': {
+                'type': 'raw-point',
+                'activity': str(point['activity'])
+            }
+        })
+    geojson = {
+        'type': 'FeatureCollection',
+        'features': features
+    }
+    return jsonify(geojson)
 
 
 @app.route("/grade_date/<requested_date>")
@@ -699,6 +734,21 @@ def data_points_snapping(device_id, datetime_start, datetime_end):
         ORDER BY time ASC
     '''
         points =  db.engine.execute(text(qstring), device_id=device_id, time_start=datetime_start, time_end=datetime_end)
+    return points
+
+def data_points_filtered(device_id, datetime_start, datetime_end):
+    qstring = '''
+        SELECT id,
+            ST_AsGeoJSON(coordinate) AS geojson,
+            activity,
+            time
+        FROM device_data_filtered
+        WHERE device_id = :device_id
+        AND time >= :time_start
+        AND time < :time_end
+        ORDER BY time ASC
+    '''
+    points =  db.engine.execute(text(qstring), device_id=device_id, time_start=datetime_start, time_end=datetime_end)
     return points
 
 
