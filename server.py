@@ -553,7 +553,8 @@ def grade_date(requested_date):
         device_id = str(row["device_id"])
         return_string += "DEVICE: " + device_id + "<br>"
         device_data_rows = data_points_snapping(device_id, date_start, date_end)
-        return_string += str(calculate_rating(device_data_rows))
+        rating = EnergyRating(device_data_rows)
+        return_string += str(rating)
         return_string += "<br><br><br>"
 
     if return_string == "":
@@ -571,7 +572,7 @@ def svg():
     TEMP_FIXED_DEVICE_ID = 80
 
     device_data_rows = data_points_snapping(TEMP_FIXED_DEVICE_ID, start_time_string, end_time_string)
-    rating = calculate_rating(device_data_rows)
+    rating = EnergyRating(device_data_rows)
     return svg_generation.generate_energy_rating_svg(rating, start_time_string, end_time_string)
 
 
