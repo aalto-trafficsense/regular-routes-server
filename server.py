@@ -1,11 +1,16 @@
 #!/usr/bin/env python
 
 import json
+import random
+import string
+from apiclient.discovery import build
 import hashlib
 import geoalchemy2 as ga2
 from datetime import date, timedelta
-from flask import Flask, abort, jsonify, request, render_template, Response
+from flask import Flask, abort, jsonify, request, render_template, Response, make_response, session
+from flask import send_file
 from flask.ext.sqlalchemy import SQLAlchemy
+import httplib2
 from oauth2client.client import *
 from oauth2client.crypt import AppIdentityError
 from sqlalchemy import MetaData, Table, Column, ForeignKey, Enum, BigInteger, Integer, String, Index, UniqueConstraint
@@ -13,6 +18,12 @@ from sqlalchemy.dialects.postgres import DOUBLE_PRECISION, TIMESTAMP, UUID
 from sqlalchemy.exc import DataError
 from sqlalchemy.sql import text, func, column, table, select
 from uuid import uuid4
+
+from simplekv.memory import DictStore
+from flask_kvsession import KVSessionExtension
+
+APPLICATION_NAME = 'TrafficSense'
+
 
 SETTINGS_FILE_ENV_VAR = 'REGULARROUTES_SETTINGS'
 CLIENT_SECRET_FILE_NAME = 'client_secrets.json'
@@ -22,6 +33,21 @@ settings_dir_path = os.path.abspath(os.path.dirname(os.getenv(SETTINGS_FILE_ENV_
 CLIENT_SECRET_FILE = os.path.join(settings_dir_path, CLIENT_SECRET_FILE_NAME)
 
 app = Flask(__name__)
+app.secret_key = ''.join(random.choice(string.ascii_uppercase + string.digits)
+                         for x in xrange(32))
+
+# See the simplekv documentation for details
+store = DictStore()
+
+# This will replace the app's session handling
+KVSessionExtension(store, app)
+
+# Update client_secrets.json with your Google API project information.
+# Do not change this assignment.
+CLIENT_ID = json.loads(
+    open(CLIENT_SECRET_FILE, 'r').read())['web']['client_id']
+SERVICE = build('plus', 'v1')
+
 
 env_var_value = os.getenv(SETTINGS_FILE_ENV_VAR, None)
 if env_var_value is not None:
@@ -100,10 +126,148 @@ metadata.create_all(bind=db.engine, checkfirst=True)
 
 # REST interface:
 
+# Browser sign-in
+
+@app.route('/', methods=['GET'])
+def index():
+  """Initialize a session for the current user, and render index.html."""
+  # Create a state token to prevent request forgery.
+  # Store it in the session for later validation.
+  state = ''.join(random.choice(string.ascii_uppercase + string.digits)
+                  for x in xrange(32))
+  session['state'] = state
+  # Set the Client ID, Token State, and Application Name in the HTML while
+  # serving it.
+  response = make_response(
+      render_template('index.html',
+                      CLIENT_ID=CLIENT_ID,
+                      STATE=state,
+                      APPLICATION_NAME=APPLICATION_NAME))
+  response.headers['Content-Type'] = 'text/html'
+  return response
+
+@app.route('/signin_button.png', methods=['GET'])
+def signin_button():
+  """Returns the button image for sign-in."""
+  return send_file("templates/signin_button.png", mimetype='image/gif')
+
+@app.route('/connect', methods=['POST'])
+def connect():
+  """Exchange the one-time authorization code for a token and
+  store the token in the session."""
+  # Ensure that the request is not a forgery and that the user sending
+  # this connect request is the expected user.
+  # print 'state from session: '+session['state']
+  # if request.args.get('state', '') != session['state']:
+  #   response = make_response(json.dumps('Invalid state parameter.'), 401)
+  #   response.headers['Content-Type'] = 'application/json'
+  #   return response
+  # Normally, the state is a one-time token; however, in this example,
+  # we want the user to be able to connect and disconnect
+  # without reloading the page.  Thus, for demonstration, we don't
+  # implement this best practice.
+  # del session['state']
+
+  code = request.data
+
+  try:
+    # Upgrade the authorization code into a credentials object
+    oauth_flow = flow_from_clientsecrets(CLIENT_SECRET_FILE, scope='')
+    oauth_flow.redirect_uri = 'postmessage'
+    credentials = oauth_flow.step2_exchange(code)
+  except FlowExchangeError:
+    response = make_response(
+        json.dumps('Failed to upgrade the authorization code.'), 401)
+    response.headers['Content-Type'] = 'application/json'
+    return response
+
+  # An ID Token is a cryptographically-signed JSON object encoded in base 64.
+  # Normally, it is critical that you validate an ID Token before you use it,
+  # but since you are communicating directly with Google over an
+  # intermediary-free HTTPS channel and using your Client Secret to
+  # authenticate yourself to Google, you can be confident that the token you
+  # receive really comes from Google and is valid. If your server passes the
+  # ID Token to other components of your app, it is extremely important that
+  # the other components validate the token before using it.
+  gplus_id = credentials.id_token['sub']
+
+  stored_credentials = session.get('credentials')
+  stored_gplus_id = session.get('gplus_id')
+  if stored_credentials is not None and gplus_id == stored_gplus_id:
+    response = make_response(json.dumps('Current user is already connected.'),
+                             200)
+    response.headers['Content-Type'] = 'application/json'
+    return response
+  # Store the access token in the session for later use.
+  session['credentials'] = credentials
+  session['gplus_id'] = gplus_id
+  response = make_response(json.dumps('Successfully connected user.'), 200)
+  response.headers['Content-Type'] = 'application/json'
+  return response
+
+@app.route('/disconnect', methods=['POST'])
+def disconnect():
+  """Revoke current user's token and reset their session."""
+
+  # Only disconnect a connected user.
+  credentials = session.get('credentials')
+  if credentials is None:
+    response = make_response(json.dumps('Current user not connected.'), 401)
+    response.headers['Content-Type'] = 'application/json'
+    return response
+
+  # Execute HTTP GET request to revoke current token.
+  access_token = credentials.access_token
+  url = 'https://accounts.google.com/o/oauth2/revoke?token=%s' % access_token
+  h = httplib2.Http()
+  result = h.request(url, 'GET')[0]
+
+  if result['status'] == '200':
+    # Reset the user's session.
+    del session['credentials']
+    response = make_response(json.dumps('Successfully disconnected.'), 200)
+    response.headers['Content-Type'] = 'application/json'
+    return response
+  else:
+    # For whatever reason, the given token was invalid.
+    response = make_response(
+        json.dumps('Failed to revoke token for given user.', 400))
+    response.headers['Content-Type'] = 'application/json'
+    return response
+
+@app.route('/people', methods=['GET'])
+def people():
+  """Get list of people user has shared with this app."""
+  credentials = session.get('credentials')
+  # Only fetch a list of people for connected users.
+  if credentials is None:
+    response = make_response(json.dumps('Current user not connected.'), 401)
+    response.headers['Content-Type'] = 'application/json'
+    return response
+  try:
+    # Create a new authorized API client.
+    http = httplib2.Http()
+    http = credentials.authorize(http)
+    # Get a list of people that this user has shared with this app.
+    google_request = SERVICE.people().list(userId='me', collection='visible')
+    result = google_request.execute(http=http)
+
+    response = make_response(json.dumps(result), 200)
+    response.headers['Content-Type'] = 'application/json'
+    return response
+  except AccessTokenRefreshError:
+    response = make_response(json.dumps('Failed to refresh access token.'), 500)
+    response.headers['Content-Type'] = 'application/json'
+    return response
+
+
+
+# Android client registration
+
 @app.route('/register', methods=['POST'])
 def register_post():
     """
-        Server should receive valid one-time tokan that can be used to authenticate user via Google+ API
+        Server should receive a valid one-time token that can be used to authenticate user via Google+ API
         See: https://developers.google.com/+/web/signin/server-side-flow#step_6_send_the_authorization_code_to_the_server
 
     """
