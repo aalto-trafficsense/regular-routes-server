@@ -15,14 +15,14 @@ class DeviceDataFilterer:
         self.previous_activity_2_conf = 0
         self.previous_activity_3_conf = 0
 
-    def flush_device_data_queue(self, device_data_queue, activity, device_id):
+    def flush_device_data_queue(self, device_data_queue, activity, user_id):
         if len(device_data_queue) == 0:
             return
         filtered_device_data = []
         for device_data_row in device_data_queue:
             current_location = json.loads(device_data_row["geojson"])["coordinates"]
             filtered_device_data.append({"activity" : activity,
-                                         "device_id" : device_id,
+                                         "user_id" : user_id,
                                          'coordinate': 'POINT(%f %f)' % (float(current_location[0]), float(current_location[1])),
                                          "time" : device_data_row["time"],
                                          "waypoint_id" : device_data_row["waypoint_id"]})
@@ -72,32 +72,39 @@ class DeviceDataFilterer:
         return False
 
 
-    def analyse_unfiltered_data(self, device_data_rows, device_id):
+    def analyse_unfiltered_data(self, device_data_rows, user_id):
         rows = device_data_rows.fetchall()
         if len(rows) == 0:
             return
         device_data_queue = []
-        time_previous = rows[0]["time"]
+        previous_device_id = rows[0]["device_id"]
+        previous_time = rows[0]["time"]
+        previous_activity = "NOT_SET"
         chosen_activity = "NOT_SET"
         consecutive_differences = 0
-        previous_activity = "NOT_SET"
         match_counter = 0
         different_activity_counter = 0
 
-
-
         for i in xrange(len(rows)):
             current_row = rows[i]
-            if (current_row["time"] - time_previous).total_seconds() > MAX_POINT_TIME_DIFFERENCE:
+            if (current_row["time"] - previous_time).total_seconds() > MAX_POINT_TIME_DIFFERENCE:
                 if chosen_activity != "NOT_SET": #if false, no good activity was found
-                    self.flush_device_data_queue(device_data_queue, chosen_activity, device_id)
+                    self.flush_device_data_queue(device_data_queue, chosen_activity, user_id)
                 device_data_queue = []
+                previous_device_id = current_row["device_id"]
+                previous_time = current_row["time"]
+                previous_activity = "NOT_SET"
                 chosen_activity = "NOT_SET"
                 match_counter = 0
 
-
-            time_previous = current_row["time"]
             current_activity = self.analyse_row_activities(current_row)
+
+            if previous_device_id != current_row["device_id"] and (current_row["time"] - previous_time) < MAX_DIFFERENT_DEVICE_TIME_DIFFERENCE:
+                if previous_device_id > current_row["device_id"]:
+                    device_data_queue.pop()
+                else:
+                    continue
+
             device_data_queue.append(current_row)
 
             if current_activity != "NOT_SET":
@@ -124,13 +131,15 @@ class DeviceDataFilterer:
             if consecutive_differences == CONSECUTIVE_DIFFERENCE_LIMIT:
                 #split the transition points, first half is previous activity, latter half is new activity
                 splitting_point = CONSECUTIVE_DIFFERENCE_LIMIT + (different_activity_counter - CONSECUTIVE_DIFFERENCE_LIMIT) / 2
-                self.flush_device_data_queue(device_data_queue[:-splitting_point], chosen_activity, device_id)
+                self.flush_device_data_queue(device_data_queue[:-splitting_point], chosen_activity, user_id)
                 device_data_queue = device_data_queue[-splitting_point:]
                 consecutive_differences = 0
                 different_activity_counter = 0
                 chosen_activity = current_activity
+
+            previous_device_id = current_row["device_id"]
+            previous_time = current_row["time"]
             previous_activity = current_activity
 
         if chosen_activity != "NOT_SET":
-            self.flush_device_data_queue(device_data_queue, chosen_activity, device_id)
-            pass
+            self.flush_device_data_queue(device_data_queue, chosen_activity, user_id)

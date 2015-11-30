@@ -119,17 +119,17 @@ device_data_table = Table('device_data', metadata,
 Index('idx_device_data_snapping_time_null', device_data_table.c.snapping_time, postgresql_where=device_data_table.c.snapping_time == None)
 
 # device_data_table after filtering activities.
-filtered_device_data_table = Table('device_data_filtered', metadata,
+device_data_filtered_table = Table('device_data_filtered', metadata,
                           Column('id', Integer, primary_key=True),
-                          Column('device_id', Integer, ForeignKey('devices.id'), nullable=False),
+                          Column('user_id', Integer, ForeignKey('users.id'), nullable=False),
                           Column('coordinate', ga2.Geography('point', 4326, spatial_index=False), nullable=False),
                           Column('time', TIMESTAMP, nullable=False),
                           Column('activity', activity_type_enum),
                           Column('waypoint_id', BigInteger),
                           Index('idx_device_data_filtered_time', 'time'),
-                          Index('idx_device_data_filtered_device_id_time', 'device_id', 'time'))
+                          Index('idx_device_data_filtered_user_id_time', 'user_id', 'time'))
 
-filtered_device_data_table.create(bind=db.engine, checkfirst=True)
+device_data_filtered_table.create(bind=db.engine, checkfirst=True)
 
 # travelled distances per day per device
 travelled_distances_table = Table('travelled_distances', metadata,
@@ -614,23 +614,22 @@ def svg():
 # Helper Functions:
 
 def filter_device_data():
-    ids =  db.engine.execute(text("SELECT DISTINCT device_id FROM device_data;"))
-    for id_row in ids:
+    user_ids =  db.engine.execute(text("SELECT id FROM users;"))
+    for id_row in user_ids:
         query = '''
             SELECT MAX(time) as time
             FROM device_data_filtered
-            GROUP BY device_id
-            HAVING device_id = :id;
+            GROUP BY user_id
+            HAVING user_id = :id;
         '''
-        time_row = db.engine.execute(text(query), id=id_row["device_id"]).fetchone()
+        time_row = db.engine.execute(text(query), id=id_row["id"]).fetchone()
         if time_row is None:
             time = datetime.datetime.strptime("1971-01-01", '%Y-%m-%d')
         else:
             time = time_row["time"]
-        device_data_rows = data_points_snapping(id_row["device_id"], time, datetime.datetime.now())
-
-        device_data_filterer = DeviceDataFilterer(db, filtered_device_data_table)
-        device_data_filterer.analyse_unfiltered_data(device_data_rows, id_row["device_id"])
+        device_data_rows = data_points_by_user_id(id_row["id"], time, datetime.datetime.now())
+        device_data_filterer = DeviceDataFilterer(db, device_data_filtered_table)
+        device_data_filterer.analyse_unfiltered_data(device_data_rows, id_row["id"])
 
 
 def retrieve_hsl_data():
@@ -707,6 +706,25 @@ def get_distinct_device_ids(datetime_start, datetime_end):
         AND time < :date_end;
     '''), date_start=str(datetime_start), date_end=str(datetime_end))
 
+
+def data_points_by_user_id(user_id, datetime_start, datetime_end):
+    query = '''
+        SELECT device_id,
+            ST_AsGeoJSON(coordinate) AS geojson,
+            activity_1, activity_1_conf,
+            activity_2, activity_2_conf,
+            activity_3, activity_3_conf,
+            waypoint_id,
+            time
+        FROM device_data
+        WHERE device_id IN (SELECT id FROM devices
+                                 WHERE user_id = :user_id)
+        AND time >= :time_start
+        AND time < :time_end
+        ORDER BY time ASC
+    '''
+    points =  db.engine.execute(text(query), user_id=user_id, time_start=datetime_start, time_end=datetime_end)
+    return points
 
 def data_points_snapping(device_id, datetime_start, datetime_end):
     qstart = '''
