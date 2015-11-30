@@ -134,8 +134,8 @@ device_data_filtered_table.create(bind=db.engine, checkfirst=True)
 # travelled distances per day per device
 travelled_distances_table = Table('travelled_distances', metadata,
                           Column('id', Integer, primary_key=True),
-                          Column('device_id', Integer, ForeignKey('devices.id'), nullable=False),
-                          Column('time', Date, nullable=False),
+                          Column('user_id', Integer, ForeignKey('users.id'), nullable=False),
+                          Column('time', TIMESTAMP, nullable=False), #Only the date portion of time is used. Time datatype used for consistency.
                           Column('cycling', Float),
                           Column('walking', Float),
                           Column('running', Float),
@@ -146,7 +146,7 @@ travelled_distances_table = Table('travelled_distances', metadata,
                           Column('average_CO2', Float),
                           Column('ranking', Integer),
                           Index('idx_travelled_distances_time', 'time'),
-                          Index('idx_travelled_distances_device_id_time', 'device_id', 'time'))
+                          Index('idx_travelled_distances_device_id_time', 'user_id', 'time'))
 travelled_distances_table.create(bind=db.engine, checkfirst=True)
 
 # HSL mass transit vehicle locations.
@@ -187,10 +187,15 @@ scheduler = BackgroundScheduler()
 
 def initialize():
     scheduler.add_job(retrieve_hsl_data, "cron", second="*/28")
-    scheduler.add_job(filter_device_data, "cron", hour="3")
-    filter_device_data()
+    scheduler.add_job(run_daily_tasks, "cron", hour="3")
+    run_daily_tasks()
     scheduler.start()
 
+def run_daily_tasks():
+    # The order is important.
+    filter_device_data()
+    generate_distance_data()
+    update_global_statistics()
 
 
 # REST interface:
@@ -616,20 +621,79 @@ def svg():
 def filter_device_data():
     user_ids =  db.engine.execute(text("SELECT id FROM users;"))
     for id_row in user_ids:
-        query = '''
-            SELECT MAX(time) as time
-            FROM device_data_filtered
-            GROUP BY user_id
-            HAVING user_id = :id;
-        '''
-        time_row = db.engine.execute(text(query), id=id_row["id"]).fetchone()
-        if time_row is None:
-            time = datetime.datetime.strptime("1971-01-01", '%Y-%m-%d')
-        else:
-            time = time_row["time"]
+        time = get_max_time_from_table("time", "device_data_filtered", "user_id", id_row["id"])
         device_data_rows = data_points_by_user_id(id_row["id"], time, datetime.datetime.now())
         device_data_filterer = DeviceDataFilterer(db, device_data_filtered_table)
         device_data_filterer.analyse_unfiltered_data(device_data_rows, id_row["id"])
+
+def generate_distance_data():
+    user_ids =  db.engine.execute(text("SELECT id FROM users;"))
+    ratings = []
+    for id_row in user_ids:
+        time = get_max_time_from_table("time", "travelled_distances", "user_id", id_row["id"])
+        last_midnight = datetime.datetime.now().replace(hour = 0, minute = 0, second = 0, microsecond = 0)
+        data_rows = get_filtered_device_data_points(id_row["id"], time, last_midnight)
+        ratings += get_ratings_from_rows(data_rows, id_row["id"])
+    db.engine.execute(travelled_distances_table.insert(ratings))
+
+def get_ratings_from_rows(filtered_data_rows, user_id):
+    ratings = []
+    rows = filtered_data_rows.fetchall()
+    if len(rows) == 0:
+        return ratings
+    previous_time = rows[0]["time"]
+    current_date = rows[0]["time"].replace(hour = 0, minute = 0, second = 0, microsecond = 0)
+    previous_location = json.loads(rows[0]["geojson"])["coordinates"]
+    rating = EnergyRating(user_id, current_date)
+    for row in rows[1:]:
+        current_activity = row["activity"]
+        current_time = row["time"]
+        current_location = json.loads(row["geojson"])["coordinates"]
+
+        if (current_time - current_date).total_seconds() > 60*60*24: #A full day
+            current_date = current_time.replace(hour = 0, minute = 0, second = 0, microsecond = 0)
+            rating.calculate_rating()
+            ratings.append(rating.get_data_dict())
+            rating = EnergyRating(user_id, current_date)
+
+        if (current_time - previous_time).total_seconds() > MAX_POINT_TIME_DIFFERENCE:
+            previous_time = current_time
+            previous_location = current_location
+            continue
+
+
+        # from: http://stackoverflow.com/questions/1253499/simple-calculations-for-working-with-lat-lon-km-distance
+        # The approximate conversions are:
+        # Latitude: 1 deg = 110.574 km
+        # Longitude: 1 deg = 111.320*cos(latitude) km
+
+        x_diff = (previous_location[0] - current_location[0]) * 110.320 * math.cos((current_location[1] / 360) * math.pi)
+        y_diff = (previous_location[1] - current_location[1]) * 110.574
+
+        distance = (x_diff * x_diff + y_diff * y_diff)**0.5
+
+        previous_location = current_location
+
+        if current_activity == "IN_VEHICLE":
+            #TODO add public transportation check
+            rating.add_in_vehicle_distance(distance)
+        elif current_activity == "ON_BICYCLE":
+            rating.add_on_bicycle_distance(distance)
+        elif current_activity == "RUNNING":
+            rating.add_running_distance(distance)
+        elif current_activity == "WALKING":
+            rating.add_walking_distance(distance)
+    if not rating.is_empty():
+        rating.calculate_rating()
+        ratings.append(rating.get_data_dict())
+    return ratings
+
+
+
+
+
+def update_global_statistics():
+   pass
 
 
 def retrieve_hsl_data():
@@ -698,6 +762,21 @@ def generate_csv(rows):
         yield ';'.join(['"%s"' % (to_str(x)) for x in row]) + '\n'
 
 
+def get_max_time_from_table(time_column_name, table_name, id_field_name, id):
+    query = '''
+        SELECT MAX({0}) as time
+        FROM {1}
+        GROUP BY {2}
+        HAVING {2} = :id;
+    '''.format(time_column_name, table_name, id_field_name)
+    time_row = db.engine.execute(text(query),
+                                 id = id).fetchone()
+    if time_row is None:
+        time = datetime.datetime.strptime("1971-01-01", '%Y-%m-%d')
+    else:
+        time = time_row["time"]
+    return time
+
 def get_distinct_device_ids(datetime_start, datetime_end):
     return db.engine.execute(text('''
         SELECT DISTINCT device_id
@@ -706,6 +785,20 @@ def get_distinct_device_ids(datetime_start, datetime_end):
         AND time < :date_end;
     '''), date_start=str(datetime_start), date_end=str(datetime_end))
 
+
+def get_filtered_device_data_points(user_id, datetime_start, datetime_end):
+    query = '''
+        SELECT time,
+            ST_AsGeoJSON(coordinate) AS geojson,
+            activity
+        FROM device_data_filtered
+        WHERE user_id = :user_id
+        AND time >= :time_start
+        AND time < :time_end
+        ORDER BY time ASC
+    '''
+    points =  db.engine.execute(text(query), user_id=user_id, time_start=datetime_start, time_end=datetime_end)
+    return points
 
 def data_points_by_user_id(user_id, datetime_start, datetime_end):
     query = '''

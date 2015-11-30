@@ -4,60 +4,9 @@ import math
 
 class EnergyRating:
 
-
-    def __init__(self, device_data_rows):
-        self.analyze_rows(device_data_rows)
-
-    def analyze_rows(self, device_data_rows):
-        rows = device_data_rows.fetchall()
-        bad_activities = ("UNKNOWN", "TILTING", "STILL")
-        if len(rows) == 0:
-            self.set_values(0, 0, 0, 0, 0, 0, 0)
-            return
-        in_vehicle_distance = 0
-        on_bicycle_distance = 0
-        walking_distance = 0
-        running_distance = 0
-        previous_time = rows[0]["time"]
-        current_activity = rows[0]["activity_1"]
-        previous_location = json.loads(rows[0]["geojson"])["coordinates"]
-
-        for row in rows[1:]:
-            if row["activity_1"] in bad_activities and current_activity == "UNKNOWN":
-                continue
-            current_activity = row["activity_1"]
-            current_time = row["time"]
-
-            if (current_time - previous_time).total_seconds() > 300:
-                previous_time = current_time
-                continue
-
-            current_location = json.loads(row["geojson"])["coordinates"]
-
-            # from: http://stackoverflow.com/questions/1253499/simple-calculations-for-working-with-lat-lon-km-distance
-            # The approximate conversions are:
-            # Latitude: 1 deg = 110.574 km
-            # Longitude: 1 deg = 111.320*cos(latitude) km
-
-            xdiff = (previous_location[0] - current_location[0]) * 110.320 * math.cos((current_location[1] / 360) * math.pi)
-            ydiff = (previous_location[1] - current_location[1]) * 110.574
-
-            distance = (xdiff * xdiff + ydiff * ydiff)**0.5
-
-            previous_location = current_location
-
-            if current_activity == "IN_VEHICLE":
-                in_vehicle_distance += distance
-            elif current_activity == "ON_BICYCLE":
-                on_bicycle_distance += distance
-            elif current_activity == "RUNNING":
-                running_distance += distance
-            elif current_activity == "WALKING":
-                walking_distance += distance
-
-        self.set_values(in_vehicle_distance, 0, 0, 0, on_bicycle_distance, running_distance, walking_distance)
-
-    def set_values(self, in_vehicle_distance, in_mass_transit_A_distance, in_mass_transit_B_distance, in_mass_transit_C_distance, on_bicycle_distance, running_distance, walking_distance):
+    def __init__(self, user_id, date, in_vehicle_distance=0, in_mass_transit_A_distance=0, in_mass_transit_B_distance=0, in_mass_transit_C_distance=0, on_bicycle_distance=0, running_distance=0, walking_distance=0):
+        self.user_id = user_id
+        self.date = date.replace(hour = 0, minute = 0, second = 0, microsecond = 0)
         self.in_vehicle_distance = in_vehicle_distance
         self.on_bicycle_distance = on_bicycle_distance
         self.running_distance = running_distance
@@ -65,7 +14,41 @@ class EnergyRating:
         self.in_mass_transit_A_distance = in_mass_transit_A_distance
         self.in_mass_transit_B_distance = in_mass_transit_B_distance
         self.in_mass_transit_C_distance = in_mass_transit_C_distance
-        self.total_distance = in_vehicle_distance + on_bicycle_distance + walking_distance + running_distance + in_mass_transit_A_distance + in_mass_transit_B_distance + in_mass_transit_C_distance
+        self.calculate_rating()
+
+
+    def add_in_vehicle_distance(self, distance):
+        self.in_vehicle_distance += distance
+
+    def add_on_bicycle_distance(self, distance):
+        self.on_bicycle_distance += distance
+
+    def add_running_distance(self, distance):
+        self.running_distance += distance
+
+    def add_walking_distance(self, distance):
+        self.walking_distance += distance
+
+    def add_in_mass_transit_A_distance(self, distance):
+        self.in_mass_transit_A_distance += distance
+
+    def add_in_mass_transit_B_distance(self, distance):
+        self.in_mass_transit_B_distance += distance
+
+    def add_in_mass_transit_C_distance(self, distance):
+        self.in_mass_transit_C_distance += distance
+
+    def is_empty(self):
+        return self.total_distance == 0
+
+    def calculate_rating(self):
+        self.total_distance = self.in_vehicle_distance + \
+                              self.on_bicycle_distance + \
+                              self.walking_distance + \
+                              self.running_distance + \
+                              self.in_mass_transit_A_distance + \
+                              self.in_mass_transit_B_distance + \
+                              self.in_mass_transit_C_distance
         if self.total_distance == 0:
             self.running_percentage = 0
             self.walking_percentage = 0
@@ -75,13 +58,13 @@ class EnergyRating:
             self.in_mass_transit_B_percentage = 0
             self.in_mass_transit_C_percentage = 0
         else:
-            self.running_percentage = running_distance / self.total_distance
-            self.walking_percentage = walking_distance / self.total_distance
-            self.in_vehicle_percentage = in_vehicle_distance / self.total_distance
-            self.on_bicycle_percentage = on_bicycle_distance / self.total_distance
-            self.in_mass_transit_A_percentage = in_mass_transit_A_distance / self.total_distance
-            self.in_mass_transit_B_percentage = in_mass_transit_B_distance / self.total_distance
-            self.in_mass_transit_C_percentage = in_mass_transit_C_distance / self.total_distance
+            self.running_percentage = self.running_distance / self.total_distance
+            self.walking_percentage = self.walking_distance / self.total_distance
+            self.in_vehicle_percentage = self.in_vehicle_distance / self.total_distance
+            self.on_bicycle_percentage = self.on_bicycle_distance / self.total_distance
+            self.in_mass_transit_A_percentage = self.in_mass_transit_A_distance / self.total_distance
+            self.in_mass_transit_B_percentage = self.in_mass_transit_B_distance / self.total_distance
+            self.in_mass_transit_C_percentage = self.in_mass_transit_C_distance / self.total_distance
 
         self.average_co2 = self.on_bicycle_percentage * ON_BICYCLE_CO2 + \
                            self.walking_percentage * WALKING_CO2 + \
@@ -95,6 +78,19 @@ class EnergyRating:
 
         self.final_rating = (self.average_co2 - ON_BICYCLE_CO2) / IN_VEHICLE_CO2 # value becomes 0-1 with 1 being the worst.
 
+    def get_data_dict(self):
+        return {
+            'user_id':self.user_id,
+            'time':self.date,
+            'cycling':self.on_bicycle_distance,
+            'walking':self.walking_distance,
+            'running':self.running_distance,
+            'mass_transit_a':self.in_mass_transit_A_distance,
+            'mass_transit_b':self.in_mass_transit_B_distance,
+            'mass_transit_c':self.in_mass_transit_C_distance,
+            'car':self.in_vehicle_distance,
+            'average_CO2':self.average_co2
+        }
 
     def __str__(self):
         return_string = "\
@@ -124,3 +120,4 @@ class EnergyRating:
                                                         average_co2=self.average_co2,
                                                         total_co2=self.total_co2)
         return return_string
+
