@@ -89,7 +89,8 @@ class EnergyRating:
             'mass_transit_b':self.in_mass_transit_B_distance,
             'mass_transit_c':self.in_mass_transit_C_distance,
             'car':self.in_vehicle_distance,
-            'average_CO2':self.average_co2
+            'total_distance':self.total_distance,
+            'average_co2':self.average_co2
         }
 
     def __str__(self):

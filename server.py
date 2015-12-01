@@ -143,7 +143,8 @@ travelled_distances_table = Table('travelled_distances', metadata,
                           Column('mass_transit_b', Float),
                           Column('mass_transit_c', Float),
                           Column('car', Float),
-                          Column('average_CO2', Float),
+                          Column('total_distance', Float),
+                          Column('average_co2', Float),
                           Column('ranking', Integer),
                           Index('idx_travelled_distances_time', 'time'),
                           Index('idx_travelled_distances_device_id_time', 'user_id', 'time'))
@@ -693,7 +694,54 @@ def get_ratings_from_rows(filtered_data_rows, user_id):
 
 
 def update_global_statistics():
-   pass
+    query = '''
+        SELECT MAX(time) as time
+        FROM global_statistics
+    '''
+    time_row = db.engine.execute(text(query)).fetchone()
+    if time_row["time"] is None:
+        query = '''
+            SELECT MIN(time) as time
+            FROM travelled_distances
+        '''
+        time_row = db.engine.execute(text(query)).fetchone()
+        if time_row["time"] is None:
+            return
+    time_start = time_row["time"].replace(hour=0,minute=0,second=0,microsecond=0)
+    last_midnight = datetime.datetime.now().replace(hour=0,minute=0,second=0,microsecond=0)
+    items = []
+    while (time_start < last_midnight):
+        time_end = time_start + timedelta(days=1)
+        query = '''
+            SELECT total_distance, average_co2
+            FROM travelled_distances
+            WHERE time >= :time_start
+            AND time < :time_end
+        '''
+        travelled_distances_rows = db.engine.execute(text(query), time_start=time_start, time_end=time_end)
+        items.append(get_global_statistics_for_day(travelled_distances_rows, time_start))
+        time_start += timedelta(days=1)
+    db.engine.execute(global_statistics_table.insert(items))
+
+
+
+def get_global_statistics_for_day(travelled_distances_rows, time):
+    rows = travelled_distances_rows.fetchall()
+    distance_sum = 0
+    total_co2 = 0
+    for row in rows:
+        distance_sum += row["total_distance"]
+        total_co2 += row["total_distance"] * row["average_co2"]
+    if distance_sum == 0:
+        average_co2 = 0
+    else:
+        average_co2 = total_co2 / distance_sum
+    return {'time':time,
+            'average_co2_usage':average_co2,
+            'number_of_certificates':len(rows),
+            'total_distance':distance_sum}
+
+
 
 
 def retrieve_hsl_data():
