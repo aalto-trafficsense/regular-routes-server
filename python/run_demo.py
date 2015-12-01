@@ -3,7 +3,7 @@
 # Scientific libraries
 from numpy import *
 random.seed(0)
-set_printoptions(precision=4, suppress=True)
+set_printoptions(precision=2, suppress=True)
 
 # Prepare for plotting
 import matplotlib
@@ -28,6 +28,7 @@ thres = 30       # relative movement threshold for not-filtering
 T_p = 3             # how far to predict (route) into the future
 T_b = 20            # number of steps to consider a break in trasport
 T_g = 10            # how far ahead to predict (destination) in the future
+use_test_server = False
 
 timer = 0
 from FF import FF
@@ -115,7 +116,7 @@ def get_end_of_first_day(xxxx):
             return i
     return len(xxxx)-10
 
-from db_utils import get_cursor
+from db_utils import get_conn, get_cursor
 
 ##################################################################################
 #
@@ -129,7 +130,14 @@ FILE_X = './dat/'+str(DEV_ID)+'_stream_X.csv'
 
 if not os.path.isfile(FILE_X):
 
-    c = get_cursor(True) 
+    conn = get_conn(use_test_server) 
+    c = conn.cursor()
+
+    if not use_test_server:
+        print "Building averaged_location table with new data."
+        sql = open('../sql/make_average_table.sql', 'r').read()
+        c.execute(sql)
+        conn.commit()
 
     print "Extracting trace"
     c.execute('SELECT hour,minute,day_of_week,longitude,latitude FROM averaged_location WHERE device_id = %s', (str(DEV_ID),))
@@ -300,33 +308,34 @@ Y[0:t_0],nodes = do_cluster(X[0:t_0])
 print "Training initial chuck (of %d) #1" % t_0
 h.fit(Z[0:t_0-1],Y[1:t_0])       # <--- train on a significant chunk at a time (sklearn's tree not incremental)
 print "Training initial chuck (of %d) #2" % t_0
-g = tree.DecisionTreeClassifier()
-#g = RandomForestClassifier(n_estimators=100)
+#g = tree.DecisionTreeClassifier()
+g = RandomForestClassifier(n_estimators=100)
 g.fit(Z[0:t_0-T_g],Y[T_g:t_0])     # <--- train on a significant chunk at a time (sklearn's tree not incremental)
-g30 = tree.DecisionTreeClassifier()
+#g30 = tree.DecisionTreeClassifier()
+g30 = RandomForestClassifier(n_estimators=100)
 g30.fit(Z[0:t_0-30],Y[30:t_0])     # <--- train on a significant chunk at a time (sklearn's tree not incremental)
 
 ############################
 # Setup Plot
 ############################
 ion()
-fig = figure()
+fig = figure(figsize=(16.0, 10.0))
 from matplotlib import gridspec
 gs = gridspec.GridSpec(1, 1)
 ax1 = fig.add_subplot(gs[0]) # was: [1]
-ax1.set_title("Map, device ID "+str(DEV_ID))
+ax1.set_title("Map, device ID "+str(DEV_ID),fontsize=40)
 img = imread(FILE_I) #
 ax1.imshow(img)
 ax1.set_xlim([0,img.shape[1]]) #
 ax1.set_ylim([img.shape[0],0]) #
 node_pxs = map.to_pixels(nodes)
-n_, = ax1.plot(node_pxs[:,0],node_pxs[:,1],'bo',markersize=5,label="personal node")
-mg30, = ax1.plot(0,0,'ms',markersize=10,linewidth=3,label="30-min destination pred.")
-mg, = ax1.plot(0,0,'mo',markersize=10,linewidth=3,label="10-min destination pred.")
-mp, = ax1.plot(0,0,'mo-',markersize=2,linewidth=5,label="5-min route prediction")
+n_, = ax1.plot(node_pxs[:,0],node_pxs[:,1],'bo',markersize=8,label="personal nodes")
+mm, = ax1.plot(0,0,'ro',markersize=6,linewidth=3,label="current position")
+m, = ax1.plot(0,0,'r-',markersize=1,linewidth=4,label="prev. 10-min trajectory")
+mp, = ax1.plot(0,0,'mo-',markersize=2,linewidth=7,label="5-min route prediction")
+mg, = ax1.plot(0,0,'mo',markersize=12,linewidth=3,label="10-min destination pred.")
+mg30, = ax1.plot(0,0,'ms',markersize=11,linewidth=3,label="30-min destination pred.")
 #mq, = ax1.plot(0,0,'co-',markersize=2,linewidth=5,label="5-min route prediction")
-m, = ax1.plot(0,0,'r-',markersize=1,linewidth=2,label="recent trajectory (true)")
-mm, = ax1.plot(0,0,'ro',markersize=6,linewidth=3,label="true position")
 ax1.set_yticklabels([])
 ax1.set_xticklabels([])
 ax1.grid(False)
@@ -335,6 +344,7 @@ tx1 = ax1.text(img.shape[1]/2, img.shape[0]/2, msg, style='italic', fontsize=15,
 tx1.set_visible(False)
 tx2 = ax1.text(img.shape[1]/2, img.shape[0]/2, "UPDATING MODEL", fontsize=25, bbox={'facecolor':'blue', 'pad':10})
 tx2.set_visible(False)
+tx3 = ax1.text(5,20, "pred.conf. X%", fontsize=12, color='purple', bbox={'facecolor':'white', 'pad':2})
 gs.tight_layout(fig,h_pad=0.1)
 legend()
 
@@ -348,8 +358,8 @@ day_count = 2
 import matplotlib.animation as animation
 FFMpegWriter = animation.writers['ffmpeg']
 metadata = dict(title='Simulation Device '+str(DEV_ID), artist='Jesse', comment='Demo')
-writer = FFMpegWriter(fps=15, bitrate=5000, metadata=metadata)
-with writer.saving(fig, "dat/Regular_Routes_OLD_Dev_"+str(DEV_ID)+".mp4", 100):
+writer = FFMpegWriter(fps=15, bitrate=6000, metadata=metadata)
+with writer.saving(fig, "dat/Regular_Routes_Dev_"+str(DEV_ID)+".mp4", 100):
 #if True:
     for t in range(t_0,T-1):
         print "[%d] (%3.2f %%) " % (t, t*100./T), Z[t,1:5], X[t,0:4]
@@ -367,11 +377,23 @@ with writer.saving(fig, "dat/Regular_Routes_OLD_Dev_"+str(DEV_ID)+".mp4", 100):
         # Predict into the future, P(y[t+1]|X[t])
         #######################
         yp_g = g.predict(Z[t].reshape(1,-1)).astype(int)[0]
+        pg = g.predict_proba(Z[t].reshape(1,-1))[0]
         gnp = node_pxs[yp_g]
         mg.set_data(gnp)
         yp_g30 = g30.predict(Z[t].reshape(1,-1)).astype(int)[0]
+        #print "p", g.predict_proba(Z[t].reshape(1,-1))
+        pg30 = g30.predict_proba(Z[t].reshape(1,-1))[0]
+        print "P", pg30
+        #if pg30[yp_g30] >= 0.5:
+        #    print "*"
         gnp30 = node_pxs[yp_g30]
         mg30.set_data(gnp30)
+
+        tx3.set_text("pred.conf. %3.2f (10 min), %3.2f (30 min)" % (pg[yp_g], pg30[yp_g30]))
+        #else:
+        #    print "-"
+        #    gnp30 = node_pxs[yp_g30]
+        #    mg30.set_data([-10,-10])
 
         #######################
         # Predict a full trace
@@ -402,6 +424,8 @@ with writer.saving(fig, "dat/Regular_Routes_OLD_Dev_"+str(DEV_ID)+".mp4", 100):
         if X[t+1,3] != X[t,3]:
             tx2.set_visible(True)
             print "---TRAINING--- (end of day ",(X[t,3]),", i.e., ", d2day(X[t,3]),")"
+            for iii in range(30):
+                writer.grab_frame()
             print nodes, node_pxs
             Y[0:t],nodes = do_cluster(X[0:t],min(10+day_count*5,50))
             node_pxs = map.to_pixels(nodes)
@@ -411,13 +435,12 @@ with writer.saving(fig, "dat/Regular_Routes_OLD_Dev_"+str(DEV_ID)+".mp4", 100):
             h.fit(Z[0:t-1],Y[1:t])
             g.fit(Z[0:t-10],Y[10:t])     # <--- train on a significant chunk at a time (sklearn's tree not incremental)
             g30.fit(Z[0:t-30],Y[30:t])     # <--- train on a significant chunk at a time (sklearn's tree not incremental)
-            pause(2)
-            writer.grab_frame()
+            pause(0.1)
             tx2.set_visible(False)
             day_count = day_count + 1
 
-        print X[t,2], Z[t,3]
-        ax1.set_title("Device %d. Day %d (%3.1f%% of trace, %d nodes), %s. %s" % (DEV_ID,day_count,t*100./T,len(nodes),d2day(X[t,3]), t2hr(X[t,2])))
+        #print X[t,2], Z[t,3]
+        ax1.set_title("Device %d. Day %d (%3.1f%% of trace, %d nodes), %s. %s" % (DEV_ID,day_count,t*100./T,len(nodes),d2day(X[t,3]), t2hr(X[t,2])),fontsize=25)
         pause(0.001)
         writer.grab_frame()
 
