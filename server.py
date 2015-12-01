@@ -135,7 +135,7 @@ device_data_filtered_table.create(bind=db.engine, checkfirst=True)
 travelled_distances_table = Table('travelled_distances', metadata,
                           Column('id', Integer, primary_key=True),
                           Column('user_id', Integer, ForeignKey('users.id'), nullable=False),
-                          Column('time', TIMESTAMP, nullable=False), #Only the date portion of time is used. Time datatype used for consistency.
+                          Column('time', TIMESTAMP, nullable=False), #Only the date portion of time is used. TIMESTAMP datatype used for consistency.
                           Column('cycling', Float),
                           Column('walking', Float),
                           Column('running', Float),
@@ -146,6 +146,7 @@ travelled_distances_table = Table('travelled_distances', metadata,
                           Column('total_distance', Float),
                           Column('average_co2', Float),
                           Column('ranking', Integer),
+                          UniqueConstraint('time', 'user_id', name="unique_user_id_and_daily_travels"),
                           Index('idx_travelled_distances_time', 'time'),
                           Index('idx_travelled_distances_device_id_time', 'user_id', 'time'))
 travelled_distances_table.create(bind=db.engine, checkfirst=True)
@@ -174,9 +175,9 @@ if not mass_transit_data_table.exists(bind=db.engine):
 
 global_statistics_table = Table('global_statistics', metadata,
                           Column('id', Integer, primary_key=True),
-                          Column('time', Date, nullable=False),
+                          Column('time', TIMESTAMP, nullable=False), #Only the date portion of time is used. TIMESTAMP datatype used for consistency.
                           Column('average_co2_usage', Float),
-                          Column('number_of_certificates', Integer, nullable=False),
+                          Column('past_week_certificates_number', Integer, nullable=False),
                           Column('total_distance', Float, nullable=False),
                           Index('idx_global_statistics_time', 'time'),)
 global_statistics_table.create(bind=db.engine, checkfirst=True)
@@ -631,11 +632,12 @@ def generate_distance_data():
     user_ids =  db.engine.execute(text("SELECT id FROM users;"))
     ratings = []
     for id_row in user_ids:
-        time = get_max_time_from_table("time", "travelled_distances", "user_id", id_row["id"])
+        time = get_max_time_from_table("time", "travelled_distances", "user_id", id_row["id"]) + timedelta(days=1)
         last_midnight = datetime.datetime.now().replace(hour = 0, minute = 0, second = 0, microsecond = 0)
         data_rows = get_filtered_device_data_points(id_row["id"], time, last_midnight)
         ratings += get_ratings_from_rows(data_rows, id_row["id"])
-    db.engine.execute(travelled_distances_table.insert(ratings))
+    if len(ratings) > 0:
+        db.engine.execute(travelled_distances_table.insert(ratings))
 
 def get_ratings_from_rows(filtered_data_rows, user_id):
     ratings = []
@@ -651,10 +653,11 @@ def get_ratings_from_rows(filtered_data_rows, user_id):
         current_time = row["time"]
         current_location = json.loads(row["geojson"])["coordinates"]
 
-        if (current_time - current_date).total_seconds() > 60*60*24: #A full day
+        if (current_time - current_date).total_seconds() >= 60*60*24: #A full day
             current_date = current_time.replace(hour = 0, minute = 0, second = 0, microsecond = 0)
             rating.calculate_rating()
-            ratings.append(rating.get_data_dict())
+            if not rating.is_empty():
+                ratings.append(rating.get_data_dict())
             rating = EnergyRating(user_id, current_date)
 
         if (current_time - previous_time).total_seconds() > MAX_POINT_TIME_DIFFERENCE:
@@ -684,8 +687,9 @@ def get_ratings_from_rows(filtered_data_rows, user_id):
             rating.add_running_distance(distance)
         elif current_activity == "WALKING":
             rating.add_walking_distance(distance)
+
+    rating.calculate_rating()
     if not rating.is_empty():
-        rating.calculate_rating()
         ratings.append(rating.get_data_dict())
     return ratings
 
@@ -720,16 +724,27 @@ def update_global_statistics():
         '''
         travelled_distances_rows = db.engine.execute(text(query), time_start=time_start, time_end=time_end)
         items.append(get_global_statistics_for_day(travelled_distances_rows, time_start))
+        generate_rankings(time_start)
         time_start += timedelta(days=1)
     db.engine.execute(global_statistics_table.insert(items))
 
 
 
 def get_global_statistics_for_day(travelled_distances_rows, time):
-    rows = travelled_distances_rows.fetchall()
+    time_end = time + timedelta(days=1)
+    time_start = time_end - timedelta(days=7)
+    query = '''
+        SELECT COUNT(DISTINCT user_id)
+        FROM travelled_distances
+        WHERE time < :time_end
+        AND time >= :time_start
+    '''
+    user_id_count_row = db.engine.execute(text(query), time_start=time_start, time_end=time_end).fetchone()
+    id_count = user_id_count_row["count"]
+
     distance_sum = 0
     total_co2 = 0
-    for row in rows:
+    for row in travelled_distances_rows:
         distance_sum += row["total_distance"]
         total_co2 += row["total_distance"] * row["average_co2"]
     if distance_sum == 0:
@@ -738,9 +753,44 @@ def get_global_statistics_for_day(travelled_distances_rows, time):
         average_co2 = total_co2 / distance_sum
     return {'time':time,
             'average_co2_usage':average_co2,
-            'number_of_certificates':len(rows),
+            'past_week_certificates_number':id_count,
             'total_distance':distance_sum}
 
+
+def generate_rankings(time):
+    time_end = time + timedelta(days=1)
+    time_start = time_end - timedelta(days=7)
+    query = '''
+        SELECT user_id, total_distance, average_co2
+        FROM travelled_distances
+        WHERE time < :time_end
+        AND time >= :time_start
+    '''
+    travelled_distances_rows = db.engine.execute(text(query), time_start=time_start, time_end=time_end)
+
+    total_distances = {}
+    total_co2 = {}
+    totals = []
+    for row in travelled_distances_rows:
+        if row["user_id"] in total_distances:
+            total_distances[row["user_id"]] += row["total_distance"]
+            total_co2[row["user_id"]] += row["average_co2"] * row["total_distance"]
+        else:
+            total_distances[row["user_id"]] = row["total_distance"]
+            total_co2[row["user_id"]] = row["average_co2"] * row["total_distance"]
+    for user_id in total_distances:
+        totals.append((user_id, total_co2[user_id] / total_distances[user_id]))
+    totals_sorted = sorted(totals, key=lambda average_co2: average_co2[1])
+    update_query = ""
+    for i in range(len(totals_sorted)):
+        update_query += '''
+            UPDATE travelled_distances
+            SET ranking = {0}
+            WHERE user_id = {1}
+            AND time = :time;
+        '''.format(i + 1, totals_sorted[i][0])
+    if update_query != "":
+        db.engine.execute(text(update_query), time=time)
 
 
 
