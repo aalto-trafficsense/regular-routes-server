@@ -946,19 +946,19 @@ def data_points_snapping(device_id, datetime_start, datetime_end):
         points =  db.engine.execute(text(qstring), device_id=device_id, time_start=datetime_start, time_end=datetime_end)
     return points
 
-def data_points_filtered(device_id, datetime_start, datetime_end):
+def data_points_filtered(user_id, datetime_start, datetime_end):
     qstring = '''
         SELECT id,
             ST_AsGeoJSON(coordinate) AS geojson,
             activity,
             time
         FROM device_data_filtered
-        WHERE device_id = :device_id
+        WHERE user_id = :user_id
         AND time >= :time_start
         AND time < :time_end
         ORDER BY time ASC
     '''
-    points =  db.engine.execute(text(qstring), device_id=device_id, time_start=datetime_start, time_end=datetime_end)
+    points =  db.engine.execute(text(qstring), user_id=user_id, time_start=datetime_start, time_end=datetime_end)
     return points
 
 
