@@ -19,10 +19,14 @@ from sqlalchemy.exc import DataError
 from sqlalchemy.sql import text, func, column, table, select
 from uuid import uuid4
 
-from simplekv.memory import DictStore
+# from simplekv.memory import DictStore
+# from simplekv.fs import FilesystemStore
+from simplekv.db.sql import SQLAlchemyStore
 from flask_kvsession import KVSessionExtension
 
-APPLICATION_NAME = 'TrafficSense'
+
+# APPLICATION_NAME = 'TrafficSense'
+APPLICATION_NAME = 'Google+ Python Quickstart'
 
 
 SETTINGS_FILE_ENV_VAR = 'REGULARROUTES_SETTINGS'
@@ -36,11 +40,6 @@ app = Flask(__name__)
 app.secret_key = ''.join(random.choice(string.ascii_uppercase + string.digits)
                          for x in xrange(32))
 
-# See the simplekv documentation for details
-store = DictStore()
-
-# This will replace the app's session handling
-KVSessionExtension(store, app)
 
 # Update client_secrets.json with your Google API project information.
 # Do not change this assignment.
@@ -61,6 +60,15 @@ else:
 
 db = SQLAlchemy(app)
 metadata = MetaData()
+
+# See the simplekv documentation for details
+# store = DictStore()
+# store = FilesystemStore('./kvtestdata')
+store = SQLAlchemyStore(db.engine,metadata,'kvstore')
+# store.table.create()
+# metadata.create_all() follows below...
+
+
 
 '''
 These types are the same as are defined in:
@@ -124,6 +132,9 @@ Index('idx_device_data_snapping_time_null', device_data_table.c.snapping_time, p
 
 metadata.create_all(bind=db.engine, checkfirst=True)
 
+# This will replace the app's session handling
+KVSessionExtension(store, app)
+
 # REST interface:
 
 # Browser sign-in
@@ -135,7 +146,9 @@ def index():
   # Store it in the session for later validation.
   state = ''.join(random.choice(string.ascii_uppercase + string.digits)
                   for x in xrange(32))
-  session['state'] = state
+  session['state'] = state # The original Google solution
+  # store.put('state',state)
+  print 'Session[state] assigned: ' + session['state']
   # Set the Client ID, Token State, and Application Name in the HTML while
   # serving it.
   response = make_response(
@@ -157,16 +170,16 @@ def connect():
   store the token in the session."""
   # Ensure that the request is not a forgery and that the user sending
   # this connect request is the expected user.
-  # print 'state from session: '+session['state']
-  # if request.args.get('state', '') != session['state']:
-  #   response = make_response(json.dumps('Invalid state parameter.'), 401)
-  #   response.headers['Content-Type'] = 'application/json'
-  #   return response
+  print 'state from session: '+session['state']
+  if request.args.get('state', '') != session['state']:
+    response = make_response(json.dumps('Invalid state parameter.'), 401)
+    response.headers['Content-Type'] = 'application/json'
+    return response
   # Normally, the state is a one-time token; however, in this example,
   # we want the user to be able to connect and disconnect
   # without reloading the page.  Thus, for demonstration, we don't
   # implement this best practice.
-  # del session['state']
+  # del session['state'] # This will not work - fixed below:
 
   code = request.data
 
@@ -846,6 +859,6 @@ def verify_and_get_account_id(credentials):
 # App starting point:
 if __name__ == '__main__':
     if app.debug:
-        app.run(host='0.0.0.0')
+        app.run(host='0.0.0.0', port=5000)
     else:
         app.run()
