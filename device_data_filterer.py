@@ -39,8 +39,8 @@ class DeviceDataFilterer:
         conf_1 = row["activity_1_conf"]
         conf_2 = row["activity_2_conf"]
         conf_3 = row["activity_3_conf"]
-        #if self.is_duplicate_unsure_row(act_1, act_2, act_3, conf_1, conf_2, conf_3):
-        #    return current_activity
+        if self.is_duplicate_unsure_row(act_1, act_2, act_3, conf_1, conf_2, conf_3):
+            return current_activity
         if conf_3 > 0 and act_3 in good_activities:
             current_activity = act_3
         if conf_2 > 0 and act_2 in good_activities:
@@ -99,7 +99,8 @@ class DeviceDataFilterer:
 
             current_activity = self.analyse_row_activities(current_row)
 
-            if previous_device_id != current_row["device_id"] and (current_row["time"] - previous_time) < MAX_DIFFERENT_DEVICE_TIME_DIFFERENCE:
+            if previous_device_id != current_row["device_id"] and \
+                            (current_row["time"] - previous_time) < MAX_DIFFERENT_DEVICE_TIME_DIFFERENCE:
                 if previous_device_id > current_row["device_id"]:
                     device_data_queue.pop()
                 else:
