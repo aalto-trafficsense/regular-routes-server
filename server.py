@@ -176,9 +176,9 @@ if not mass_transit_data_table.exists(bind=db.engine):
 global_statistics_table = Table('global_statistics', metadata,
                           Column('id', Integer, primary_key=True),
                           Column('time', TIMESTAMP, nullable=False), #Only the date portion of time is used. TIMESTAMP datatype used for consistency.
-                          Column('average_co2_usage', Float),
+                          Column('average_co2_usage', Float), #Daily co2 usage
                           Column('past_week_certificates_number', Integer, nullable=False),
-                          Column('total_distance', Float, nullable=False),
+                          Column('total_distance', Float, nullable=False), #Daily amount of distance
                           Index('idx_global_statistics_time', 'time'),)
 global_statistics_table.create(bind=db.engine, checkfirst=True)
 
@@ -621,6 +621,7 @@ def svg():
 # Helper Functions:
 
 def filter_device_data():
+    #TODO: Don't check for users that have been inactive for a long time.
     user_ids =  db.engine.execute(text("SELECT id FROM users;"))
     for id_row in user_ids:
         time = get_max_time_from_table("time", "device_data_filtered", "user_id", id_row["id"])
