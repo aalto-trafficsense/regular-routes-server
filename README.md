@@ -25,7 +25,6 @@ This is the procedure to set up an environment for developing server software on
           SECRET_KEY = 'secretkey'
           SQLALCHEMY_DATABASE_URI = 'postgresql+psycopg2://regularroutes:qwerty@localhost/postgres'
           MAPS_API_KEY = 'INSERT_Browser_API_key_from_Google_Developers_Console'
-          APPLICATION_ROOT = '/api'
           AUTH_REDIRECT_URI = 'urn:ietf:wg:oauth:2.0:oob'
 
     Some explanations:
