@@ -1,4 +1,5 @@
 $(document).ready(function() {
+	$('#disconnect').click(disconnectServer);
     var date = $('#date');
     date.pickadate({
 	clear: '',
@@ -70,7 +71,7 @@ $(document).ready(function() {
 	map.data.forEach(function(feature) {
 	    map.data.remove(feature);
 	});
-	$.getJSON('../energy/' + device_id + '/geojson?date=' + date, function(response) {
+	$.getJSON('../energy/geojson?date=' + date, function(response) {
 	    map.data.addGeoJson(response);
 	    mapCanvas.css('opacity', '');
 		if (response.features.length > 1) {
@@ -83,4 +84,20 @@ $(document).ready(function() {
 		}
 	});
     }
+
+	function disconnectServer() {
+      // Revoke the server tokens
+      $.ajax({
+        type: 'POST',
+        url: $(location).attr('origin') + '/disconnect',
+        async: false,
+        success: function(result) {
+            console.log('revoke response: ' + result);
+			window.location='/';
+        },
+        error: function(e) {
+          console.log(e);
+        }
+      });
+	}
 });
