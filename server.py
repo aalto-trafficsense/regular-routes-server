@@ -19,15 +19,13 @@ from sqlalchemy.exc import DataError
 from sqlalchemy.sql import text, func, column, table, select
 from uuid import uuid4
 
-# from simplekv.memory import DictStore
+from simplekv.memory import DictStore
 # from simplekv.fs import FilesystemStore
-from simplekv.db.sql import SQLAlchemyStore
+# from simplekv.db.sql import SQLAlchemyStore
 from flask_kvsession import KVSessionExtension
 
 
-# APPLICATION_NAME = 'TrafficSense'
-APPLICATION_NAME = 'Google+ Python Quickstart'
-
+APPLICATION_NAME = 'TrafficSense'
 
 SETTINGS_FILE_ENV_VAR = 'REGULARROUTES_SETTINGS'
 CLIENT_SECRET_FILE_NAME = 'client_secrets.json'
@@ -62,11 +60,9 @@ db = SQLAlchemy(app)
 metadata = MetaData()
 
 # See the simplekv documentation for details
-# store = DictStore()
+store = DictStore()
 # store = FilesystemStore('./kvtestdata')
-store = SQLAlchemyStore(db.engine,metadata,'kvstore')
-# store.table.create()
-# metadata.create_all() follows below...
+# store = SQLAlchemyStore(db.engine,metadata,'kvstore')
 
 
 
@@ -147,8 +143,7 @@ def index():
   state = ''.join(random.choice(string.ascii_uppercase + string.digits)
                   for x in xrange(32))
   session['state'] = state # The original Google solution
-  # store.put('state',state)
-  print 'Session[state] assigned: ' + session['state']
+  # print 'Session[state] assigned: ' + session['state']
   # Set the Client ID, Token State, and Application Name in the HTML while
   # serving it.
   response = make_response(
@@ -170,7 +165,7 @@ def connect():
   store the token in the session."""
   # Ensure that the request is not a forgery and that the user sending
   # this connect request is the expected user.
-  print 'state from session: '+session['state']
+  # print 'state from session: '+session['state']
   if request.args.get('state', '') != session['state']:
     response = make_response(json.dumps('Invalid state parameter.'), 401)
     response.headers['Content-Type'] = 'application/json'
@@ -179,7 +174,7 @@ def connect():
   # we want the user to be able to connect and disconnect
   # without reloading the page.  Thus, for demonstration, we don't
   # implement this best practice.
-  # del session['state'] # This will not work - fixed below:
+  # del session['state']
 
   code = request.data
 
@@ -188,9 +183,9 @@ def connect():
     oauth_flow = flow_from_clientsecrets(CLIENT_SECRET_FILE, scope='')
     oauth_flow.redirect_uri = 'postmessage'
     credentials = oauth_flow.step2_exchange(code)
-  except FlowExchangeError:
+  except FlowExchangeError as err:
     response = make_response(
-        json.dumps('Failed to upgrade the authorization code.'), 401)
+        json.dumps('Failed to upgrade the authorization code: ' + code + ' Error: ' + err), 401)
     response.headers['Content-Type'] = 'application/json'
     return response
 
@@ -248,6 +243,34 @@ def disconnect():
     response.headers['Content-Type'] = 'application/json'
     return response
 
+@app.route('/mydata', methods=['GET'])
+def get_my_data():
+  """Return the data stored under this account."""
+  credentials = session.get('credentials')
+  # Only fetch a list of people for connected users.
+  if credentials is None:
+    response = make_response(json.dumps('Current user not connected.'), 401)
+    response.headers['Content-Type'] = 'application/json'
+    return response
+  try:
+    # Get google_id from the credentials
+    account_google_id = str(credentials.id_token['sub'])
+    # Formulate the user id used in our tables
+    user_id_hash = str(hashlib.sha256(str(account_google_id).encode('utf-8')).hexdigest()).upper()
+    users_table_id = get_users_table_id(user_id_hash)
+    if users_table_id > 0:
+        result = 'The id for the currently signed-in user is: ' + str(users_table_id)
+    else:
+        result = 'No entry found for currently signed-in user. Please install client and collect some data'
+    response = make_response(json.dumps(result), 200)
+    response.headers['Content-Type'] = 'application/json'
+    return response
+  except AccessTokenRefreshError:
+    response = make_response(json.dumps('Failed to refresh access token.'), 500)
+    response.headers['Content-Type'] = 'application/json'
+    return response
+
+
 @app.route('/people', methods=['GET'])
 def people():
   """Get list of people user has shared with this app."""
@@ -272,7 +295,6 @@ def people():
     response = make_response(json.dumps('Failed to refresh access token.'), 500)
     response.headers['Content-Type'] = 'application/json'
     return response
-
 
 
 # Android client registration
