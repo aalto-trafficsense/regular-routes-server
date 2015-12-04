@@ -548,15 +548,15 @@ def visualize_device_geojson(device_id):
     }
     return jsonify(geojson)
 
-@app.route('/energy/<int:device_id>')
-def energy(device_id):
+@app.route('/energy/<int:user_id>')
+def energy(user_id):
     return render_template('energy.html',
                            api_key=app.config['MAPS_API_KEY'],
-                           device_id=device_id)
+                           user_id=user_id)
 
 
-@app.route('/energy/<int:device_id>/geojson')
-def energy_device_geojson(device_id):
+@app.route('/energy/<int:user_id>/geojson')
+def energy_device_geojson(user_id):
     if 'date' in request.args:
         date_start = datetime.datetime.strptime(request.args['date'], '%Y-%m-%d').date()
     else:
@@ -564,7 +564,7 @@ def energy_device_geojson(device_id):
 
     date_end = date_start + timedelta(days=1)
 
-    points = data_points_filtered(device_id, datetime.datetime.fromordinal(date_start.toordinal()),
+    points = data_points_filtered(user_id, datetime.datetime.fromordinal(date_start.toordinal()),
                                   datetime.datetime.fromordinal(date_end.toordinal()))
 
     features = []
