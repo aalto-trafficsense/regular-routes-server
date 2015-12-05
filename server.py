@@ -563,6 +563,8 @@ def visualize_device_geojson(device_id):
     }
     return jsonify(geojson)
 
+# Browser sign-in procedures
+
 @app.route('/', methods=['GET'])
 def index():
   """Initialize a session for the current user, and render index.html."""
@@ -581,18 +583,13 @@ def index():
   response.headers['Content-Type'] = 'text/html'
   return response
 
-@app.route('/signin_button.png', methods=['GET'])
-def signin_button():
-  """Returns the button image for sign-in."""
-  return send_file("templates/signin_button.png", mimetype='image/gif')
-
 @app.route('/connect', methods=['POST'])
 def connect():
   """Exchange the one-time authorization code for a token and
   store the token in the session."""
   # Ensure that the request is not a forgery and that the user sending
   # this connect request is the expected user.
-  if request.args.get('state', '') != session['state']:
+  if request.args.get('state', '') != session.get('state'):
     response = make_response(json.dumps('Invalid state parameter.'), 401)
     response.headers['Content-Type'] = 'application/json'
     return response
@@ -609,7 +606,7 @@ def connect():
     credentials = oauth_flow.step2_exchange(code)
   except FlowExchangeError as err:
     # invalid token
-    print 'invalid token: ' + code + ". error: " + err.message
+    print 'Invalid token: ' + code + ". error: " + err.message
     response = make_response(
         json.dumps('Failed to upgrade the authorization code.'), 401)
     response.headers['Content-Type'] = 'application/json'
@@ -623,18 +620,28 @@ def connect():
   # receive really comes from Google and is valid. If your server passes the
   # ID Token to other components of your app, it is extremely important that
   # the other components validate the token before using it.
-  gplus_id = credentials.id_token['sub']
+  google_id = verify_and_get_account_id(credentials)['google_id']
 
   stored_credentials = session.get('credentials')
-  stored_gplus_id = session.get('gplus_id')
-  if stored_credentials is not None and gplus_id == stored_gplus_id:
+  stored_google_id = session.get('google_id')
+  if stored_credentials is not None and google_id == stored_google_id:
     response = make_response(json.dumps('Current user is already connected.'),
                              200)
     response.headers['Content-Type'] = 'application/json'
     return response
   # Store the access token in the session for later use.
   session['credentials'] = credentials
-  session['gplus_id'] = gplus_id
+  session['google_id'] = google_id
+  # Find and store the RegularRoutes user id
+  user_hash_id = str(hashlib.sha256(str(google_id).encode('utf-8')).hexdigest()).upper()
+  user_id = get_users_table_id(user_hash_id)
+  if user_id < 0:
+      # No data for the user -> show the nodata -page
+      print 'No data found for the current user.'
+      response = make_response(json.dumps('Nodata.'), 200)
+      response.headers['Content-Type'] = 'application/json'
+      return response
+  session['rr_user_id'] = user_id
   response = make_response(json.dumps('Successfully connected user.'), 200)
   response.headers['Content-Type'] = 'application/json'
   return response
@@ -670,32 +677,22 @@ def disconnect():
     response.headers['Content-Type'] = 'application/json'
     return response
 
-@app.route('/testcredentials', methods=['GET'])
-def testcredentials():
-  """A helper call to test whether the current credentials exist and are working."""
-  credentials = session.get('credentials')
-  if credentials is None:
-    response = make_response(json.dumps('Current user not connected.'), 401)
-    response.headers['Content-Type'] = 'application/json'
-    return response
-  else:
-    response = make_response(json.dumps('Everything in order'), 200)
-    response.headers['Content-Type'] = 'application/json'
-    return response
+@app.route('/signedout')
+def signed_out():
+    """User disconnected from the service."""
+    return render_template('signedout.html')
+
+@app.route('/nodata')
+def no_data():
+    """No data was found for this user account."""
+    return render_template('nodata.html')
 
 @app.route('/energy')
 def energy():
     """Draw the energy consumption map of the user."""
-    credentials = session.get('credentials')
-    if credentials is None:
-        # No credentials -> Throw back to front page
-        return index()
-    account_google_id = verify_and_get_account_id(credentials)['google_id']
-    # The following hash value is also generated in client and used in authentication
-    user_hash_id = str(hashlib.sha256(str(account_google_id).encode('utf-8')).hexdigest()).upper()
-    user_id = get_users_table_id(user_hash_id)
-    if user_id < 1:
-        # No data for the user -> throw back to front page
+    user_id = session.get('rr_user_id')
+    if user_id == None:
+        # Not authenticated -> throw back to front page
         return index()
     return render_template('energy.html',
                            api_key=app.config['MAPS_API_KEY'])
@@ -710,10 +707,11 @@ def energy_device_geojson():
 
     date_end = date_start + timedelta(days=1)
 
-    credentials = session.get('credentials')
-    account_google_id = verify_and_get_account_id(credentials)['google_id']
-    user_hash_id = str(hashlib.sha256(str(account_google_id).encode('utf-8')).hexdigest()).upper()
-    user_id = get_users_table_id(user_hash_id)
+    user_id = session.get('rr_user_id')
+    if user_id == None:
+        response = make_response(json.dumps('No user data in current session.'), 401)
+        response.headers['Content-Type'] = 'application/json'
+        return response
 
     points = data_points_filtered(user_id, datetime.datetime.fromordinal(date_start.toordinal()),
                                   datetime.datetime.fromordinal(date_end.toordinal()))

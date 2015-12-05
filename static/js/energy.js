@@ -93,7 +93,7 @@ $(document).ready(function() {
         async: false,
         success: function(result) {
             console.log('revoke response: ' + result);
-			window.location='/';
+			window.location='signedout';
         },
         error: function(e) {
           console.log(e);
