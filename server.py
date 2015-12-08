@@ -607,18 +607,34 @@ def grade_date(requested_date):
 @app.route("/svg")
 def svg():
     #end_time = datetime.datetime.now()
-    end_time = datetime.datetime.strptime("2015-09-17", '%Y-%m-%d')
+    end_time = datetime.datetime.strptime("2015-11-18", '%Y-%m-%d')
     start_time = end_time.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=7)
     end_time_string = end_time.strftime("%Y-%m-%d")
     start_time_string = start_time.strftime("%Y-%m-%d")
-    TEMP_FIXED_DEVICE_ID = 80
+    TEMP_FIXED_USER_ID = 5
 
-    device_data_rows = data_points_snapping(TEMP_FIXED_DEVICE_ID, start_time_string, end_time_string)
-    rating = EnergyRating(device_data_rows)
-    return svg_generation.generate_energy_rating_svg(rating, start_time_string, end_time_string)
+    rating = get_rating(TEMP_FIXED_USER_ID, start_time_string, end_time_string)
+    return svg_generation.generate_energy_rating_svg(rating, start_time, end_time, 1, 2)
 
 
 # Helper Functions:
+
+def get_rating(user_id, start_date, end_date):
+    query = '''SELECT * FROM travelled_distances
+               WHERE time >= :start_date
+               AND time < :end_date
+               AND user_id = :user_id;
+               '''
+    distance_rows = db.engine.execute(text(query), start_date=start_date, end_date=end_date, user_id=user_id)
+    rows = distance_rows.fetchall()
+    if len(rows) == 0:
+        return EnergyRating(user_id)
+
+    rating = EnergyRating(user_id)
+    for row in rows:
+        rating.add_travelled_distances_row(row)
+    rating.calculate_rating()
+    return rating
 
 def filter_device_data():
     #TODO: Don't check for users that have been inactive for a long time.
@@ -628,6 +644,8 @@ def filter_device_data():
         device_data_rows = data_points_by_user_id(id_row["id"], time, datetime.datetime.now())
         device_data_filterer = DeviceDataFilterer(db, device_data_filtered_table)
         device_data_filterer.analyse_unfiltered_data(device_data_rows, id_row["id"])
+
+
 
 def generate_distance_data():
     user_ids =  db.engine.execute(text("SELECT id FROM users;"))
@@ -648,7 +666,7 @@ def get_ratings_from_rows(filtered_data_rows, user_id):
     previous_time = rows[0]["time"]
     current_date = rows[0]["time"].replace(hour = 0, minute = 0, second = 0, microsecond = 0)
     previous_location = json.loads(rows[0]["geojson"])["coordinates"]
-    rating = EnergyRating(user_id, current_date)
+    rating = EnergyRating(user_id, date=current_date)
     for row in rows[1:]:
         current_activity = row["activity"]
         current_time = row["time"]
