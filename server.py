@@ -146,10 +146,21 @@ travelled_distances_table = Table('travelled_distances', metadata,
                           Column('total_distance', Float),
                           Column('average_co2', Float),
                           Column('ranking', Integer),
-                          UniqueConstraint('time', 'user_id', name="unique_user_id_and_daily_travels"),
+                          UniqueConstraint('time', 'user_id', name="unique_user_id_and_time_on_travelled_distances"),
                           Index('idx_travelled_distances_time', 'time'),
                           Index('idx_travelled_distances_device_id_time', 'user_id', 'time'))
-travelled_distances_table.create(bind=db.engine, checkfirst=True)
+if not travelled_distances_table.exists(bind=db.engine):
+    travelled_distances_table.create(bind=db.engine, checkfirst=True)
+    db.engine.execute(text('''
+        CREATE RULE "travelled_distances_table_duplicate_update" AS ON INSERT TO "travelled_distances"
+        WHERE EXISTS(SELECT 1 FROM travelled_distances
+                    WHERE (user_id, time)=(NEW.user_id, NEW.time))
+        DO INSTEAD UPDATE travelled_distances
+            SET ranking = NEW.ranking
+            WHERE user_id = NEW.user_id
+            AND time = NEW.time;
+        '''))
+
 
 # HSL mass transit vehicle locations.
 mass_transit_data_table = Table('mass_transit_data', metadata,
@@ -677,7 +688,7 @@ def get_ratings_from_rows(filtered_data_rows, user_id):
             rating.calculate_rating()
             if not rating.is_empty():
                 ratings.append(rating.get_data_dict())
-            rating = EnergyRating(user_id, current_date)
+            rating = EnergyRating(user_id, date=current_date)
 
         if (current_time - previous_time).total_seconds() > MAX_POINT_TIME_DIFFERENCE:
             previous_time = current_time
@@ -791,23 +802,24 @@ def generate_rankings(time):
     total_co2 = {}
     totals = []
     for row in travelled_distances_rows:
-        if row["user_id"] in total_distances:
-            total_distances[row["user_id"]] += row["total_distance"]
-            total_co2[row["user_id"]] += row["average_co2"] * row["total_distance"]
-        else:
-            total_distances[row["user_id"]] = row["total_distance"]
-            total_co2[row["user_id"]] = row["average_co2"] * row["total_distance"]
+        if row["total_distance"] is not None:
+            if row["user_id"] in total_distances:
+                total_distances[row["user_id"]] += row["total_distance"]
+                total_co2[row["user_id"]] += row["average_co2"] * row["total_distance"]
+            else:
+                total_distances[row["user_id"]] = row["total_distance"]
+                total_co2[row["user_id"]] = row["average_co2"] * row["total_distance"]
     for user_id in total_distances:
         totals.append((user_id, total_co2[user_id] / total_distances[user_id]))
     totals_sorted = sorted(totals, key=lambda average_co2: average_co2[1])
     update_query = ""
     for i in range(len(totals_sorted)):
         update_query += '''
-            UPDATE travelled_distances
-            SET ranking = {0}
-            WHERE user_id = {1}
-            AND time = :time;
-        '''.format(i + 1, totals_sorted[i][0])
+            INSERT INTO travelled_distances
+            (user_id, time, ranking)
+            VALUES
+            ({0}, :time, {1});
+        '''.format(totals_sorted[i][0], i + 1)
     if update_query != "":
         db.engine.execute(text(update_query), time=time)
 
