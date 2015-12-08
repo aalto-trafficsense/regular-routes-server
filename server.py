@@ -586,7 +586,8 @@ def energy_device_geojson(user_id):
             'geometry': point_geo,
             'properties': {
                 'type': 'raw-point',
-                'activity': str(point['activity'])
+                'activity': str(point['activity']),
+                'title': 'activity: %s' % point["activity"]
             }
         })
     geojson = {
