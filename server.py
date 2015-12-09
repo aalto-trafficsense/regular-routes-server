@@ -614,7 +614,7 @@ def svg():
     TEMP_FIXED_USER_ID = 4
 
     rating, ranking = get_rating(TEMP_FIXED_USER_ID, start_time_string, end_time_string)
-    rating = get_rating(TEMP_FIXED_USER_ID, start_time_string, end_time_string)
+    # rating = get_rating(TEMP_FIXED_USER_ID, start_time_string, end_time_string)
     # rating = EnergyRating(TEMP_FIXED_USER_ID)
     # rating.add_on_bicycle_distance(127.84)
     # rating.add_walking_distance(43.2)
