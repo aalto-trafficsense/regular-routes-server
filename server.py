@@ -573,7 +573,8 @@ def energy_device_geojson(user_id):
     else:
         date_start = date.today()
 
-    date_end = date_start + timedelta(days=1)
+    date_start = datetime.datetime.strptime("2015-11-11", '%Y-%m-%d')
+    date_end = date_start + timedelta(days=7)
 
     points = data_points_filtered(user_id, datetime.datetime.fromordinal(date_start.toordinal()),
                                   datetime.datetime.fromordinal(date_end.toordinal()))
@@ -623,9 +624,18 @@ def svg():
     start_time = end_time.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=7)
     end_time_string = end_time.strftime("%Y-%m-%d")
     start_time_string = start_time.strftime("%Y-%m-%d")
-    TEMP_FIXED_USER_ID = 5
+    TEMP_FIXED_USER_ID = 4
 
     rating = get_rating(TEMP_FIXED_USER_ID, start_time_string, end_time_string)
+    # rating = EnergyRating(TEMP_FIXED_USER_ID)
+    # rating.add_on_bicycle_distance(127.84)
+    # rating.add_walking_distance(43.2)
+    # rating.add_running_distance(55)
+    # rating.add_in_mass_transit_A_distance(21.5)
+    # rating.add_in_mass_transit_B_distance(27.5)
+    # rating.add_in_mass_transit_C_distance(0)
+    # rating.add_in_vehicle_distance(35.7)
+    # rating.calculate_rating()
     return svg_generation.generate_energy_rating_svg(rating, start_time, end_time, 1, 2)
 
 

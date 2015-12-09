@@ -41,9 +41,9 @@ def generate_energy_rating_svg(energy_rating, start_time, end_time, ranking, ran
     labels = ("Bicycle",
               "Walking",
               "Running",
-              "Mass transit A",
-              "Mass transit B",
-              "Mass transit C",
+              "Train",
+              "Subway, Tram",
+              "Bus",
               "Car")
 
     CO2_amounts = (ON_BICYCLE_CO2,
