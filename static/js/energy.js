@@ -1,5 +1,5 @@
 $(document).ready(function() {
-	$('#disconnect').click(disconnectServer);
+	$('#signout').click(disconnectServer);
     var date = $('#date');
     date.pickadate({
 	clear: '',

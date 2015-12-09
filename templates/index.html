@@ -21,6 +21,7 @@
 
 <html>
 <head>
+  <link href="http://aaltofimedia1.aalto.fi/style2015/css/style.min.css" rel=stylesheet type="text/css"/>
   <title>{{ APPLICATION_NAME }}</title>
     <meta name="google-signin-client_id" content='{{ CLIENT_ID }}'>
     <script src="https://apis.google.com/js/platform.js" async defer></script>
@@ -29,9 +30,9 @@
     <script src="//ajax.googleapis.com/ajax/libs/jquery/1.8.2/jquery.min.js" ></script>
 </head>
 <body>
-  <div id="gConnect" >
+  <div class=container>
       <h2>TrafficSense</h2>
-      <p>Sign in with your Google+ account to view RegularRoutes data.</p>
+      <p>Sign in with your Google account to view RegularRoutes data.</p>
       <div class="g-signin2"
            data-scope="profile"
            data-onsuccess="onSignIn"

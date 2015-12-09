@@ -2,25 +2,29 @@
         "http://www.w3.org/TR/html4/loose.dtd">
 <html>
 <head>
+    <link href="http://aaltofimedia1.aalto.fi/style2015/css/style.min.css" rel=stylesheet type="text/css"/>
     <title>TrafficSense Nodata</title>
     <script src="//ajax.googleapis.com/ajax/libs/jquery/1.8.2/jquery.min.js" ></script>
 </head>
 <body>
-<p>No data for the Google account was found in the TrafficSense service.
-If this was in error, please contact <a href="mailto:trafficsense.aalto@gmail.com?Subject=Account%20linking%20problem"
-                                        target="_top">trafficsense</a>.</p>
+<div class=container>
+    <h2>No data for this user.</h2>
+    <p>No data for the specified Google account was found in the RegularRoutes service.
+        If this was in error, please contact <a href="mailto:trafficsense.aalto@gmail.com?Subject=Account%20linking%20problem"
+                                                target="_top">trafficsense</a>.</p>
 
-<p>The mobile client for data collection is not in public distribution yet.</p>
+    <p>The mobile client for data collection is not in public distribution yet.</p>
 
-<p><a href="http://cse.aalto.fi/en/research/groups/distributed_systems/projects/trafficsense/">TrafficSense</a> is a research project at Aalto University.</p>
+    <p><a href="http://cse.aalto.fi/en/research/groups/distributed_systems/projects/trafficsense/">TrafficSense</a> is a research project at Aalto University.</p>
 
-<button id="restart" >Retry with another account</button>
+    <button id="restart" >Retry with another account</button>
+</div>
 </body>
 <script type="text/javascript">
 
-$(document).ready(function() {
-  $('#restart').click(function() { window.location='/' } );
-});
+    $(document).ready(function() {
+        $('#restart').click(function() { window.location='/' } );
+    });
 
 </script>
 

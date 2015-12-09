@@ -667,6 +667,7 @@ def disconnect():
   if result['status'] == '200':
     # Reset the user's session.
     del session['credentials']
+    if session.get('rr_user_id') != None: del session['rr_user_id']
     response = make_response(json.dumps('Successfully disconnected.'), 200)
     response.headers['Content-Type'] = 'application/json'
     return response
