@@ -77,7 +77,7 @@ def generate_energy_rating_svg(energy_rating, start_time, end_time, ranking, ran
                                      font_family="Helvetica"))
     #Average CO2
     svg_drawing.add(svg_drawing.text("{:.1f} CO2 g/km".format(energy_rating.average_co2),
-                                     insert=(450, 180),
+                                     insert=(420, 160),
                                      fill=svgwrite.rgb(0,0,0),
                                      stroke=svgwrite.rgb(0,0,0),
                                      stroke_width=1,
@@ -86,7 +86,7 @@ def generate_energy_rating_svg(energy_rating, start_time, end_time, ranking, ran
 
     #Ranking
     svg_drawing.add(svg_drawing.text("Ranking: {0} / {1}".format(ranking, ranking_max),
-                                     insert=(450, 270),
+                                     insert=(420, 250),
                                      fill=svgwrite.rgb(0,0,0),
                                      stroke=svgwrite.rgb(0,0,0),
                                      stroke_width=1,

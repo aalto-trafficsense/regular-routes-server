@@ -10,7 +10,6 @@ import svg_generation
 from device_data_filterer import DeviceDataFilterer
 from energy_rating import EnergyRating
 from constants import *
-from apscheduler.schedulers.background import BackgroundScheduler
 from datetime import date, timedelta
 from flask import Flask, abort, jsonify, request, render_template, Response
 from flask.ext.sqlalchemy import SQLAlchemy
@@ -196,19 +195,6 @@ global_statistics_table.create(bind=db.engine, checkfirst=True)
 
 metadata.create_all(bind=db.engine, checkfirst=True)
 
-scheduler = BackgroundScheduler()
-
-def initialize():
-    scheduler.add_job(retrieve_hsl_data, "cron", second="*/28")
-    scheduler.add_job(run_daily_tasks, "cron", hour="3")
-    run_daily_tasks()
-    scheduler.start()
-
-def run_daily_tasks():
-    # The order is important.
-    filter_device_data()
-    generate_distance_data()
-    update_global_statistics()
 
 
 # REST interface:
@@ -619,13 +605,15 @@ def grade_date(requested_date):
 
 @app.route("/svg")
 def svg():
-    #end_time = datetime.datetime.now()
+    #end_time = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
     end_time = datetime.datetime.strptime("2015-11-18", '%Y-%m-%d')
     start_time = end_time.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=7)
+    ranking_start_time = end_time.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=1)
     end_time_string = end_time.strftime("%Y-%m-%d")
     start_time_string = start_time.strftime("%Y-%m-%d")
     TEMP_FIXED_USER_ID = 4
 
+    rating, ranking = get_rating(TEMP_FIXED_USER_ID, start_time_string, end_time_string)
     rating = get_rating(TEMP_FIXED_USER_ID, start_time_string, end_time_string)
     # rating = EnergyRating(TEMP_FIXED_USER_ID)
     # rating.add_on_bicycle_distance(127.84)
@@ -638,6 +626,15 @@ def svg():
     # rating.calculate_rating()
     return svg_generation.generate_energy_rating_svg(rating, start_time, end_time, 1, 2)
 
+    query = '''SELECT past_week_certificates_number FROM global_statistics
+               WHERE time < :end_time
+               AND time >= :ranking_start_time'''
+    ranking_row = db.engine.execute(text(query), ranking_start_time=start_time, end_time=end_time)
+    max_ranking = ranking_row.fetchone()["past_week_certificates_number"]
+
+
+    return svg_generation.generate_energy_rating_svg(rating, start_time, end_time, ranking, max_ranking)
+
 
 # Helper Functions:
 
@@ -649,242 +646,16 @@ def get_rating(user_id, start_date, end_date):
                '''
     distance_rows = db.engine.execute(text(query), start_date=start_date, end_date=end_date, user_id=user_id)
     rows = distance_rows.fetchall()
+    ranking = 0
     if len(rows) == 0:
-        return EnergyRating(user_id)
+        return EnergyRating(user_id), ranking
 
     rating = EnergyRating(user_id)
     for row in rows:
         rating.add_travelled_distances_row(row)
+        ranking = row["ranking"]
     rating.calculate_rating()
-    return rating
-
-def filter_device_data():
-    #TODO: Don't check for users that have been inactive for a long time.
-    user_ids =  db.engine.execute(text("SELECT id FROM users;"))
-    for id_row in user_ids:
-        time = get_max_time_from_table("time", "device_data_filtered", "user_id", id_row["id"])
-        device_data_rows = data_points_by_user_id(id_row["id"], time, datetime.datetime.now())
-        device_data_filterer = DeviceDataFilterer(db, device_data_filtered_table)
-        device_data_filterer.analyse_unfiltered_data(device_data_rows, id_row["id"])
-
-
-
-def generate_distance_data():
-    user_ids =  db.engine.execute(text("SELECT id FROM users;"))
-    ratings = []
-    for id_row in user_ids:
-        time = get_max_time_from_table("time", "travelled_distances", "user_id", id_row["id"]) + timedelta(days=1)
-        last_midnight = datetime.datetime.now().replace(hour = 0, minute = 0, second = 0, microsecond = 0)
-        data_rows = get_filtered_device_data_points(id_row["id"], time, last_midnight)
-        ratings += get_ratings_from_rows(data_rows, id_row["id"])
-    if len(ratings) > 0:
-        db.engine.execute(travelled_distances_table.insert(ratings))
-
-def get_ratings_from_rows(filtered_data_rows, user_id):
-    ratings = []
-    rows = filtered_data_rows.fetchall()
-    if len(rows) == 0:
-        return ratings
-    previous_time = rows[0]["time"]
-    current_date = rows[0]["time"].replace(hour = 0, minute = 0, second = 0, microsecond = 0)
-    previous_location = json.loads(rows[0]["geojson"])["coordinates"]
-    rating = EnergyRating(user_id, date=current_date)
-    for row in rows[1:]:
-        current_activity = row["activity"]
-        current_time = row["time"]
-        current_location = json.loads(row["geojson"])["coordinates"]
-
-        if (current_time - current_date).total_seconds() >= 60*60*24: #A full day
-            current_date = current_time.replace(hour = 0, minute = 0, second = 0, microsecond = 0)
-            rating.calculate_rating()
-            if not rating.is_empty():
-                ratings.append(rating.get_data_dict())
-            rating = EnergyRating(user_id, date=current_date)
-
-        if (current_time - previous_time).total_seconds() > MAX_POINT_TIME_DIFFERENCE:
-            previous_time = current_time
-            previous_location = current_location
-            continue
-
-
-        # from: http://stackoverflow.com/questions/1253499/simple-calculations-for-working-with-lat-lon-km-distance
-        # The approximate conversions are:
-        # Latitude: 1 deg = 110.574 km
-        # Longitude: 1 deg = 111.320*cos(latitude) km
-
-        x_diff = (previous_location[0] - current_location[0]) * 110.320 * math.cos((current_location[1] / 360) * math.pi)
-        y_diff = (previous_location[1] - current_location[1]) * 110.574
-
-        distance = (x_diff * x_diff + y_diff * y_diff)**0.5
-
-        previous_location = current_location
-
-        if current_activity == "IN_VEHICLE":
-            #TODO add public transportation check
-            rating.add_in_vehicle_distance(distance)
-        elif current_activity == "ON_BICYCLE":
-            rating.add_on_bicycle_distance(distance)
-        elif current_activity == "RUNNING":
-            rating.add_running_distance(distance)
-        elif current_activity == "WALKING":
-            rating.add_walking_distance(distance)
-
-    rating.calculate_rating()
-    if not rating.is_empty():
-        ratings.append(rating.get_data_dict())
-    return ratings
-
-
-
-
-
-def update_global_statistics():
-    query = '''
-        SELECT MAX(time) as time
-        FROM global_statistics
-    '''
-    time_row = db.engine.execute(text(query)).fetchone()
-    if time_row["time"] is None:
-        query = '''
-            SELECT MIN(time) as time
-            FROM travelled_distances
-        '''
-        time_row = db.engine.execute(text(query)).fetchone()
-        if time_row["time"] is None:
-            return
-    time_start = time_row["time"].replace(hour=0,minute=0,second=0,microsecond=0)
-    last_midnight = datetime.datetime.now().replace(hour=0,minute=0,second=0,microsecond=0)
-    items = []
-    while (time_start < last_midnight):
-        time_end = time_start + timedelta(days=1)
-        query = '''
-            SELECT total_distance, average_co2
-            FROM travelled_distances
-            WHERE time >= :time_start
-            AND time < :time_end
-        '''
-        travelled_distances_rows = db.engine.execute(text(query), time_start=time_start, time_end=time_end)
-        items.append(get_global_statistics_for_day(travelled_distances_rows, time_start))
-        generate_rankings(time_start)
-        time_start += timedelta(days=1)
-    db.engine.execute(global_statistics_table.insert(items))
-
-
-
-def get_global_statistics_for_day(travelled_distances_rows, time):
-    time_end = time + timedelta(days=1)
-    time_start = time_end - timedelta(days=7)
-    query = '''
-        SELECT COUNT(DISTINCT user_id)
-        FROM travelled_distances
-        WHERE time < :time_end
-        AND time >= :time_start
-    '''
-    user_id_count_row = db.engine.execute(text(query), time_start=time_start, time_end=time_end).fetchone()
-    id_count = user_id_count_row["count"]
-
-    distance_sum = 0
-    total_co2 = 0
-    for row in travelled_distances_rows:
-        distance_sum += row["total_distance"]
-        total_co2 += row["total_distance"] * row["average_co2"]
-    if distance_sum == 0:
-        average_co2 = 0
-    else:
-        average_co2 = total_co2 / distance_sum
-    return {'time':time,
-            'average_co2_usage':average_co2,
-            'past_week_certificates_number':id_count,
-            'total_distance':distance_sum}
-
-
-def generate_rankings(time):
-    time_end = time + timedelta(days=1)
-    time_start = time_end - timedelta(days=7)
-    query = '''
-        SELECT user_id, total_distance, average_co2
-        FROM travelled_distances
-        WHERE time < :time_end
-        AND time >= :time_start
-    '''
-    travelled_distances_rows = db.engine.execute(text(query), time_start=time_start, time_end=time_end)
-
-    total_distances = {}
-    total_co2 = {}
-    totals = []
-    for row in travelled_distances_rows:
-        if row["total_distance"] is not None:
-            if row["user_id"] in total_distances:
-                total_distances[row["user_id"]] += row["total_distance"]
-                total_co2[row["user_id"]] += row["average_co2"] * row["total_distance"]
-            else:
-                total_distances[row["user_id"]] = row["total_distance"]
-                total_co2[row["user_id"]] = row["average_co2"] * row["total_distance"]
-    for user_id in total_distances:
-        totals.append((user_id, total_co2[user_id] / total_distances[user_id]))
-    totals_sorted = sorted(totals, key=lambda average_co2: average_co2[1])
-    update_query = ""
-    for i in range(len(totals_sorted)):
-        update_query += '''
-            INSERT INTO travelled_distances
-            (user_id, time, ranking)
-            VALUES
-            ({0}, :time, {1});
-        '''.format(totals_sorted[i][0], i + 1)
-    if update_query != "":
-        db.engine.execute(text(update_query), time=time)
-
-
-
-def retrieve_hsl_data():
-    url = "http://dev.hsl.fi/siriaccess/vm/json"
-    response = urllib2.urlopen(url)
-    json_data = json.loads(response.read())
-    vehicle_data = json_data["Siri"]["ServiceDelivery"]["VehicleMonitoringDelivery"][0]["VehicleActivity"]
-
-    all_vehicles = []
-
-    for vehicle in vehicle_data:
-        timestamp = datetime.datetime.fromtimestamp(vehicle["RecordedAtTime"] / 1000) #datetime doesn't like millisecond accuracy
-        line_name, line_type = interpret_jore(vehicle["MonitoredVehicleJourney"]["LineRef"]["value"])
-        longitude = vehicle["MonitoredVehicleJourney"]["VehicleLocation"]["Longitude"]
-        latitude = vehicle["MonitoredVehicleJourney"]["VehicleLocation"]["Latitude"]
-        coordinate = 'POINT(%f %f)' % (longitude, latitude)
-        vehicle_ref = vehicle["MonitoredVehicleJourney"]["VehicleRef"]["value"]
-
-        vehicle_item = {
-            'coordinate': coordinate,
-            'line_name': line_name,
-            'line_type': line_type,
-            'time': timestamp,
-            'vehicle_ref': vehicle_ref
-        }
-        all_vehicles.append(vehicle_item)
-
-    db.engine.execute(mass_transit_data_table.insert(all_vehicles))
-
-
-def interpret_jore(jore_code):
-    if re.search(jore_ferry_regex, jore_code):
-        line_name = "Ferry"
-        line_type = "FERRY"
-    elif re.search(jore_subway_regex, jore_code):
-        line_name = jore_code[4:5]
-        line_type = "SUBWAY"
-    elif re.search(jore_rail_regex, jore_code):
-        line_name = jore_code[4:5]
-        line_type = "TRAIN"
-    elif re.search(jore_tram_regex, jore_code):
-        line_name = re.sub(jore_tram_replace_regex, "", jore_code)
-        line_type = "TRAM"
-    elif re.search(jore_bus_regex, jore_code):
-        line_name = re.sub(jore_tram_replace_regex, "", jore_code)
-        line_type = "BUS"
-    else:
-        # unknown, assume bus
-        line_name = jore_code
-        line_type = "BUS"
-    return line_name, line_type
+    return rating, ranking
 
 
 def generate_csv(rows):
@@ -901,21 +672,6 @@ def generate_csv(rows):
     for row in rows:
         yield ';'.join(['"%s"' % (to_str(x)) for x in row]) + '\n'
 
-
-def get_max_time_from_table(time_column_name, table_name, id_field_name, id):
-    query = '''
-        SELECT MAX({0}) as time
-        FROM {1}
-        GROUP BY {2}
-        HAVING {2} = :id;
-    '''.format(time_column_name, table_name, id_field_name)
-    time_row = db.engine.execute(text(query),
-                                 id = id).fetchone()
-    if time_row is None:
-        time = datetime.datetime.strptime("1971-01-01", '%Y-%m-%d')
-    else:
-        time = time_row["time"]
-    return time
 
 def get_distinct_device_ids(datetime_start, datetime_end):
     return db.engine.execute(text('''
@@ -1191,8 +947,7 @@ def verify_and_get_account_id(credentials):
 
 # App starting point:
 if __name__ == '__main__':
-    initialize()
     if app.debug:
-        app.run(host='0.0.0.0', use_reloader=False)
+        app.run(host='0.0.0.0')
     else:
         app.run()
