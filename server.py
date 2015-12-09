@@ -621,12 +621,21 @@ def svg():
     #end_time = datetime.datetime.now()
     end_time = datetime.datetime.strptime("2015-11-18", '%Y-%m-%d')
     start_time = end_time.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=7)
+    ranking_start_time = end_time.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=1)
     end_time_string = end_time.strftime("%Y-%m-%d")
     start_time_string = start_time.strftime("%Y-%m-%d")
     TEMP_FIXED_USER_ID = 5
 
-    rating = get_rating(TEMP_FIXED_USER_ID, start_time_string, end_time_string)
-    return svg_generation.generate_energy_rating_svg(rating, start_time, end_time, 1, 2)
+    rating, ranking = get_rating(TEMP_FIXED_USER_ID, start_time_string, end_time_string)
+
+    query = '''SELECT past_week_certificates_number FROM global_statistics
+               WHERE time < :end_time
+               AND time >= :ranking_start_time'''
+    ranking_row = db.engine.execute(text(query), ranking_start_time=start_time, end_time=end_time)
+    max_ranking = ranking_row.fetchone()["past_week_certificates_number"]
+
+
+    return svg_generation.generate_energy_rating_svg(rating, start_time, end_time, ranking, max_ranking)
 
 
 # Helper Functions:
@@ -639,14 +648,16 @@ def get_rating(user_id, start_date, end_date):
                '''
     distance_rows = db.engine.execute(text(query), start_date=start_date, end_date=end_date, user_id=user_id)
     rows = distance_rows.fetchall()
+    ranking = 0
     if len(rows) == 0:
-        return EnergyRating(user_id)
+        return EnergyRating(user_id), ranking
 
     rating = EnergyRating(user_id)
     for row in rows:
         rating.add_travelled_distances_row(row)
+        ranking = row["ranking"]
     rating.calculate_rating()
-    return rating
+    return rating, ranking
 
 def filter_device_data():
     #TODO: Don't check for users that have been inactive for a long time.
