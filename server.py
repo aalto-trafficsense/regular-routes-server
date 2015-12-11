@@ -575,7 +575,7 @@ def index():
       render_template('index.html',
                       CLIENT_ID=CLIENT_ID,
                       STATE=state,
-                      RR_URL_PREFIX=app.config['APPLICATION_ROOT'],
+                      RR_URL_PREFIX=app.config['RR_URL_PREFIX'],
                       APPLICATION_NAME=APPLICATION_NAME))
   response.headers['Content-Type'] = 'text/html'
   return response
