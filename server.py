@@ -710,6 +710,7 @@ def energymap():
         # Not authenticated -> throw back to front page
         return index()
     return render_template('energymap.html',
+                           RR_URL_PREFIX=app.config['RR_URL_PREFIX'],
                            api_key=app.config['MAPS_API_KEY'])
 
 
