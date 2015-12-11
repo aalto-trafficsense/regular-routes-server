@@ -95,13 +95,20 @@ class EnergyRating:
         }
 
     def add_travelled_distances_row(self, travelled_distances_row):
-        self.on_bicycle_distance += travelled_distances_row["cycling"]
-        self.walking_distance += travelled_distances_row["walking"]
-        self.running_distance += travelled_distances_row["running"]
-        self.in_mass_transit_A_distance += travelled_distances_row["mass_transit_a"]
-        self.in_mass_transit_B_distance += travelled_distances_row["mass_transit_b"]
-        self.in_mass_transit_C_distance += travelled_distances_row["mass_transit_c"]
-        self.in_vehicle_distance += travelled_distances_row["car"]
+        if travelled_distances_row["cycling"] is not None:
+            self.on_bicycle_distance += travelled_distances_row["cycling"]
+        if travelled_distances_row["walking"] is not None:
+            self.walking_distance += travelled_distances_row["walking"]
+        if travelled_distances_row["running"] is not None:
+            self.running_distance += travelled_distances_row["running"]
+        if travelled_distances_row["mass_transit_a"] is not None:
+            self.in_mass_transit_A_distance += travelled_distances_row["mass_transit_a"]
+        if travelled_distances_row["mass_transit_b"] is not None:
+            self.in_mass_transit_B_distance += travelled_distances_row["mass_transit_b"]
+        if travelled_distances_row["mass_transit_c"] is not None:
+            self.in_mass_transit_C_distance += travelled_distances_row["mass_transit_c"]
+        if travelled_distances_row["car"] is not None:
+            self.in_vehicle_distance += travelled_distances_row["car"]
 
 
     def __str__(self):
