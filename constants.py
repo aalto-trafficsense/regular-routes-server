@@ -17,7 +17,7 @@ MAX_POINT_TIME_DIFFERENCE = 300
 MAX_DIFFERENT_DEVICE_TIME_DIFFERENCE = 20
 
 #Required number of different activities for triggering an activity change.
-CONSECUTIVE_DIFFERENCE_LIMIT = 10
+CONSECUTIVE_DIFFERENCE_LIMIT = 6
 
 
 #Regexes for the HSL api

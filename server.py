@@ -491,14 +491,13 @@ def visualize(device_id):
 @app.route('/visualize/<int:device_id>/geojson')
 def visualize_device_geojson(device_id):
     if 'date' in request.args:
-        date_start = datetime.datetime.strptime(request.args['date'], '%Y-%m-%d').date()
+        date_start = datetime.datetime.strptime(request.args['date'], '%Y-%m-%d').replace(hour=0, minute=0, second=0, microsecond=0)
     else:
-        date_start = date.today()
+        date_start = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
 
-    date_end = date_start + timedelta(days=1)
+    date_end = date_start + timedelta(days=24)
 
-    points = data_points_snapping(device_id, datetime.datetime.fromordinal(date_start.toordinal()),
-                                  datetime.datetime.fromordinal(date_end.toordinal()))
+    points = data_points_snapping(device_id, date_start, date_end)
 
     features = []
     waypoints = set()
@@ -555,15 +554,14 @@ def energy(user_id):
 @app.route('/energy/<int:user_id>/geojson')
 def energy_device_geojson(user_id):
     if 'date' in request.args:
-        date_start = datetime.datetime.strptime(request.args['date'], '%Y-%m-%d').date()
+        date_start = datetime.datetime.strptime(request.args['date'], '%Y-%m-%d').replace(hour=0, minute=0, second=0, microsecond=0)
     else:
-        date_start = date.today()
+        date_start = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
 
     # date_start = datetime.datetime.strptime("2015-11-11", '%Y-%m-%d')
-    date_end = date_start + timedelta(days=1)
+    date_end = date_start + timedelta(days=7)
 
-    points = data_points_filtered(user_id, datetime.datetime.fromordinal(date_start.toordinal()),
-                                  datetime.datetime.fromordinal(date_end.toordinal()))
+    points = data_points_filtered(user_id, date_start, date_end)
 
     features = []
     for point in points:

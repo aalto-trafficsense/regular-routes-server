@@ -344,8 +344,9 @@ def get_global_statistics_for_day(travelled_distances_rows, time):
     distance_sum = 0
     total_co2 = 0
     for row in travelled_distances_rows:
-        distance_sum += row["total_distance"]
-        total_co2 += row["total_distance"] * row["average_co2"]
+        if row["total_distance"]:
+            distance_sum += row["total_distance"]
+            total_co2 += row["total_distance"] * row["average_co2"]
     if distance_sum == 0:
         average_co2 = 0
     else:
