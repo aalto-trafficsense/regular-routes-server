@@ -703,18 +703,18 @@ def no_data():
     return render_template('nodata.html')
 
 @app.route('/energymap')
-def energy():
+def energymap():
     """Draw the energy consumption map of the user."""
     user_id = session.get('rr_user_id')
     if user_id == None:
         # Not authenticated -> throw back to front page
         return index()
-    return render_template('energy.html',
+    return render_template('energymap.html',
                            api_key=app.config['MAPS_API_KEY'])
 
 
-@app.route('/energy/geojson')
-def energy_device_geojson():
+@app.route('/energymap/geojson')
+def energymap_device_geojson():
     if 'date' in request.args:
         date_start = datetime.datetime.strptime(request.args['date'], '%Y-%m-%d').replace(hour=0, minute=0, second=0, microsecond=0)
     else:

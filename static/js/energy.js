@@ -71,7 +71,7 @@ $(document).ready(function() {
 	map.data.forEach(function(feature) {
 	    map.data.remove(feature);
 	});
-	$.getJSON('../energy/geojson?date=' + date, function(response) {
+	$.getJSON('../energymap/geojson?date=' + date, function(response) {
 	    map.data.addGeoJson(response);
 	    mapCanvas.css('opacity', '');
 		if (response.features.length > 1) {
