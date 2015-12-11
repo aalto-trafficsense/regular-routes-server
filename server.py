@@ -694,7 +694,8 @@ def regularroutes_menu():
     if user_id == None:
         # Not authenticated -> throw back to front page
         return index()
-    return render_template('menu.html')
+    return render_template('menu.html',
+                           RR_URL_PREFIX=app.config['RR_URL_PREFIX'])
 
 @app.route('/nodata')
 def no_data():
