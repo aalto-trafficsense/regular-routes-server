@@ -36,9 +36,13 @@
       <div class="g-signin2"
            data-scope="profile"
            data-onsuccess="onSignIn"
-           data-onfailure="onSignInFailure" data-accesstype="offline" data-theme="dark"></div>
+           data-onfailure="onSignInFailure" data-accesstype="offline" data-theme="dark"></div><br><br>
       <p>Note: This service assumes that you have been running the RegularRoutes Android application with the same account.
       Otherwise no data is available.</p>
+      <p><a href="http://cse.aalto.fi/en/research/groups/distributed_systems/projects/trafficsense/">TrafficSense</a> is a research project at Aalto University.</p>
+      <br>
+      <p>Contact <a href="mailto:trafficsense.aalto@gmail.com?Subject=Front%20page%20contact"
+                                                target="_top">trafficsense</a>.</p>
   </div>
 </body>
 <script type="text/javascript">
@@ -98,7 +102,8 @@ var helper = (function() {
       console.log('connectServer called');
       $.ajax({
         type: 'POST',
-        url: $(location).attr('origin') + '/connect?state={{ STATE }}',
+        // url: $(location).attr('origin') + '/connect?state={{ STATE }}',
+        url: '../connect?state={{ STATE }}',
         contentType: 'application/octet-stream; charset=utf-8',
         success: function(result) {
           console.log('connectServer success result: ' + result);
