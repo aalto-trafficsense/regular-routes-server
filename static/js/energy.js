@@ -1,5 +1,5 @@
 $(document).ready(function() {
-	$('#signout').click(disconnectServer);
+	$('#menu').click(function() { window.location='menu' } );
     var date = $('#date');
     date.pickadate({
 	clear: '',
@@ -85,19 +85,4 @@ $(document).ready(function() {
 	});
     }
 
-	function disconnectServer() {
-      // Revoke the server tokens
-      $.ajax({
-        type: 'POST',
-        url: $(location).attr('origin') + '/disconnect',
-        async: false,
-        success: function(result) {
-            console.log('revoke response: ' + result);
-			window.location='signedout';
-        },
-        error: function(e) {
-          console.log(e);
-        }
-      });
-	}
 });

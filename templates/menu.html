@@ -1,0 +1,50 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+        "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+    <link href="http://aaltofimedia1.aalto.fi/style2015/css/style.min.css" rel=stylesheet type="text/css"/>
+    <title>TrafficSense Menu</title>
+    <script src="//ajax.googleapis.com/ajax/libs/jquery/1.8.2/jquery.min.js" ></script>
+</head>
+<body>
+<div class=container>
+    <h2>TrafficSense Main Menu</h2>
+    <button id="certificate" >View Your Energy Certificate for The Past Week</button>
+    <br><br>
+    <button id="energymap" >View Qualified Routes on A Map</button>
+    <br><br>
+    <button id="signout" >Log Out</button>
+    <br><br>
+    <p><a href="http://cse.aalto.fi/en/research/groups/distributed_systems/projects/trafficsense/">TrafficSense</a> is a research project at Aalto University.</p>
+    <br>
+    <p>Contact <a href="mailto:trafficsense.aalto@gmail.com?Subject=Account%20linking%20problem"
+                                                target="_top">trafficsense</a>.</p>
+
+</div>
+</body>
+<script type="text/javascript">
+
+    $(document).ready(function() {
+        $('#certificate').click(function() { window.location='energycertificate' } );
+        $('#energymap').click(function() { window.location='energymap' } );
+        $('#signout').click(disconnectServer);
+    });
+
+	function disconnectServer() {
+      // Revoke the server tokens
+      $.ajax({
+        type: 'POST',
+        url: $(location).attr('origin') + '/disconnect',
+        async: false,
+        success: function(result) {
+			window.location='signedout';
+        },
+        error: function(e) {
+          console.log(e);
+        }
+      });
+	}
+
+</script>
+
+</html>

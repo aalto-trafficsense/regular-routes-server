@@ -679,12 +679,21 @@ def signed_out():
     """User disconnected from the service."""
     return render_template('signedout.html')
 
+@app.route('/menu')
+def regularroutes_menu():
+    """User disconnected from the service."""
+    user_id = session.get('rr_user_id')
+    if user_id == None:
+        # Not authenticated -> throw back to front page
+        return index()
+    return render_template('menu.html')
+
 @app.route('/nodata')
 def no_data():
     """No data was found for this user account."""
     return render_template('nodata.html')
 
-@app.route('/energy')
+@app.route('/energymap')
 def energy():
     """Draw the energy consumption map of the user."""
     user_id = session.get('rr_user_id')
@@ -753,17 +762,23 @@ def grade_date(requested_date):
 
     return return_string
 
-@app.route("/svg")
-def svg():
-    #end_time = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-    end_time = datetime.datetime.strptime("2015-11-18", '%Y-%m-%d')
+@app.route("/energycertificate")
+def energycertificate():
+
+    user_id = session.get('rr_user_id')
+    # user_id = 4
+    if user_id == None:
+        # Not authenticated -> throw back to front page
+        return index()
+
+    end_time = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    # end_time = datetime.datetime.strptime("2015-11-18", '%Y-%m-%d')
     start_time = end_time.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=7)
     ranking_start_time = end_time.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=1)
     end_time_string = end_time.strftime("%Y-%m-%d")
     start_time_string = start_time.strftime("%Y-%m-%d")
-    TEMP_FIXED_USER_ID = 4
 
-    rating, ranking = get_rating(TEMP_FIXED_USER_ID, start_time_string, end_time_string)
+    rating, ranking = get_rating(user_id, start_time_string, end_time_string)
     # rating = get_rating(TEMP_FIXED_USER_ID, start_time_string, end_time_string)
     # rating = EnergyRating(TEMP_FIXED_USER_ID)
     # rating.add_on_bicycle_distance(127.84)
@@ -774,14 +789,14 @@ def svg():
     # rating.add_in_mass_transit_C_distance(0)
     # rating.add_in_vehicle_distance(35.7)
     # rating.calculate_rating()
-    return svg_generation.generate_energy_rating_svg(rating, start_time, end_time, 1, 2)
+
+    # return svg_generation.generate_energy_rating_svg(rating, start_time, end_time, 1, 2)
 
     query = '''SELECT past_week_certificates_number FROM global_statistics
                WHERE time < :end_time
                AND time >= :ranking_start_time'''
     ranking_row = db.engine.execute(text(query), ranking_start_time=start_time, end_time=end_time)
     max_ranking = ranking_row.fetchone()["past_week_certificates_number"]
-
 
     return svg_generation.generate_energy_rating_svg(rating, start_time, end_time, ranking, max_ranking)
 
