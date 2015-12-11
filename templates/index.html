@@ -1,0 +1,164 @@
+<!--
+
+/*
+ *
+ * Copyright 2015 Google Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+-->
+
+<html>
+<head>
+  <link href="http://aaltofimedia1.aalto.fi/style2015/css/style.min.css" rel=stylesheet type="text/css"/>
+  <title>{{ APPLICATION_NAME }}</title>
+    <meta name="google-signin-client_id" content='{{ CLIENT_ID }}'>
+    <script src="https://apis.google.com/js/platform.js" async defer></script>
+  <!-- JavaScript specific to this application that is not related to API
+     calls -->
+    <script src="//ajax.googleapis.com/ajax/libs/jquery/1.8.2/jquery.min.js" ></script>
+</head>
+<body>
+  <div class=container>
+      <h2>TrafficSense</h2>
+      <p>Sign in with your Google account to view RegularRoutes data.</p>
+      <div class="g-signin2"
+           data-scope="profile"
+           data-onsuccess="onSignIn"
+           data-onfailure="onSignInFailure" data-accesstype="offline" data-theme="dark"></div>
+      <p>Note: This service assumes that you have been running the RegularRoutes Android application with the same account.
+      Otherwise no data is available.</p>
+  </div>
+</body>
+<script type="text/javascript">
+var helper = (function() {
+  var authResult = undefined;
+
+  return {
+    /**
+     * Hides the sign-in button and connects the server-side app after
+     * the user successfully signs in.
+     *
+     * @param {Object} authResult An Object which contains the access token and
+     *   other authentication information.
+     */
+    onSignInCallback: function(authResult) {
+        console.log('onSignInCallback called.')
+      if (authResult['access_token']) {
+        // The user is signed in
+        this.authResult = authResult;
+
+      } else if (authResult['error']) {
+        // There was an error, which means the user is not signed in.
+        // As an example, you can troubleshoot by writing to the console:
+        console.log('There was an error: ' + authResult['error']);
+      }
+      console.log('authResult', authResult);
+      window.location='energy';
+
+
+    },
+    /**
+     * Calls the server endpoint to disconnect the app for the user.
+     * Currently not used from this page.
+     */
+    disconnectServer: function() {
+      // Revoke the server tokens
+      $.ajax({
+        type: 'POST',
+        url: $(location).attr('origin') + '/disconnect',
+        async: false,
+        success: function(result) {
+          console.log('revoke response: ' + result);
+        },
+        error: function(e) {
+          console.log(e);
+        }
+      });
+    },
+    /**
+     * Calls the server endpoint to connect the app for the user. The client
+     * sends the one-time authorization code to the server and the server
+     * exchanges the code for its own tokens to use for offline API access.
+     * For more information, see:
+     *   https://developers.google.com/+/web/signin/server-side-flow
+     */
+    connectServer: function(auth2,code) {
+      console.log('connectServer called');
+      $.ajax({
+        type: 'POST',
+        url: $(location).attr('origin') + '/connect?state={{ STATE }}',
+        contentType: 'application/octet-stream; charset=utf-8',
+        success: function(result) {
+          console.log('connectServer success result: ' + result);
+          if (result == 'Nodata.') {
+              helper.disconnectServer();
+              window.location = 'nodata';
+          }  else { // Everything fine, pass the callback }
+              onSignInCallback(auth2.currentUser.get().getAuthResponse());
+          }
+        },
+        processData: false,
+        data: code
+      });
+    },
+  };
+})();
+
+/**
+ * Add anything that needs to be done when the form is loaded.
+ * client ID.
+ */
+$(document).ready(function() {
+  // $('#disconnect').click(helper.disconnectServer);
+});
+
+/**
+ * Called by the sign-in button
+ */
+
+function onSignIn(googleUser) {
+        // The ID token you need to pass to your backend:
+        console.log('onSignIn called');
+        auth2 = gapi.auth2.getAuthInstance();
+        auth2.grantOfflineAccess().then(
+          function(result){
+            helper.connectServer(auth2,result.code);
+          });
+
+        // helper.connectServer(googleUser);
+      };
+
+/**
+ * Called if there's a problem with the sign-in.
+ * (if that happens, where is the failure code?)
+ */
+
+function onSignInFailure() {
+        // The ID token you need to pass to your backend:
+        console.log('onSignInFailure');
+      };
+
+
+/**
+ * Calls the helper method that handles the authentication flow.
+ *
+ * @param {Object} authResult An Object which contains the access token and
+ *   other authentication information.
+ */
+function onSignInCallback(authResult) {
+  helper.onSignInCallback(authResult);
+}
+</script>
+</html>
