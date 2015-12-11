@@ -25,7 +25,8 @@ from sqlalchemy.exc import DataError
 from sqlalchemy.sql import text, func, column, table, select
 from uuid import uuid4
 
-from simplekv.memory import DictStore
+# from simplekv.memory import DictStore
+from simplekv.db.sql import SQLAlchemyStore
 from flask_kvsession import KVSessionExtension
 
 import logging
@@ -45,10 +46,10 @@ CLIENT_ID = json.loads(open(CLIENT_SECRET_FILE, 'r').read())['web']['client_id']
 app = Flask(__name__)
 
 # Memory-resident session storage, see the simplekv documentation for details
-store = DictStore()
+# store = DictStore()
 
 # This will replace the app's session handling
-KVSessionExtension(store, app)
+# KVSessionExtension(store, app)
 
 env_var_value = os.getenv(SETTINGS_FILE_ENV_VAR, None)
 if env_var_value is not None:
@@ -62,6 +63,10 @@ else:
 
 db = SQLAlchemy(app)
 metadata = MetaData()
+
+# Run session storage also on SQLAlchemy
+store = SQLAlchemyStore(db.engine, metadata, 'kv_session')
+KVSessionExtension(store, app)
 
 '''
 These types are the same as are defined in:
