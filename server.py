@@ -559,8 +559,8 @@ def energy_device_geojson(user_id):
     else:
         date_start = date.today()
 
-    date_start = datetime.datetime.strptime("2015-11-11", '%Y-%m-%d')
-    date_end = date_start + timedelta(days=7)
+    # date_start = datetime.datetime.strptime("2015-11-11", '%Y-%m-%d')
+    date_end = date_start + timedelta(days=1)
 
     points = data_points_filtered(user_id, datetime.datetime.fromordinal(date_start.toordinal()),
                                   datetime.datetime.fromordinal(date_end.toordinal()))
