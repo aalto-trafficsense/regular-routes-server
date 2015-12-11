@@ -81,7 +81,7 @@ var helper = (function() {
       // Revoke the server tokens
       $.ajax({
         type: 'POST',
-        url: $(location).attr('origin') + '/disconnect',
+        url: $(location).attr('origin') + '{{ RR_URL_PREFIX }}/disconnect',
         async: false,
         success: function(result) {
           console.log('revoke response: ' + result);
@@ -102,8 +102,8 @@ var helper = (function() {
       console.log('connectServer called');
       $.ajax({
         type: 'POST',
-        // url: $(location).attr('origin') + '/connect?state={{ STATE }}',
-        url: '../../connect?state={{ STATE }}',
+        url: $(location).attr('origin') + '{{ RR_URL_PREFIX }}/connect?state={{ STATE }}',
+        // url: '../../connect?state={{ STATE }}',
         contentType: 'application/octet-stream; charset=utf-8',
         success: function(result) {
           console.log('connectServer success result: ' + result);
