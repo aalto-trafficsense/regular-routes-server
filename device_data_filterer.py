@@ -100,7 +100,7 @@ class DeviceDataFilterer:
             current_activity = self.analyse_row_activities(current_row)
 
             if previous_device_id != current_row["device_id"] and \
-                            (current_row["time"] - previous_time) < MAX_DIFFERENT_DEVICE_TIME_DIFFERENCE:
+                            (current_row["time"] - previous_time).total_seconds() < MAX_DIFFERENT_DEVICE_TIME_DIFFERENCE:
                 if previous_device_id > current_row["device_id"]:
                     device_data_queue.pop()
                 else:

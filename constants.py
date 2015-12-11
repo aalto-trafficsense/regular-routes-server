@@ -14,10 +14,10 @@ IN_VEHICLE_CO2 = 150
 MAX_POINT_TIME_DIFFERENCE = 300
 
 #If two devices for the same user id have produced activity data within this time limit (in seconds), the one with the larger device_id is dropped.
-MAX_DIFFERENT_DEVICE_TIME_DIFFERENCE = 20
+MAX_DIFFERENT_DEVICE_TIME_DIFFERENCE = 40
 
-#Required number of different activities for triggering an activity change.
-CONSECUTIVE_DIFFERENCE_LIMIT = 10
+#Required number of different activities for triggering an activity change in device_data_filtering.
+CONSECUTIVE_DIFFERENCE_LIMIT = 6
 
 
 #Regexes for the HSL api

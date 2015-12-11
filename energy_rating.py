@@ -1,10 +1,11 @@
 from constants import *
+import datetime
 import json
 import math
 
 class EnergyRating:
 
-    def __init__(self, user_id, date, in_vehicle_distance=0, in_mass_transit_A_distance=0, in_mass_transit_B_distance=0, in_mass_transit_C_distance=0, on_bicycle_distance=0, running_distance=0, walking_distance=0):
+    def __init__(self, user_id, in_vehicle_distance=0, in_mass_transit_A_distance=0, in_mass_transit_B_distance=0, in_mass_transit_C_distance=0, on_bicycle_distance=0, running_distance=0, walking_distance=0, date=datetime.datetime.now()):
         self.user_id = user_id
         self.date = date.replace(hour = 0, minute = 0, second = 0, microsecond = 0)
         self.in_vehicle_distance = in_vehicle_distance
@@ -92,6 +93,16 @@ class EnergyRating:
             'total_distance':self.total_distance,
             'average_co2':self.average_co2
         }
+
+    def add_travelled_distances_row(self, travelled_distances_row):
+        self.on_bicycle_distance += travelled_distances_row["cycling"]
+        self.walking_distance += travelled_distances_row["walking"]
+        self.running_distance += travelled_distances_row["running"]
+        self.in_mass_transit_A_distance += travelled_distances_row["mass_transit_a"]
+        self.in_mass_transit_B_distance += travelled_distances_row["mass_transit_b"]
+        self.in_mass_transit_C_distance += travelled_distances_row["mass_transit_c"]
+        self.in_vehicle_distance += travelled_distances_row["car"]
+
 
     def __str__(self):
         return_string = "\
