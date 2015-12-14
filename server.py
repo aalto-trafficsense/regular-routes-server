@@ -585,13 +585,18 @@ def index():
   response.headers['Content-Type'] = 'text/html'
   return response
 
+@app.route('/signin', methods=['GET'])
+def sign_in():
+    return index()
+
+
 @app.route('/connect', methods=['POST'])
 def connect():
   """Exchange the one-time authorization code for a token and
   store the token in the session."""
   # Ensure that the request is not a forgery and that the user sending
   # this connect request is the expected user.
-  print 'Session state returns: ' + session.get('state')
+  # print 'Session state returns: ' + session.get('state')
   if request.args.get('state', '') != session.get('state'):
     response = make_response(json.dumps('Invalid state parameter.'), 401)
     response.headers['Content-Type'] = 'application/json'
