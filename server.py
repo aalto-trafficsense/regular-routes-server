@@ -1,29 +1,25 @@
 #!/usr/bin/env python
 
-import json
 import random
 import string
 import hashlib
-import re
-import urllib2
+from datetime import timedelta
+from uuid import uuid4
+
 import geoalchemy2 as ga2
-import math
-import svg_generation
-from device_data_filterer import DeviceDataFilterer
-from energy_rating import EnergyRating
-from constants import *
-from datetime import date, timedelta
 from flask import Flask, abort, jsonify, request, render_template, Response
-from flask import make_response, session, send_file
+from flask import make_response, session
 from flask.ext.sqlalchemy import SQLAlchemy
 from oauth2client.client import *
 from oauth2client.crypt import AppIdentityError
-from sqlalchemy import MetaData, Table, Column, ForeignKey, Enum, BigInteger, Integer, String, Index, UniqueConstraint, Date, \
+from sqlalchemy import MetaData, Table, Column, ForeignKey, Enum, BigInteger, Integer, String, Index, UniqueConstraint, \
     Float
 from sqlalchemy.dialects.postgres import DOUBLE_PRECISION, TIMESTAMP, UUID
 from sqlalchemy.exc import DataError
 from sqlalchemy.sql import text, func, column, table, select
-from uuid import uuid4
+
+from pyfiles import svg_generation
+from pyfiles.energy_rating import EnergyRating
 
 # from simplekv.memory import DictStore
 from simplekv.db.sql import SQLAlchemyStore
