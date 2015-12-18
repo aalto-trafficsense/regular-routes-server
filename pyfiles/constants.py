@@ -16,7 +16,20 @@ MAX_POINT_TIME_DIFFERENCE = 300
 #If two devices for the same user id have produced activity data within this time limit (in seconds), the one with the larger device_id is dropped.
 MAX_DIFFERENT_DEVICE_TIME_DIFFERENCE = 40
 
-#Required number of different activities for triggering an activity change in device_data_filtering.
+# The maximum amount of time difference (in seconds) between a device data sample and a mass transit data item
+# the mass transit matching algorithm will allow. Minimum value = 15 because mass transit data is sampled every 30 seconds.
+MAX_MASS_TRANSIT_TIME_DIFFERENCE = 60
+
+# The maximum distance (in metres) between a device data sample and a mass transit data item
+# the mass transit matching algorithm will allow. Note that trains can be long, yet each provides only one set of coordinates.
+MAX_MASS_TRANSIT_DISTANCE_DIFFERENCE = 200
+
+# The number of samples that device data filtering will use when matching the IN_VEHICLE sequence with mass transit data.
+# Must be equal or smaller than CONSECUTIVE_DIFFERENCE_LIMIT
+NUMBER_OF_MASS_TRANSIT_MATCH_SAMPLES = 4
+
+# Required number of different activities for triggering an activity change in device_data_filtering.
+# Must be equal or greater than MASS_TRANSIT_MATCH_SAMPLES
 CONSECUTIVE_DIFFERENCE_LIMIT = 6
 
 

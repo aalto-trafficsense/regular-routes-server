@@ -6,9 +6,9 @@ import urllib2
 import geoalchemy2 as ga2
 import math
 import svg_generation
-from device_data_filterer import DeviceDataFilterer
-from energy_rating import EnergyRating
-from constants import *
+from pyfiles.device_data_filterer import DeviceDataFilterer
+from pyfiles.energy_rating import EnergyRating
+from pyfiles.constants import *
 from datetime import date, timedelta
 from apscheduler.schedulers.background import BackgroundScheduler
 from flask import Flask, abort, jsonify, request, render_template, Response
@@ -127,6 +127,8 @@ device_data_filtered_table = Table('device_data_filtered', metadata,
                           Column('time', TIMESTAMP, nullable=False),
                           Column('activity', activity_type_enum),
                           Column('waypoint_id', BigInteger),
+                          Column('line_type', mass_transit_type_enum),
+                          Column('line_name', String),
                           Index('idx_device_data_filtered_time', 'time'),
                           Index('idx_device_data_filtered_user_id_time', 'user_id', 'time'))
 
@@ -208,6 +210,7 @@ def initialize():
     scheduler.add_job(retrieve_hsl_data, "cron", second="*/28")
     scheduler.add_job(run_daily_tasks, "cron", hour="3")
     run_daily_tasks()
+    print "scheduler init done"
     scheduler.start()
 
 def run_daily_tasks():
@@ -278,8 +281,15 @@ def get_ratings_from_rows(filtered_data_rows, user_id):
         previous_location = current_location
 
         if current_activity == "IN_VEHICLE":
-            #TODO add public transportation check
-            rating.add_in_vehicle_distance(distance)
+            #TODO: handle FERRY somehow.
+            if row["line_type"] == "TRAIN":
+                rating.add_in_mass_transit_A_distance(distance)
+            elif row["line_type"] in ("TRAM", "SUBWAY"):
+                rating.add_in_mass_transit_B_distance(distance)
+            elif row["line_type"] == "BUS":
+                rating.add_in_mass_transit_C_distance(distance)
+            else:
+                rating.add_in_vehicle_distance(distance)
         elif current_activity == "ON_BICYCLE":
             rating.add_on_bicycle_distance(distance)
         elif current_activity == "RUNNING":

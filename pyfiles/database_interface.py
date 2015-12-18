@@ -119,6 +119,8 @@ def init_db(app):
                               Column('time', TIMESTAMP, nullable=False),
                               Column('activity', activity_type_enum),
                               Column('waypoint_id', BigInteger),
+                              Column('line_type', mass_transit_type_enum),
+                              Column('line_name', String),
                               Index('idx_device_data_filtered_time', 'time'),
                               Index('idx_device_data_filtered_user_id_time', 'user_id', 'time'))
 

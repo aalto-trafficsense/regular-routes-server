@@ -1,6 +1,8 @@
 import json
 
 from pyfiles.constants import *
+import datetime
+from sqlalchemy.sql import text, func, column, table, select
 
 
 class DeviceDataFilterer:
@@ -19,15 +21,69 @@ class DeviceDataFilterer:
         if len(device_data_queue) == 0:
             return
         filtered_device_data = []
+
+        line_type, line_name = self.match_mass_transit_line(activity, device_data_queue)
+
         for device_data_row in device_data_queue:
             current_location = json.loads(device_data_row["geojson"])["coordinates"]
             filtered_device_data.append({"activity" : activity,
                                          "user_id" : user_id,
                                          'coordinate': 'POINT(%f %f)' % (float(current_location[0]), float(current_location[1])),
                                          "time" : device_data_row["time"],
-                                         "waypoint_id" : device_data_row["waypoint_id"]})
+                                         "waypoint_id" : device_data_row["waypoint_id"],
+                                         "line_type": line_type,
+                                         "line_name": line_name})
 
         self.db.engine.execute(self.filtered_device_data_table.insert(filtered_device_data))
+
+    def match_mass_transit_line(self, activity, device_data_queue):
+        if activity != "IN_VEHICLE":
+            return None, None
+
+        matching_vehicle_ids = set()
+        vehicle_data = {}
+
+        # Get NUMBER_OF_MASS_TRANSIT_MATCH_SAMPLES samples from device_data_queue and try to match those samples
+        # with mass transit data.
+        sampling_factor = len(device_data_queue) / NUMBER_OF_MASS_TRANSIT_MATCH_SAMPLES
+        for i in range(NUMBER_OF_MASS_TRANSIT_MATCH_SAMPLES):
+            sample = device_data_queue[i * sampling_factor]
+            mass_transit_points = self.get_mass_transit_points(sample)
+            new_vehicle_ids = set()
+            for point in mass_transit_points:
+                # Get all distinct vehicle ids around the device data sample and store their data
+                new_vehicle_ids.add(point["vehicle_ref"])
+                vehicle_data[point["vehicle_ref"]] = (point["line_type"], point["line_name"])
+            if len(matching_vehicle_ids) == 0:
+                # First iteration: just copy the set
+                matching_vehicle_ids = new_vehicle_ids
+            else:
+                # Subsequent iterations:  intersect previous matches with new ones.
+                matching_vehicle_ids &= new_vehicle_ids
+            if len(matching_vehicle_ids) == 0:
+                return None, None
+        final_vehicle = matching_vehicle_ids.pop() # If there were more than one matches, we pick a random one.
+        line_data = vehicle_data[final_vehicle]
+        return line_data[0], line_data[1] # line_type, line_name
+
+    def get_mass_transit_points(self, sample):
+        # Get all mass transit points near a device data sample with timestamps close to each other.
+        min_time = sample["time"] - datetime.timedelta(seconds=MAX_MASS_TRANSIT_TIME_DIFFERENCE / 2)
+        max_time = sample["time"] + datetime.timedelta(seconds=MAX_MASS_TRANSIT_TIME_DIFFERENCE / 2)
+        current_location = json.loads(sample["geojson"])["coordinates"]
+        query = """SELECT line_type, line_name, vehicle_ref
+                   FROM mass_transit_data
+                   WHERE time >= :min_time
+                   AND time < :max_time
+                   AND ST_DWithin(coordinate, ST_Point(:longitude,:latitude), :MAX_MATCH_DISTANCE)"""
+
+        mass_transit_points =  self.db.engine.execute(text(query),
+                                         min_time=min_time,
+                                         max_time=max_time,
+                                         longitude=current_location[0],
+                                         latitude=current_location[1],
+                                         MAX_MATCH_DISTANCE=MAX_MASS_TRANSIT_DISTANCE_DIFFERENCE)
+        return mass_transit_points
 
 
     def analyse_row_activities(self, row):
