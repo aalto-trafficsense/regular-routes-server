@@ -40,8 +40,11 @@ class DeviceDataFilterer:
         if activity != "IN_VEHICLE":
             return None, None
 
-        matching_vehicle_ids = set()
-        vehicle_data = {}
+
+        vehicle_data = {} # Contains the line name and line type of a vehicle id
+        match_counts = {} # Contains the number of matches per vehicle id
+        collected_matches = [] # Contains lists of vehicle matches. One list per sampling point.
+        final_matches = []
 
         # Get NUMBER_OF_MASS_TRANSIT_MATCH_SAMPLES samples from device_data_queue and try to match those samples
         # with mass transit data.
@@ -50,26 +53,46 @@ class DeviceDataFilterer:
             sample = device_data_queue[i * sampling_factor]
             mass_transit_points = self.get_mass_transit_points(sample)
             new_vehicle_ids = set()
+            match_list = []
             for point in mass_transit_points:
                 # Get all distinct vehicle ids around the device data sample and store their data
                 new_vehicle_ids.add(point["vehicle_ref"])
                 vehicle_data[point["vehicle_ref"]] = (point["line_type"], point["line_name"])
-            if len(matching_vehicle_ids) == 0:
-                # First iteration: just copy the set
-                matching_vehicle_ids = new_vehicle_ids
-            else:
-                # Subsequent iterations:  intersect previous matches with new ones.
-                matching_vehicle_ids &= new_vehicle_ids
-            if len(matching_vehicle_ids) == 0:
-                return None, None
-        final_vehicle = matching_vehicle_ids.pop() # If there were more than one matches, we pick a random one.
+            for veh_id in new_vehicle_ids:
+                match_list.append(veh_id)
+            collected_matches.append(match_list)
+
+        # Count the total number of matches
+        for match_list in collected_matches:
+            for veh_id in match_list:
+                if veh_id in match_counts:
+                    match_counts[veh_id] += 1
+                else:
+                    match_counts[veh_id] = 1
+
+        # Find the vehicle ids with most matches
+        for i in range(MAXIMUM_MASS_TRANSIT_MISSES + 1):
+            for match in match_counts:
+                if match_counts[match] == NUMBER_OF_MASS_TRANSIT_MATCH_SAMPLES - i:
+                    final_matches.append(match)
+            if len(final_matches) > 0:
+                break
+
+        if len(final_matches) == 0:
+            return None, None
+
+        #print device_data_queue[0]["time"]
+        #for transit in final_matches:
+        #    print vehicle_data[transit]
+
+        final_vehicle = final_matches.pop() # If there were more than one matches, we pick just one.
         line_data = vehicle_data[final_vehicle]
         return line_data[0], line_data[1] # line_type, line_name
 
     def get_mass_transit_points(self, sample):
         # Get all mass transit points near a device data sample with timestamps close to each other.
-        min_time = sample["time"] - datetime.timedelta(seconds=MAX_MASS_TRANSIT_TIME_DIFFERENCE / 2)
-        max_time = sample["time"] + datetime.timedelta(seconds=MAX_MASS_TRANSIT_TIME_DIFFERENCE / 2)
+        min_time = sample["time"] - datetime.timedelta(seconds=MAX_MASS_TRANSIT_TIME_DIFFERENCE)
+        max_time = sample["time"] + datetime.timedelta(seconds=MAX_MASS_TRANSIT_TIME_DIFFERENCE)
         current_location = json.loads(sample["geojson"])["coordinates"]
         query = """SELECT line_type, line_name, vehicle_ref
                    FROM mass_transit_data

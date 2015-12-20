@@ -22,11 +22,14 @@ MAX_MASS_TRANSIT_TIME_DIFFERENCE = 60
 
 # The maximum distance (in metres) between a device data sample and a mass transit data item
 # the mass transit matching algorithm will allow. Note that trains can be long, yet each provides only one set of coordinates.
-MAX_MASS_TRANSIT_DISTANCE_DIFFERENCE = 200
+MAX_MASS_TRANSIT_DISTANCE_DIFFERENCE = 100
 
 # The number of samples that device data filtering will use when matching the IN_VEHICLE sequence with mass transit data.
 # Must be equal or smaller than CONSECUTIVE_DIFFERENCE_LIMIT
 NUMBER_OF_MASS_TRANSIT_MATCH_SAMPLES = 4
+
+# Maximum number of misses in mass transit sampling. Ensures that one bad sample doesn't ruin the matching.
+MAXIMUM_MASS_TRANSIT_MISSES = 1
 
 # Required number of different activities for triggering an activity change in device_data_filtering.
 # Must be equal or greater than MASS_TRANSIT_MATCH_SAMPLES

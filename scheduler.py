@@ -206,6 +206,7 @@ metadata.create_all(bind=db.engine, checkfirst=True)
 
 
 def initialize():
+    print "initialising scheduler"
     scheduler = BackgroundScheduler()
     scheduler.add_job(retrieve_hsl_data, "cron", second="*/28")
     scheduler.add_job(run_daily_tasks, "cron", hour="3")
@@ -486,7 +487,9 @@ def get_filtered_device_data_points(user_id, datetime_start, datetime_end):
     query = '''
         SELECT time,
             ST_AsGeoJSON(coordinate) AS geojson,
-            activity
+            activity,
+            line_type,
+            line_name
         FROM device_data_filtered
         WHERE user_id = :user_id
         AND time >= :time_start
