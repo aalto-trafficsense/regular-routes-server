@@ -372,7 +372,7 @@ def get_mass_transit_points(device_data_sample):
                AND time < :max_time
                AND ST_DWithin(coordinate, ST_Point(:longitude,:latitude), :MAX_MATCH_DISTANCE)"""
 
-    mass_transit_points =  self.db.engine.execute(text(query),
+    mass_transit_points =  db.engine.execute(text(query),
                                      min_time=min_time,
                                      max_time=max_time,
                                      longitude=current_location[0],
