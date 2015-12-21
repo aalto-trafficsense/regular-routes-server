@@ -437,6 +437,18 @@ def get_device_table_id_for_session(session_token):
         return -1
 
 
+def get_user_id_from_device_id(device_id):
+    try:
+        query = select([table('devices', column('user_id'))]).where(text("id='" + str(device_id) + "'"))
+        row = db.engine.execute(query).first()
+        if not row:
+            return None
+        return int(row[0])
+    except DataError as e:
+        print 'Exception: ' + e.message
+
+    return -1
+
 def get_users_table_id(user_id):
     """
     :param user_id: user_id (hash value)

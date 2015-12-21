@@ -5,11 +5,13 @@ from uuid import uuid4
 from flask import Flask, abort, jsonify, request
 from oauth2client.client import *
 from sqlalchemy.sql import text
+import json
 
 from pyfiles.database_interface import init_db, db_engine_execute, users_table_insert, users_table_update, devices_table_insert, device_data_table_insert
 from pyfiles.database_interface import verify_user_id, update_last_activity, get_users_table_id_for_device, get_device_table_id
-from pyfiles.database_interface import get_device_table_id_for_session, get_users_table_id, get_session_token_for_device
+from pyfiles.database_interface import get_device_table_id_for_session, get_users_table_id, get_session_token_for_device, get_user_id_from_device_id
 from pyfiles.database_interface import activity_types
+from pyfiles.database_interface import get_svg
 
 from pyfiles.authentication_helper import user_hash, authenticate_with_google_oauth
 
@@ -258,6 +260,16 @@ def maintenance_snapping():
         sql = sql_file.read()
         result = db_engine_execute(text(sql))
         return 'Snapping was done to %d data points' % (result.rowcount)
+
+@app.route('/svg/<session_token>')
+def svg(session_token):
+    device_id = get_device_table_id_for_session(session_token)
+    if device_id < 0:
+        return ""
+    user_id = get_user_id_from_device_id(device_id)
+    if user_id < 0:
+        return ""
+    return get_svg(user_id)
 
 # App starting point:
 if __name__ == '__main__':
