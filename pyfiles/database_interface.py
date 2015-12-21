@@ -372,7 +372,7 @@ def get_mass_transit_points(device_data_sample):
                AND time < :max_time
                AND ST_DWithin(coordinate, ST_Point(:longitude,:latitude), :MAX_MATCH_DISTANCE)"""
 
-    mass_transit_points =  db.engine.execute(text(query),
+    mass_transit_points = db.engine.execute(text(query),
                                      min_time=min_time,
                                      max_time=max_time,
                                      longitude=current_location[0],
@@ -530,6 +530,9 @@ def devices_table_insert(users_table_id, device_id, installation_id, device_mode
 
 def device_data_table_insert(batch):
     db.engine.execute(device_data_table.insert(batch))
+
+def device_data_filtered_table_insert(batch):
+    db.engine.execute(device_data_filtered_table.insert(batch))
 
 def db_engine_execute(query):
     return db.engine.execute(query)

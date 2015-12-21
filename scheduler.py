@@ -6,9 +6,11 @@ import urllib2
 import geoalchemy2 as ga2
 import math
 import svg_generation
+from pyfiles.database_interface import init_db
 from pyfiles.device_data_filterer import DeviceDataFilterer
 from pyfiles.energy_rating import EnergyRating
 from pyfiles.constants import *
+from pyfiles.common_helpers import *
 from datetime import date, timedelta
 from apscheduler.schedulers.background import BackgroundScheduler
 from flask import Flask, abort, jsonify, request, render_template, Response
@@ -47,7 +49,7 @@ else:
     app.config.from_pyfile('regularroutes.cfg')
     app.debug = True
 
-db = SQLAlchemy(app)
+db, store = init_db(app)
 metadata = MetaData()
 
 '''
@@ -226,7 +228,7 @@ def filter_device_data():
     for id_row in user_ids:
         time = get_max_time_from_table("time", "device_data_filtered", "user_id", id_row["id"])
         device_data_rows = data_points_by_user_id(id_row["id"], time, datetime.datetime.now())
-        device_data_filterer = DeviceDataFilterer(db, device_data_filtered_table)
+        device_data_filterer = DeviceDataFilterer()
         device_data_filterer.analyse_unfiltered_data(device_data_rows, id_row["id"])
 
 
@@ -268,16 +270,7 @@ def get_ratings_from_rows(filtered_data_rows, user_id):
             previous_location = current_location
             continue
 
-
-        # from: http://stackoverflow.com/questions/1253499/simple-calculations-for-working-with-lat-lon-km-distance
-        # The approximate conversions are:
-        # Latitude: 1 deg = 110.574 km
-        # Longitude: 1 deg = 111.320*cos(latitude) km
-
-        x_diff = (previous_location[0] - current_location[0]) * 110.320 * math.cos((current_location[1] / 360) * math.pi)
-        y_diff = (previous_location[1] - current_location[1]) * 110.574
-
-        distance = (x_diff * x_diff + y_diff * y_diff)**0.5
+        distance = get_distance_between_coordinates(previous_location, current_location)
 
         previous_location = current_location
 
