@@ -1,8 +1,7 @@
 import json
 
 from pyfiles.constants import *
-import datetime
-from sqlalchemy.sql import text, func, column, table, select
+from database_interface import get_mass_transit_points
 
 
 class DeviceDataFilterer:
@@ -52,7 +51,7 @@ class DeviceDataFilterer:
         for i in range(NUMBER_OF_MASS_TRANSIT_MATCH_SAMPLES):
             print i # to get some responses of the progress.
             sample = device_data_queue[i * sampling_factor]
-            mass_transit_points = self.get_mass_transit_points(sample)
+            mass_transit_points = get_mass_transit_points(sample)
             new_vehicle_ids = set()
             match_list = []
             for point in mass_transit_points:
@@ -90,24 +89,7 @@ class DeviceDataFilterer:
         line_data = vehicle_data[final_vehicle]
         return line_data[0], line_data[1] # line_type, line_name
 
-    def get_mass_transit_points(self, sample):
-        # Get all mass transit points near a device data sample with timestamps close to each other.
-        min_time = sample["time"] - datetime.timedelta(seconds=MAX_MASS_TRANSIT_TIME_DIFFERENCE)
-        max_time = sample["time"] + datetime.timedelta(seconds=MAX_MASS_TRANSIT_TIME_DIFFERENCE)
-        current_location = json.loads(sample["geojson"])["coordinates"]
-        query = """SELECT line_type, line_name, vehicle_ref
-                   FROM mass_transit_data
-                   WHERE time >= :min_time
-                   AND time < :max_time
-                   AND ST_DWithin(coordinate, ST_Point(:longitude,:latitude), :MAX_MATCH_DISTANCE)"""
 
-        mass_transit_points =  self.db.engine.execute(text(query),
-                                         min_time=min_time,
-                                         max_time=max_time,
-                                         longitude=current_location[0],
-                                         latitude=current_location[1],
-                                         MAX_MATCH_DISTANCE=MAX_MASS_TRANSIT_DISTANCE_DIFFERENCE)
-        return mass_transit_points
 
 
     def analyse_row_activities(self, row):
