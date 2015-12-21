@@ -7,6 +7,7 @@ from oauth2client.client import *
 from sqlalchemy.sql import text
 
 from pyfiles.database_interface import init_db, db_engine_execute, data_points_snapping
+import json
 
 import logging
 logging.basicConfig()
@@ -135,7 +136,7 @@ def visualize_device_geojson(device_id):
             'properties': {
                 'type': 'raw-point',
                 'activity': str(point['activity_1']),
-                'title': 'accuracy: %d\n%s' % (point['accuracy'], activity_info)
+                'title': 'accuracy: %d\n%s\n%s' % (point['accuracy'], activity_info, str(point['time']))
             }
         })
         if point['accuracy'] < 500:

@@ -3,6 +3,7 @@
 import random
 import string
 from datetime import timedelta
+import json
 
 from flask import Flask, jsonify, request, render_template
 from flask import make_response, session
@@ -10,7 +11,7 @@ from oauth2client.client import *
 from sqlalchemy.sql import text
 
 from pyfiles import svg_generation
-from pyfiles.database_interface import init_db, get_rating, data_points_filtered, get_users_table_id
+from pyfiles.database_interface import init_db, get_svg, data_points_filtered, get_users_table_id
 from pyfiles.authentication_helper import user_hash, verify_and_get_account_id
 
 import logging
@@ -245,39 +246,11 @@ def energymap_device_geojson():
 def energycertificate():
 
     user_id = session.get('rr_user_id')
-    # user_id = 4
+    #user_id = 7
     if user_id == None:
         # Not authenticated -> throw back to front page
         return index()
-
-    end_time = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-    # end_time = datetime.datetime.strptime("2015-11-18", '%Y-%m-%d')
-    start_time = end_time.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=7)
-    ranking_start_time = end_time.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=1)
-    end_time_string = end_time.strftime("%Y-%m-%d")
-    start_time_string = start_time.strftime("%Y-%m-%d")
-
-    rating, ranking = get_rating(user_id, start_time_string, end_time_string)
-    # rating = get_rating(TEMP_FIXED_USER_ID, start_time_string, end_time_string)
-    # rating = EnergyRating(TEMP_FIXED_USER_ID)
-    # rating.add_on_bicycle_distance(127.84)
-    # rating.add_walking_distance(43.2)
-    # rating.add_running_distance(55)
-    # rating.add_in_mass_transit_A_distance(21.5)
-    # rating.add_in_mass_transit_B_distance(27.5)
-    # rating.add_in_mass_transit_C_distance(0)
-    # rating.add_in_vehicle_distance(35.7)
-    # rating.calculate_rating()
-
-    # return svg_generation.generate_energy_rating_svg(rating, start_time, end_time, 1, 2)
-
-    query = '''SELECT past_week_certificates_number FROM global_statistics
-               WHERE time < :end_time
-               AND time >= :ranking_start_time'''
-    ranking_row = db.engine.execute(text(query), ranking_start_time=start_time, end_time=end_time)
-    max_ranking = ranking_row.fetchone()["past_week_certificates_number"]
-
-    return svg_generation.generate_energy_rating_svg(rating, start_time, end_time, ranking, max_ranking)
+    return get_svg(user_id)
 
 # App starting point:
 if __name__ == '__main__':

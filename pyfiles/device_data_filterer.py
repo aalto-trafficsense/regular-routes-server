@@ -50,6 +50,7 @@ class DeviceDataFilterer:
         # with mass transit data.
         sampling_factor = len(device_data_queue) / NUMBER_OF_MASS_TRANSIT_MATCH_SAMPLES
         for i in range(NUMBER_OF_MASS_TRANSIT_MATCH_SAMPLES):
+            print i # to get some responses of the progress.
             sample = device_data_queue[i * sampling_factor]
             mass_transit_points = self.get_mass_transit_points(sample)
             new_vehicle_ids = set()

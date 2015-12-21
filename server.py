@@ -189,7 +189,7 @@ mass_transit_data_table = Table('mass_transit_data', metadata,
                           Column('vehicle_ref', String, nullable=False),
                           UniqueConstraint('time', 'vehicle_ref', name="unique_vehicle_and_timestamp"),
                           Index('idx_mass_transit_data_time', 'time'),
-                          Index('idx_mass_transit_data_vehicle_ref_time', 'vehicle_ref', 'time'))
+                          Index('idx_mass_transit_data_time_coordinate', 'time', 'coordinate'))
 
 
 if not mass_transit_data_table.exists(bind=db.engine):

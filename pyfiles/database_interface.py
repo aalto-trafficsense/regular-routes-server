@@ -9,6 +9,8 @@ from sqlalchemy import MetaData, Table, Column, ForeignKey, Enum, BigInteger, In
 from sqlalchemy.dialects.postgres import DOUBLE_PRECISION, TIMESTAMP, UUID
 from sqlalchemy.exc import DataError
 from sqlalchemy.sql import text, func, column, table, select
+import svg_generation
+from datetime import timedelta
 
 from pyfiles.energy_rating import EnergyRating
 
@@ -169,7 +171,7 @@ def init_db(app):
                               Column('vehicle_ref', String, nullable=False),
                               UniqueConstraint('time', 'vehicle_ref', name="unique_vehicle_and_timestamp"),
                               Index('idx_mass_transit_data_time', 'time'),
-                              Index('idx_mass_transit_data_vehicle_ref_time', 'vehicle_ref', 'time'))
+                              Index('idx_mass_transit_data_time_coordinate', 'time', 'coordinate'))
 
 
     if not mass_transit_data_table.exists(bind=db.engine):
@@ -219,6 +221,37 @@ def get_rating(user_id, start_date, end_date):
         ranking = row["ranking"]
     rating.calculate_rating()
     return rating, ranking
+
+
+def get_svg(user_id):
+    end_time = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    # end_time = datetime.datetime.strptime("2015-11-18", '%Y-%m-%d')
+    start_time = end_time.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=7)
+    ranking_start_time = end_time.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=1)
+    end_time_string = end_time.strftime("%Y-%m-%d")
+    start_time_string = start_time.strftime("%Y-%m-%d")
+
+    rating, ranking = get_rating(user_id, start_time_string, end_time_string)
+    # rating = get_rating(TEMP_FIXED_USER_ID, start_time_string, end_time_string)
+    # rating = EnergyRating(TEMP_FIXED_USER_ID)
+    # rating.add_on_bicycle_distance(127.84)
+    # rating.add_walking_distance(43.2)
+    # rating.add_running_distance(55)
+    # rating.add_in_mass_transit_A_distance(21.5)
+    # rating.add_in_mass_transit_B_distance(27.5)
+    # rating.add_in_mass_transit_C_distance(0)
+    # rating.add_in_vehicle_distance(35.7)
+    # rating.calculate_rating()
+
+    # return svg_generation.generate_energy_rating_svg(rating, start_time, end_time, 1, 2)
+
+    query = '''SELECT past_week_certificates_number FROM global_statistics
+               WHERE time < :end_time
+               AND time >= :ranking_start_time'''
+    ranking_row = db.engine.execute(text(query), ranking_start_time=start_time, end_time=end_time)
+    max_ranking = ranking_row.fetchone()["past_week_certificates_number"]
+
+    return svg_generation.generate_energy_rating_svg(rating, start_time, end_time, ranking, max_ranking)
 
 
 def generate_csv(rows):
