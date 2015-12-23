@@ -53,18 +53,25 @@ class DeviceDataFilterer:
             #print i # print to get some responses of the progress.
             sample = device_data_queue[i * sampling_factor]
             mass_transit_points = get_mass_transit_points(sample)
-            new_vehicles = {}
+            new_vehicles_and_distances = {} # Dictionary: vehicle_id, distance to device_data sample
             matches_and_distances = []
             sample_location = json.loads(sample["geojson"])["coordinates"]
             for point in mass_transit_points:
                 vehicle_location = json.loads(point["geojson"])["coordinates"]
                 # Get all distinct nearby vehicle ids and their distances from the device data sample and store their data
                 distance = get_distance_between_coordinates(sample_location, vehicle_location)
-                new_vehicles[point["vehicle_ref"]] = distance
+                
+                # Because there can be multiple matches for a single mass transport vehicle,
+                # we pick the closest one.
+                if point["vehicle_ref"] in new_vehicles_and_distances:
+                    if new_vehicles_and_distances[point["vehicle_ref"]] > distance:
+                        new_vehicles_and_distances[point["vehicle_ref"]] = distance
+                else:
+                    new_vehicles_and_distances[point["vehicle_ref"]] = distance
                 vehicle_data[point["vehicle_ref"]] = (point["line_type"], point["line_name"])
 
-            for veh_id in new_vehicles:
-                matches_and_distances.append((veh_id, new_vehicles[veh_id]))
+            for veh_id in new_vehicles_and_distances:
+                matches_and_distances.append((veh_id, new_vehicles_and_distances[veh_id]))
             collected_matches.append(matches_and_distances)
 
         # Count the total number of matches
