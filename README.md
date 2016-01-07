@@ -25,7 +25,6 @@ This is the procedure to set up an environment for developing server software on
           SECRET_KEY = 'secretkey'
           SQLALCHEMY_DATABASE_URI = 'postgresql+psycopg2://regularroutes:qwerty@localhost/postgres'
           MAPS_API_KEY = 'INSERT_Browser_API_key_from_Google_Developers_Console'
-          APPLICATION_ROOT = '/api'
           AUTH_REDIRECT_URI = 'urn:ietf:wg:oauth:2.0:oob'
 
     Some explanations:
@@ -45,7 +44,7 @@ This is the procedure to set up an environment for developing server software on
 
 ##Python virtualenv
 
-Basically [virtualenv](https://virtualenv.pypa.io/en/latest/virtualenv.html) and pip should be the only global python packages. Virtualenv isolates the site-packages for each separate project, making it easier to maintain them. Here's a guide for OSX.
+Basically [virtualenv](http://docs.python-guide.org/en/latest/dev/virtualenvs/) and pip should be the only global python packages. Virtualenv isolates the site-packages for each separate project, making it easier to maintain them. Here's a guide for OSX.
   - install virtualenv
     - e.g. via pip, easy_install, apt-get
     $ sudo easy_install virtual env
