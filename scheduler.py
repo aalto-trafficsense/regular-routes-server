@@ -5,7 +5,7 @@ import re
 import urllib2
 import geoalchemy2 as ga2
 import math
-import svg_generation
+from pyfiles import svg_generation
 from pyfiles.database_interface import init_db
 from pyfiles.device_data_filterer import DeviceDataFilterer
 from pyfiles.energy_rating import EnergyRating
