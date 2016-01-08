@@ -2,7 +2,12 @@
 
 ##Introduction
 
-"Learning Regular Routes" -server project contains the server-side code for the "learning regular routes"-project.
+"Learning Regular Routes" -server project contains the server-side code for the "learning regular routes"-project. The server is currently split into four separate components:
+
+1. regularroutes-site: An end-user website supporting oauth2 login with a Google account and display of user-specific information. Accessible from the root address of the site.
+1. regularroutes-api: Interface to the mobile client. Also some maintenance operations, which are accessed automatically (duplicate removal and snapping)
+1. regularroutes-dev: Developer operations, not to be left openly accessible on a production site. Currently includes visualizations based on client numbers and generation of CSV-dumps from the data.
+1. regularroutes-scheduler: Scheduled operations. Currently includes device_data filtering, retrieval of (Helsinki region) mass transit live data) and computation of statistics for energy certificate generation.
 
 ##Setting up a new client-server package
 
