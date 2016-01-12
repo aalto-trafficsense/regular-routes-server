@@ -29,7 +29,7 @@ if len(sys.argv) > 2:
     DEV_ID = int(sys.argv[1])
 
 b = 10              # majic window parameter
-thres = 30       # relative movement threshold for not-filtering
+min_metres = 30       # relative movement threshold for not-filtering
 T_h = 5
 T_p = 3             # how far to predict (route) into the future
 T_b = 20            # number of steps to consider a break in trasport
@@ -201,7 +201,7 @@ def do_cluster(X, N_clusters=10):
 
     return Y, nodes
 
-def filter_out_boring(X,thres):
+def filter_out_boring(X,min_metres):
     '''
         Filter out boring examples
     '''
@@ -223,7 +223,7 @@ def filter_out_boring(X,thres):
         # 3. calc distance
         d = cdistance2metres(p1,p2)
         # 4. threshold
-        if d > thres:
+        if d > min_metres:
             #print i,"<-",t
             X_[i,:] = X[t,:]
             i = i + 1
@@ -271,7 +271,7 @@ def proc_X_segment(X):
     if os.path.isfile(FILE_S):
         X_small = genfromtxt(FILE_S, skip_header=0, delimiter=',')
     else:
-        X_small = filter_out_boring(X,thres)
+        X_small = filter_out_boring(X,min_metres)
         savetxt(FILE_S, X_small, delimiter=',')
 
     ############################
@@ -390,7 +390,6 @@ with writer.saving(fig, "dat/Regular_Routes_Dev_"+str(DEV_ID)+".mp4", 100):
     print "---INITIAL BUILD--- (end of day ",(X[t,3]),", i.e., ", d2day(X[t,3]),")"
     pause(0.1)
     Y[0:t_0],nodes = do_cluster(X[0:t_0])
-    print "UNIQUE:", unique(Y[0:t_0])
     node_pxs = map.to_pixels(nodes)
     h.fit(Z[0:t_0-1],Y[1:t_0])       # <--- train on a significant chunk at a time (sklearn's tree not incremental)
     g.fit(Z[0:t_0-T_g],Y[T_g:t_0])     # <--- train on a significant chunk at a time (sklearn's tree not incremental)
@@ -423,31 +422,20 @@ with writer.saving(fig, "dat/Regular_Routes_Dev_"+str(DEV_ID)+".mp4", 100):
         # Predict into the future, P(y[t+1]|X[t])
         #######################
         yp_g = g.predict(Z[t].reshape(1,-1)).astype(int)[0]
-        pg = g.predict_proba(Z[t].reshape(1,-1))[0]
+        py_g = max(g.predict_proba(Z[t].reshape(1,-1))[0])
         gnp = node_pxs[yp_g]
-        l_10.set_markeredgewidth(conf2mark(pg[yp_g]))
+        l_10.set_markeredgewidth(conf2mark(py_g))
         l_10.set_data(gnp)
 
         yp_g30 = g30.predict(Z[t].reshape(1,-1)).astype(int)[0]    # predict node
-        pg30 = g30.predict_proba(Z[t].reshape(1,-1))[0]            # among these confidences
-        #l_10.set_alpha(pg30[yp_g30])
-        #if pg30[yp_g30] >= 0.5:
-        #    print "*"
+        py_g30 = max(g30.predict_proba(Z[t].reshape(1,-1))[0])            # among these confidences
         gnp30 = node_pxs[yp_g30]
 
-        try:
-            l_30.set_markeredgewidth(conf2mark(pg30[yp_g30]))
-        except:
-            print "BIG ERROR!, BUT WE'LLL KEEP GOING"
-            print pg30, yp_g30
+        l_30.set_markeredgewidth(conf2mark(py_g30))
         l_30.set_data(gnp30)
 
 
-        #tx3.set_text("Prediction Confidence: %3.2f (10 min), %3.2f (30 min)" % (pg[yp_g], pg30[yp_g30]))
-        #else:
-        #    print "-"
-        #    gnp30 = node_pxs[yp_g30]
-        #    l_30.set_data([-10,-10])
+        tx3.set_text("Prediction Confidence: %3.2f (10 min), %3.2f (30 min)" % (py_g, py_g30))
 
         #######################
         # Predict a full trace
