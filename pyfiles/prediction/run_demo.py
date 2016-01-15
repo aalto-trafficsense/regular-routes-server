@@ -28,7 +28,6 @@ if len(sys.argv) > 2:
     use_test_server = (sys.argv[2] == 'test')
     DEV_ID = int(sys.argv[1])
 
-b = 10              # majic window parameter
 min_metres = 30       # relative movement threshold for not-filtering
 T_h = 5
 T_p = 3             # how far to predict (route) into the future
@@ -94,10 +93,6 @@ map = joblib.load(FILE_M)
 #        return c_xy
 #
 #cc = centerer(bx)
-
-def cdistance2metres(p1,p2):
-    from geopy.distance import vincenty
-    return vincenty(p1, p2).meters
 
 def t2hr(tt):
     #hh = int(tt * 24.)
@@ -173,92 +168,16 @@ XXX = genfromtxt(FILE_X, skip_header=0, delimiter=',')
 T,D = XXX.shape
 
 
+from pred_utils import do_cluster, do_snapping, do_movement_filtering, do_feature_filtering 
 
-
-
-
-
-
-
-def do_cluster(X, N_clusters=10):
-
-    ##################################################################################
-    #
-    # Create clusters from data, and snap to them
-    #
-    ##################################################################################
-
-    # CLUSTERING: make N_clusters clusters.
-    from sklearn.cluster import KMeans
-    h = KMeans(N_clusters, max_iter=100, n_init=1)
-    h.fit(X[:,0:2])
-    labels = h.labels_
-    nodes = h.cluster_centers_
-
-    # SNAPPING: snap all lon/lat points in X to a cluster, return as Y.
-    print "Snapping trace to these ", len(nodes)," waypoints"
-    from utils import snap
-    print X.shape,nodes.shape
-    Y = snap(X[:,0:2],nodes).astype(int)
-
-    return Y, nodes
-
-def filter_out_boring(X,min_metres):
-    '''
-        Filter out boring examples
-    '''
-    print "Filter out stationary segments ...", 
-
-    T,D = X.shape
-
-    X_ = zeros(X.shape)
-    X_[0:b,:] = X[0:b,:]
-    i = b
-    breaks = [0]
-    for t in range(b,T):
-
-        xx = X[t-b:t,0:2]
-        # 1. get lat, lon distance
-        # 2. convert to metres
-        p1 = array([min(xx[:,0]), max(xx[:,1])])
-        p2 = array([max(xx[:,0]), max(xx[:,1])])
-        # 3. calc distance
-        d = cdistance2metres(p1,p2)
-        # 4. threshold
-        if d > min_metres:
-            #print i,"<-",t
-            X_[i,:] = X[t,:]
-            i = i + 1
-        else:
-            breaks = breaks + [t]
-
-    X = X_[0:i,:]
-    T,D = X.shape
-    print "... We filtered down from", T, "examples to", i, "consisting of around ", (T*100./(len(breaks)+T)), "% travelling."
-    return X
-
-
-def filter_ESN(X):
-    print "Pass thorugh ESN filter"
-    T,D = X.shape
-    #from sklearn.kernel_approximation import RBFSampler
-    #rbf = RBFSampler(gamma=1, random_state=1)
-    #H=D*2+1 #20
-    rtf = FF(D)
-    H = rtf.N_h
-    #X = cc.coord_center(X)  # CENTER DATA
-    Z = zeros((T,H))
-    for t in range(0,T):
-        #print X[t,0:2], Y[t+1]
-        Z[t] = rtf.phi(X[t])
-
-    print "... turned ", X.shape, "into", Z.shape
-
-    return Z
-
-def proc_X_segment(X):
+def do_process_segment(X):
     '''
         Process X as if it was the full segment.
+        ----------------------------------------
+        INPUT: X (raw data up)
+        OUTPUT: filtered X, and fancy new features Z.
+
+        Save some files to disk so we don't need to fetch from the database everytime (allows for offline work on the prediction).
     '''
 
     ##################################################################################
@@ -273,7 +192,7 @@ def proc_X_segment(X):
     if os.path.isfile(FILE_S):
         X_small = genfromtxt(FILE_S, skip_header=0, delimiter=',')
     else:
-        X_small = filter_out_boring(X,min_metres)
+        X_small = do_movement_filtering(X,min_metres)
         savetxt(FILE_S, X_small, delimiter=',')
 
     ############################
@@ -286,7 +205,7 @@ def proc_X_segment(X):
     if os.path.isfile(FILE_Z):
         Z = genfromtxt(FILE_Z, skip_header=0, delimiter=',')
     else:
-        Z = filter_ESN(X_small)
+        Z = do_feature_filtering(X_small)
         savetxt(FILE_Z, Z, delimiter=',')
 
 
@@ -323,7 +242,7 @@ h = RandomForestClassifier(n_estimators=100)
 # Initial window training
 ############################
 
-X,Z = proc_X_segment(copy(XXX)) # everything
+X,Z = do_process_segment(copy(XXX)) # everything
 T,D = X.shape
 Y = zeros(T) 
 print "Processed everything from ", XXX.shape, "to", X.shape, Z.shape
@@ -391,7 +310,8 @@ with writer.saving(fig, "dat/Regular_Routes_Dev_"+str(DEV_ID)+".mp4", 100):
     tx2.set_visible(True)
     print "---INITIAL BUILD--- (end of day ",(X[t,3]),", i.e., ", d2day(X[t,3]),")"
     pause(0.1)
-    Y[0:t_0],nodes = do_cluster(X[0:t_0])
+    nodes = do_cluster(X[0:t_0])
+    Y[0:t_0] = do_snapping(X[0:t_0],nodes)
     node_pxs = map.to_pixels(nodes)
     h.fit(Z[0:t_0-1],Y[1:t_0])       # <--- train on a significant chunk at a time (sklearn's tree not incremental)
     g.fit(Z[0:t_0-T_g],Y[T_g:t_0])     # <--- train on a significant chunk at a time (sklearn's tree not incremental)
@@ -484,7 +404,8 @@ with writer.saving(fig, "dat/Regular_Routes_Dev_"+str(DEV_ID)+".mp4", 100):
                 writer.grab_frame()
             tx2.set_text("UPDATING NODES")
             pause(0.1)
-            Y[0:t],nodes = do_cluster(X[0:t],min(10+day_count*5,50))
+            nodes = do_cluster(X[0:t],min(10+day_count*5,50))
+            Y[0:t] = do_snapping(X[0:t],nodes)
             node_pxs = map.to_pixels(nodes)
             l_n.set_xdata(node_pxs[:,0])
             l_n.set_ydata(node_pxs[:,1])

@@ -48,6 +48,16 @@ class FF():
                 6       time since last stop
                 7       weekend vs weekday
         '''
+    # OTHER FEATURES
+    #   1. average speed (y[t-win:t])
+    #   2. direction (y[t-win:t])              # i.e., y[t] - y[t-win], y[t] - y[t-1], etc
+    #   3. included (nodes[k] \in y[t-win:t]) 
+    #   4. average (nodes[y[t-win:t]])
+    # X Features
+    #   1. hour-of-day
+    #      distance_from(hour,k)              # i.e., k-oclock - hour
+    #   2. day-of-week
+
         self.N_i = N_i          # inputs
         self.N_h = N_END      # outputs
         self.Z = zeros((buf,self.N_h)) # buffer
