@@ -1,17 +1,30 @@
 # Documentation
 
-## List of technologies/libraries used
+## Technologies/libraries used
 
-* Python 2
+* Python 2.7
 * `smopy` for obtaining OSM data (mainly for plotting, and measuring distances)
 * `psycopg2` to connect to the database
 * `numpy` for vectors and matrices
 * `sklearn` for clustering and learning
 * `matplotlib` for plotting and saving animations (as mp4 files)
 
-## Demo `run_demo.py` for a particular device ID
+## Demo 
 
-Simply run `python run_demo.py <deviceID> [test]` where `test` specifies to use the test server. It does the following:
+To run the demo, first simply connect to a server, possibly tunnelling through, e.g., 
+
+```sh
+laptop ~ $ ssh -L 5432:localhost:54322 <username>@kekkonen.niksula.hut.fi
+kekkonen ~ $ ssh -L 54322:localhost:5432 <username>@regularroutes.niksula.hut.fi
+```
+
+then simply run `python run_demo.py <deviceID> [test]` where `test` specifies to use the test server. For example
+
+```sh
+$ python run_demo.py 98
+```
+
+It does the following:
 
 1. Get OSM data (using `smopy` library) and a png image for the specified bounding box
 2. [Set up plots, animation]
@@ -59,8 +72,22 @@ Simply run `python run_demo.py <deviceID> [test]` where `test` specifies to use 
 	* if the hour cell in `Z[t]` corresponds to the end of the day, GOTO 5.
 8. [Export animation as `mp4`]
 
-## TODO
+## Server code to run nightly
 
-- [ ] global nodes
+Significant development on prediction and data processing has rendered most of the other `run_` files outdated. However, I have since updated `run_build_models.py` which carries out most of the same process as `run_demo.py` (in fact it uses much of the same code) but instead dumps a model to disk (in the `dat` folder). As of writing, 
+
+In other words, running
+```sh
+$ python run_build_models.py 98
+```
+will fetch all data for device `98`, cluster, filter, build the model and save it to `./dat/model-98.npy`.
+
+## TODO (Unfinished and Future development)
+
+- [ ] finish integration to the server database by creating `run_prediction.py`
+- [ ] clustering could possibly be separated into `run_clustering.py`
+- [ ] use user name instead of device id
+- [ ] global nodes instead of personal nodes
 - [ ] fade out nodes over time (i.e., remove non-regular routes)
 - [ ] analyse one of the decision tree models to see how the model is being created from the features
+- [ ] use the travel MODE both in the input (easy) and for output (not as easy)
