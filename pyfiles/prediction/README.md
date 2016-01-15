@@ -40,6 +40,7 @@ Simply run `python run_demo.py <deviceID> [test]` where `test` specifies to use 
 	* **filter** out boring segments (non-movement)
 	* create advanced recurrent features (**feature filter** `FF.py`)
 	* return this data as `Z[0:t]`	
+
 6. Build models on data `Z[0:t]`, e.g., learn to predict one step ahead
 
 	```python
@@ -58,3 +59,8 @@ Simply run `python run_demo.py <deviceID> [test]` where `test` specifies to use 
 	* if the hour cell in `Z[t]` corresponds to the end of the day, GOTO 5.
 8. [Export animation as `mp4`]
 
+## TODO
+
+- [ ] global nodes
+- [ ] fade out nodes over time (i.e., remove non-regular routes)
+- [ ] analyse one of the decision tree models to see how the model is being created from the features
