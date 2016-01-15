@@ -74,7 +74,7 @@ It does the following:
 
 ## Server code to run nightly
 
-Significant development on prediction and data processing has rendered most of the other `run_` files outdated. However, I have since updated `run_build_models.py` which carries out most of the same process as `run_demo.py` (in fact it uses much of the same code) but instead dumps a model to disk (in the `dat` folder). As of writing, 
+Significant development on prediction and data processing has rendered most of the other `run_` files outdated. However, I have since updated `run_build_models.py` which carries out most of the same process as `run_demo.py` (in fact it uses much of the same code) but instead dumps a model to disk (in the `dat` folder). 
 
 In other words, running
 ```sh
@@ -91,3 +91,10 @@ will fetch all data for device `98`, cluster, filter, build the model and save i
 - [ ] fade out nodes over time (i.e., remove non-regular routes)
 - [ ] analyse one of the decision tree models to see how the model is being created from the features
 - [ ] use the travel MODE both in the input (easy) and for output (not as easy)
+- [ ] (long term) evaluate the worth of different features wrt their predictive power
+
+## Summary
+
+This code has been simplified considerably, and most efforts were placed on getting a running system on a minimal set of standard libraries, suitable for server integration. 
+
+Decision trees (and random forests thereof) are by far and away the most powerful learners. It appears most of the predictive power comes down to a few simply engineered features: knowing where the traveller is, which direction they are currently travelling in, and at what speed, and at what time of day and what day of the week.
