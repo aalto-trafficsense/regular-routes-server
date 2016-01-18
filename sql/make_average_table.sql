@@ -1,23 +1,9 @@
-DROP TABLE IF EXISTS averaged_location;
-
-CREATE TABLE averaged_location (
-  device_id integer,
-  time_stamp timestamp, -- was: integer
-  minute integer,
-  hour integer,
-  year integer,
-  day_of_week integer,
-  day_of_year integer,
-  longitude float,
-  latitude float,
-  accuracy float
-  --waypoint_id bigint
-);
+\i create_average_table.sql
 
 INSERT INTO averaged_location
     SELECT
         device_id,
-        date_trunc('minute', time) as time_stamp,
+        (date_trunc('minute', time) + interval '1 minutes') as time_stamp, -- time stamp to the nearest minute
         CAST(date_part('minute',time) as integer) as minute,
         CAST(date_part('hour',time) as integer) as hour,
         CAST(date_part('year',time) as integer) as year,
@@ -28,6 +14,7 @@ INSERT INTO averaged_location
         CAST(AVG(accuracy) as float) as accuracy
       FROM device_data
       GROUP BY device_id, time_stamp, minute, hour, year, day_of_week, day_of_year
+      -- GROUP BY device_id, time_stamp
       ORDER BY device_id, time_stamp
 ;
 

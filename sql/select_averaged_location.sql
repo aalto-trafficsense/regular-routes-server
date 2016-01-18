@@ -12,7 +12,7 @@ CAST(AVG(ST_X(coordinate::geometry)) as float) as latitude,
 CAST(AVG(accuracy) as float) as accuracy,
 waypoint_id
 FROM device_data
-WHERE (time > current_timestamp - interval '120 minutes') 
+WHERE (time > current_timestamp - interval '10 minutes') 
 GROUP BY device_id,year,day_of_year,hour,minute, device_data.time, device_data.waypoint_id
 ORDER BY device_id, time_stamp
 LIMIT 10
