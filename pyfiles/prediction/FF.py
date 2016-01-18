@@ -66,9 +66,10 @@ class FF():
 
         FIVE_MINUTES = 5./60.
         if abs(x[TOD] - _z[XSTAT][TOD]) > FIVE_MINUTES:
-            print " THERE WAS A GAP OF ",abs(x[TOD] - _z[XSTAT][TOD])," HRS SINCE THE LAST MEASUREMENT, IGNORE THIS PREVIOUS Z"
-            print "_x", _z[XSTAT]
-            print " x", x
+            print "WARNING: There was a gap of ",abs(x[TOD] - _z[XSTAT][TOD])," hours since the last measurement!"
+            print "         (This means that this is the first reading, or there are missing previous readings (e.g., when device has been turned off)"
+            #print "_x", _z[XSTAT]
+            #print " x", x
             _z[XSTAT] = x[:]
             _z[XSTAT][TOD] = x[TOD] - FIVE_MINUTES
 

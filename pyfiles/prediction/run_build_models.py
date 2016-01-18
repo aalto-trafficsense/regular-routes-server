@@ -5,19 +5,12 @@
     Build Models
     ----------------------------------
 
-    Running 
-    ```
-        train(98) should do the following ...
-    ```
+    Build a model for the specified device ID.
 '''
 
 # Scientific Libraries
 from numpy import *
 set_printoptions(precision=5, suppress=True)
-
-# Provides snapping and stacking functionality
-import sys
-sys.path.append("./src")
 
 def train(DEV_ID,use_test_server=False,win_past=5,win_futr=5,mod="EML",lim='NOW()'):
     '''
@@ -32,20 +25,20 @@ def train(DEV_ID,use_test_server=False,win_past=5,win_futr=5,mod="EML",lim='NOW(
 
     print "----------------\n\n\n---- BEGIN\n\n\n---------------------\n"
 
-    from db_utils import get_conn, get_cursor
-
     ##################################################################################
     #
     # 1. Load trace from database
     #
     ##################################################################################
 
+    from db_utils import get_conn, get_cursor
+
     conn = get_conn(use_test_server) 
     c = conn.cursor()
 
     if not use_test_server:
         print "Building averaged_location table with new data."
-        sql = open('../..//sql/make_average_table.sql', 'r').read()
+        sql = open('../../sql/make_average_table.sql', 'r').read()
         c.execute(sql)
         conn.commit()
 

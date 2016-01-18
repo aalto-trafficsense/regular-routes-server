@@ -82,7 +82,7 @@ def do_feature_filtering(X):
         Note: most of the predictive power comes from good features!!!
     """
 
-    print "Pass thorugh ESN filter"
+    #print "Pass thorugh ESN filter"
     T,D = X.shape
     #from sklearn.kernel_approximation import RBFSampler
     #rbf = RBFSampler(gamma=1, random_state=1)
@@ -95,7 +95,7 @@ def do_feature_filtering(X):
         #print X[t,0:2], Y[t+1]
         Z[t] = rtf.phi(X[t])
 
-    print "... turned ", X.shape, "into", Z.shape
+    #print "... turned ", X.shape, "into", Z.shape
 
     return Z
 
