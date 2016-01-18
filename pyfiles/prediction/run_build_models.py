@@ -106,5 +106,5 @@ def train(DEV_ID,use_test_server=False,win_past=5,win_futr=5,mod="EML",lim='NOW(
 
 
 if __name__ == '__main__':
-    train(98)
+    train(45,use_test_server=True)
 
