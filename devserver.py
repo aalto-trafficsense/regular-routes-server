@@ -100,7 +100,7 @@ def generate_csv_waypoints(rows):
         yield ';'.join(['"%s"' % (str(x)) for x in row]) + '\n'
 
 @app.route('/predict/<int:device_id>')
-def predict(device_id):
+def predict_dev(device_id):
     return predict(device_id,True)
 
 @app.route('/visualize/<int:device_id>')
