@@ -101,8 +101,7 @@ def generate_csv_waypoints(rows):
 
 @app.route('/predict/<int:device_id>')
 def predict(device_id):
-    return "True"
-    # return predict(device_id,True)
+    return predict(device_id,True)
 
 @app.route('/visualize/<int:device_id>')
 def visualize(device_id):
