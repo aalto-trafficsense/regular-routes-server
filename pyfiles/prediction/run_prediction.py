@@ -32,7 +32,7 @@ def predict(DEV_ID,use_test_server=False,win_past=5,win_futr=5,mod="EML",lim=0,c
 
     print "Load model from disk ..."
     import joblib
-    fname = "./dat/model-"+str(DEV_ID)+".dat"
+    fname = "./pyfiles/prediction/dat/model-"+str(DEV_ID)+".dat"
     h = joblib.load( fname)
 
     ##################################################################################
@@ -47,7 +47,7 @@ def predict(DEV_ID,use_test_server=False,win_past=5,win_futr=5,mod="EML",lim=0,c
     c = conn.cursor()
 
     print "Updating averaged location table"
-    sql = open('../../sql/update_averaged_location.sql', 'r').read()
+    sql = open('./sql/update_averaged_location.sql', 'r').read()
     c.execute(sql)
     conn.commit()
 
