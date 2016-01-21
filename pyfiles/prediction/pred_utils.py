@@ -21,7 +21,6 @@ def do_cluster(X, N_clusters=10):
     nodes = h.cluster_centers_
     return nodes
 
-
 def do_snapping(X, nodes):
     """
         SNAPPING: snap all lon/lat points in X to a cluster, return as Y.  

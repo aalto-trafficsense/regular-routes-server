@@ -19,6 +19,7 @@ def train(DEV_ID,use_test_server=False,win_past=5,win_futr=5,mod="EML",lim='NOW(
         1. obtain full trace PRIOR OR EQUAL TO 'lim'
         2. filter
         3. cluster and snap full trace to clusters
+            3.b save the clusters (personal nodes) to the database
         4. build model
         5. dump the model to disk
     '''
@@ -72,6 +73,15 @@ def train(DEV_ID,use_test_server=False,win_past=5,win_futr=5,mod="EML",lim='NOW(
 
     nodes = do_cluster(X)
     Y = do_snapping(X,nodes)
+
+    ## SAVE THEM ALSO
+    print "Save the cluster nodes to the database (and delete any old ones)"
+    sql = "DELETE FROM cluster_centers WHERE device_id = %s"
+    c.execute(sql, (DEV_ID,))
+    sql = "INSERT INTO cluster_centers (device_id, cluster_id, longitude, latitude, time_stamp) VALUES (%s, %s, %s, %s, NOW())"
+    for i in range(len(nodes)):
+        c.execute(sql, (DEV_ID, i,  nodes[i,0], nodes[i,1],)) 
+    conn.commit()
 
     ##################################################################################
     #
