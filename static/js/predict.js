@@ -57,12 +57,12 @@ $(document).ready(function() {
 		},
 		title: title
 	    };
-	} else if (type === 'route-point') {
+	} else if (type === 'prediction') {
 	    return {
 		icon: {
 		    path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
 		    scale: 3,
-		    fillColor: 'red',
+		    fillColor: 'yellow',
 		    fillOpacity: 1.0,
 		    strokeColor: 'black'
 		},
@@ -81,9 +81,10 @@ $(document).ready(function() {
 	map.data.forEach(function(feature) {
 	    map.data.remove(feature);
 	});
-	$.getJSON('../visualize/' + device_id + '/geojson?date=' + date, function(response) {
+	$.getJSON('../predict/' + device_id, function(response) {
 	    map.data.addGeoJson(response);
 	    mapCanvas.css('opacity', '');
+		/*
 		if (response.features.length > 1) {
 			var bounds = new google.maps.LatLngBounds();
 			response.features.forEach(function (feature) {
@@ -91,7 +92,7 @@ $(document).ready(function() {
 		    	bounds.extend(new google.maps.LatLng(coords[1],coords[0]));
 			});
 			map.fitBounds(bounds);
-		}
+		} */
 	});
     }
 });
