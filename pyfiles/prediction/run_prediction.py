@@ -128,8 +128,8 @@ def predict(DEV_ID,use_test_server=False):
         {
             "geometry": {
                 "coordinates": [
-                    dat[1], 
-                    dat[0]
+                    str(dat[1]), 
+                    str(dat[0])
                 ],
                 "type": "Point",
             },
@@ -137,7 +137,7 @@ def predict(DEV_ID,use_test_server=False):
                 "type": "Prediction",
                 "activity": "UNSPECIFIED",
                 "predtype": "node-prediction at 1 minute from now",
-                "node_id": yp
+                "node_id": str(yp)
             },
             "type": "Feature",
         },
