@@ -7,7 +7,7 @@ from oauth2client.client import *
 from sqlalchemy.sql import text
 
 from pyfiles.database_interface import init_db, db_engine_execute, data_points_snapping
-from pyfiles.prediction.run_prediction import predict
+# from pyfiles.prediction.run_prediction import predict
 import json
 
 import logging
@@ -101,7 +101,13 @@ def generate_csv_waypoints(rows):
 
 @app.route('/predict/<int:device_id>')
 def predict_dev(device_id):
-    return str(predict(device_id,True))
+    return "True" # str(predict(device_id,True))
+
+@app.route('/predicttest/<int:device_id>')
+def predict_test(device_id):
+    return render_template('predict.html',
+                           api_key=app.config['MAPS_API_KEY'],
+                           device_id=device_id)
 
 @app.route('/visualize/<int:device_id>')
 def visualize(device_id):

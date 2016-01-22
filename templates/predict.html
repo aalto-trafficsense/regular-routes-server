@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/meyer-reset/2.0/reset.css">
+    <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/pickadate.js/3.5.3/compressed/themes/default.css">
+    <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/pickadate.js/3.5.3/compressed/themes/default.date.css">
+    <link rel="stylesheet" href="../static/css/visualize.css">
+    <script type="text/javascript"
+      src="https://maps.googleapis.com/maps/api/js?key={{ api_key }}">
+    </script>
+    <script type="text/javascript">
+      var device_id = {{ device_id }};
+    </script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/pickadate.js/3.5.3/picker.js"></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/pickadate.js/3.5.3/compressed/picker.date.js"></script>
+  </head>
+  <body>
+    <div id="controls-wrap">
+      <div id="controls">
+        <input id="date" />
+      </div>
+    </div>
+    <div id="map-canvas"></div>
+    <script src="../static/js/predict.js"></script>
+  </body>
+</html>
