@@ -123,30 +123,27 @@ def predict(DEV_ID,use_test_server=False):
 
     print "Form geojson, and return it ..."
 
-    gj = """{
+    return {
     "features": [
         {
             "geometry": {
                 "coordinates": [
-                    %f, 
-                    %f
+                    dat[1], 
+                    dat[0]
                 ],
                 "type": "Point",
-                }
+            },
             "properties": {
-                "type": "Prediction"
+                "type": "Prediction",
                 "activity": "UNSPECIFIED",
                 "predtype": "node-prediction at 1 minute from now",
-                "node_id": %d
-            }
+                "node_id": yp
+            },
             "type": "Feature",
         },
     ],
     "type": "FeatureCollection"
-}
-""" % (dat[1],dat[0],yp)
-
-    return gj
+    }
 
 if __name__ == '__main__':
     print predict(45,use_test_server=True)
