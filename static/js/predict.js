@@ -82,6 +82,7 @@ $(document).ready(function() {
 	    map.data.remove(feature);
 	});
 	$.getJSON('../predict/' + device_id, function(response) {
+		console.log('response' + response);
 	    map.data.addGeoJson(response);
 	    mapCanvas.css('opacity', '');
 		/*
