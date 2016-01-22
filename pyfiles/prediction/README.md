@@ -84,14 +84,25 @@ will fetch all data for device `98`, cluster, filter, build the model and save i
 
 ## TODO (Unfinished and Future development)
 
-- [ ] finish integration to the server database by creating `run_prediction.py`
-- [ ] clustering could possibly be separated into `run_clustering.py`
-- [ ] use user name instead of device id
-- [ ] global nodes instead of personal nodes
-- [ ] fade out nodes over time (i.e., remove non-regular routes)
-- [ ] analyse one of the decision tree models to see how the model is being created from the features
-- [ ] use the travel MODE both in the input (easy) and for output (not as easy)
-- [ ] (long term) evaluate the worth of different features wrt their predictive power
+Low Hanging Fruit
+
+- [ ] Use `user_id` instead of `device id` throughout
+- [ ] Output different forms of predictions (e.g., 5-min, 20-min destination, minute-by-minute route prediction as in the demo)
+- [ ] Fade out nodes over time (i.e., remove non-regular routes)
+- [ ] Use crowd nodes instead of personal nodes
+- [ ] Improvement of engineered/recursive features in `FF.py`
+- [ ] Analysis of a decision tree model used in prediction, to see how the model is being created from the features
+- [ ] Clustering could possibly be separated into `run_clustering.py`
+- [ ] Use the travel *mode* in the input 
+
+Medium-Term
+
+- [ ] use travel *mode* in the _output_, and visualize it with a different colour
+- [ ] crowd prediction: display it along side ordinar predictions
+
+Long Term
+
+- [ ] evaluate the worth of different features wrt their predictive power
 
 ## Summary
 
