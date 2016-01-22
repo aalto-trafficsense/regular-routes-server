@@ -89,11 +89,13 @@ def predict(DEV_ID,use_test_server=False):
     #c.execute('SELECT ST_MakePoint(longitude, latitude) FROM cluster_centers WHERE device_id = %s AND cluster_id = %s', (DEV_ID,yp,))
     import json
     c.execute('SELECT ST_AsGeoJSON(location) FROM cluster_centers WHERE device_id = %s AND cluster_id = %s', (DEV_ID,yp,))
+    dat = c.fetchall()[0]
     #dat = json.loads(row)
-    print c.fetchall()[0]
-    dat = json.loads(c.fetchall()[0])
-    print dat
-    exit(1)
+    #print c.fetchall()[0]
+    #exit(1)
+    #dat = json.loads(''+c.fetchall()[0])
+    #print dat
+    #exit(1)
     #current = snap(X[-1,0:2],nodes).astype(int)
 
     ##################################################################################
@@ -131,25 +133,25 @@ def predict(DEV_ID,use_test_server=False):
     print "Form geojson, and return it ..."
 
     return {
-    "features": [
+    'features': [
         {
-            "geometry": {
-                "coordinates": dat, #[
+            'geometry': {
+                'coordinates': dat, #[
                     #dat[1], 
                     #dat[0]
                 #],
-                "type": "Point",
+                'type': 'Point',
             },
-            "properties": {
-                "type": "Prediction",
-                "activity": "UNSPECIFIED",
-                "predtype": "node-prediction at 1 minute from now",
-                "node_id": yp
+            'properties': {
+                'type': 'Prediction',
+                'activity': 'UNSPECIFIED',
+                'predtype': 'node-prediction at 1 minute from now',
+                'node_id': yp
             },
-            "type": "Feature",
+            'type': 'Feature',
         },
     ],
-    "type": "FeatureCollection"
+    'type': 'FeatureCollection'
     }
 
 if __name__ == '__main__':
