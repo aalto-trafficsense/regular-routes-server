@@ -103,6 +103,12 @@ def generate_csv_waypoints(rows):
 def predict_dev(device_id):
     return str(predict(device_id,True))
 
+@app.route('/predicttest/<int:device_id>')
+def predict_test(device_id):
+    return render_template('predict.html',
+                           api_key=app.config['MAPS_API_KEY'],
+                           device_id=device_id)
+
 @app.route('/visualize/<int:device_id>')
 def visualize(device_id):
     return render_template('visualize.html',
