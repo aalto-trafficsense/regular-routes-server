@@ -84,8 +84,11 @@ def predict(DEV_ID,use_test_server=False):
     print yp
 
     print "Getting coordinates for prediction (from cluster_centers table): ", 
-    c.execute('SELECT longitude,latitude FROM cluster_centers WHERE device_id = %s AND cluster_id = %s', (DEV_ID,yp,))
-    dat = array(c.fetchall(),dtype={'names':['lon', 'lat'], 'formats':['f4', 'f4']})[0]
+    #c.execute('SELECT longitude,latitude FROM cluster_centers WHERE device_id = %s AND cluster_id = %s', (DEV_ID,yp,))
+    #dat = array(c.fetchall(),dtype={'names':['lon', 'lat'], 'formats':['f4', 'f4']})[0]
+    #c.execute('SELECT ST_MakePoint(longitude, latitude) FROM cluster_centers WHERE device_id = %s AND cluster_id = %s', (DEV_ID,yp,))
+    c.execute('SELECT location FROM cluster_centers WHERE device_id = %s AND cluster_id = %s', (DEV_ID,yp,))
+    dat = c.fetchall()[0]
     print dat
     #current = snap(X[-1,0:2],nodes).astype(int)
 
@@ -127,17 +130,17 @@ def predict(DEV_ID,use_test_server=False):
     "features": [
         {
             "geometry": {
-                "coordinates": [
-                    str(dat[1]), 
-                    str(dat[0])
-                ],
+                "coordinates": dat, #[
+                    #dat[1], 
+                    #dat[0]
+                #],
                 "type": "Point",
             },
             "properties": {
                 "type": "Prediction",
                 "activity": "UNSPECIFIED",
                 "predtype": "node-prediction at 1 minute from now",
-                "node_id": str(yp)
+                "node_id": yp
             },
             "type": "Feature",
         },
