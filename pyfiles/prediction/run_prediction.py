@@ -131,20 +131,20 @@ def predict(DEV_ID,use_test_server=False):
                     %f, 
                     %f
                 ],
-                "type": "Prediction",
+                "type": "Point",
                 }
             "properties": {
+                "type": "Prediction"
                 "activity": "UNSPECIFIED",
                 "predtype": "node-prediction at 1 minute from now",
                 "node_id": %d
-                "note": "Check longitude/latitude order."
             }
             "type": "Feature",
         },
     ],
     "type": "FeatureCollection"
 }
-""" % (dat[0],dat[1],yp)
+""" % (dat[1],dat[0],yp)
 
     return gj
 
