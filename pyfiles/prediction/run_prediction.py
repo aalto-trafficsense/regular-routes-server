@@ -87,9 +87,13 @@ def predict(DEV_ID,use_test_server=False):
     #c.execute('SELECT longitude,latitude FROM cluster_centers WHERE device_id = %s AND cluster_id = %s', (DEV_ID,yp,))
     #dat = array(c.fetchall(),dtype={'names':['lon', 'lat'], 'formats':['f4', 'f4']})[0]
     #c.execute('SELECT ST_MakePoint(longitude, latitude) FROM cluster_centers WHERE device_id = %s AND cluster_id = %s', (DEV_ID,yp,))
-    c.execute('SELECT location FROM cluster_centers WHERE device_id = %s AND cluster_id = %s', (DEV_ID,yp,))
-    dat = c.fetchall()[0]
+    import json
+    c.execute('SELECT ST_AsGeoJSON(location) FROM cluster_centers WHERE device_id = %s AND cluster_id = %s', (DEV_ID,yp,))
+    #dat = json.loads(row)
+    print c.fetchall()[0]
+    dat = json.loads(c.fetchall()[0])
     print dat
+    exit(1)
     #current = snap(X[-1,0:2],nodes).astype(int)
 
     ##################################################################################
@@ -149,6 +153,6 @@ def predict(DEV_ID,use_test_server=False):
     }
 
 if __name__ == '__main__':
-    print predict(45,use_test_server=True)
+    print str(predict(45,use_test_server=True))
 
 
