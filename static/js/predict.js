@@ -4,6 +4,7 @@ $(document).ready(function() {
 	center: { lat: 60.1841396, lng: 24.8300838 },
 	zoom: 12
     };
+	mapCanvas.css('opacity', 0.1);
     var map = new google.maps.Map(mapCanvas[0], mapOptions);
     map.data.setStyle(function(feature) {
 	var type = feature.getProperty('type');
@@ -49,6 +50,7 @@ $(document).ready(function() {
 			    map.panTo(new google.maps.LatLng(coords[1],coords[0]));
 			});
 			map.setZoom(18);
+			mapCanvas.css('opacity', '');
 		}
 	});
     });
