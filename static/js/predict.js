@@ -46,8 +46,8 @@ $(document).ready(function() {
 		if (response.features.length == 1) {
 			response.features.forEach(function (feature) {
 				var coords = feature.geometry.coordinates;
+			    map.panTo(new google.maps.LatLng(coords[1],coords[0]));
 			});
-		    map.panTo(new google.maps.LatLng(coords[1],coords[0]));
 			map.setZoom(5);
 		}
 	});
