@@ -57,7 +57,7 @@ For build models and making predictions from the API, see the calls in `devserve
 
 ## Demo (`run_demo.py`)
 
-Then simply run `python run_demo.py <deviceID> [test]` where `test` specifies to use the test server. For example
+Simply run `python run_demo.py <deviceID> [test]` where `test` specifies to use the test server. For example
 
 ```sh
 $ python run_demo.py 98
@@ -113,7 +113,7 @@ It does the following:
 
 ## TODO (Unfinished and Future development)
 
-Low Hanging Fruit
+Low Hanging Fruit (ordered approximately by easyness and importance)
 
 - [ ] Improve/add more information (time of prediction, expected time of arrival, etc) in the geojson string return from `predict`.
 - [ ] Use `user_id` instead of `device id` throughout
@@ -124,15 +124,13 @@ Low Hanging Fruit
 - [ ] Try different clustering methods, or try using the waypoints as clusters
 - [ ] Improvement of the engineered/recurrent features in `FF.py` 
 - [ ] Use the travel *mode* in the input 
-
-Medium-Term
-
 - [ ] Use travel *mode* in the _output_, and visualize it with a different colour
 - [ ] Crowd prediction: display it along side ordinar predictions
 
-Long Term
+Long Term (paper material!)
 
-- [ ] Evaluate the worth of different features wrt their predictive power 
+- [ ] Study how to measure prediction quantitively
+- [ ] Using the just-above-mentioned study, evaluate the value of different features wrt their predictive power 
 
 ## Summary
 
