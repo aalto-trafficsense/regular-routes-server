@@ -48,7 +48,7 @@ $(document).ready(function() {
 				var coords = feature.geometry.coordinates;
 			    map.panTo(new google.maps.LatLng(coords[1],coords[0]));
 			});
-			map.setZoom(5);
+			map.setZoom(18);
 		}
 	});
     });
