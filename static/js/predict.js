@@ -19,11 +19,11 @@ $(document).ready(function() {
 	    } // end-of-switch
 	    return {
 		icon: {
-		    path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+		    path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
 		    scale: 3,
 		    fillColor: pointColor,
 		    fillOpacity: 1.0,
-		    strokeColor: 'white'
+		    strokeColor: 'blue'
 		},
 		title: title
 	    };
@@ -41,19 +41,7 @@ $(document).ready(function() {
 	}
     });
 
-	/* map.data.forEach(function(feature) {
-	    map.data.remove(feature);
-	} */
 	$.getJSON('../predict/' + device_id, function(response) {
 	    map.data.addGeoJson(response);
-		/*
-		if (response.features.length > 1) {
-			var bounds = new google.maps.LatLngBounds();
-			response.features.forEach(function (feature) {
-				var coords = feature.geometry.coordinates;
-		    	bounds.extend(new google.maps.LatLng(coords[1],coords[0]));
-			});
-			map.fitBounds(bounds);
-		} */
 	});
     });
