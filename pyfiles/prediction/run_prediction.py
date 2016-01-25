@@ -83,11 +83,65 @@ def predict(DEV_ID,use_test_server=False):
     yp = h.predict(Z[-1].reshape(1,-1)).astype(int)[0]
     print yp
 
+    ##################################################################################
+    #
+    # 6. Form Geojson
+    #
+    ##################################################################################
+
     print "Getting coordinates for prediction (from cluster_centers table): ", 
-    c.execute('SELECT longitude,latitude FROM cluster_centers WHERE device_id = %s AND cluster_id = %s', (DEV_ID,yp,))
-    dat = array(c.fetchall(),dtype={'names':['lon', 'lat'], 'formats':['f4', 'f4']})[0]
-    print dat
-    #current = snap(X[-1,0:2],nodes).astype(int)
+    #c.execute('SELECT longitude,latitude FROM cluster_centers WHERE device_id = %s AND cluster_id = %s', (DEV_ID,yp,))
+    #dat = array(c.fetchall(),dtype={'names':['lon', 'lat'], 'formats':['f4', 'f4']})[0]
+    #c.execute('SELECT ST_MakePoint(longitude, latitude) FROM cluster_centers WHERE device_id = %s AND cluster_id = %s', (DEV_ID,yp,))
+    sql = 'SELECT ST_AsGeoJSON(location) FROM cluster_centers WHERE device_id = %s AND cluster_id = %s'
+    #print 'SELECT ST_AsGeoJSON(location) FROM cluster_centers WHERE device_id = %s AND cluster_id = %s' % (DEV_ID, yp)
+    c.execute(sql, (DEV_ID,yp,))
+
+    print "Form geojson code ..."
+    import json
+
+    features = []
+
+    rows = c.fetchall()
+    for row in rows:
+        features.append({
+            'type': 'Feature',
+            'geometry': json.loads(row[0]),
+            'properties': {
+                "type": "Prediction",
+                "activity": "UNSPECIFIED",
+                "predtype": "node-prediction at 1 minute from now",
+                "node_id": yp
+            }
+        })
+
+    """ FORMAT SHOULD LOOK LIKE THIS:
+    {
+      "features": [
+        {
+          "geometry": {
+            "coordinates": [
+              24.705304,
+              60.170879
+            ],
+            "type": "Point"
+          },
+          "properties": {
+            "activity": "STILL",
+            "title": "accuracy: 20\nactivities: {type:STILL, conf:100}\n2015-03-02 00:00:04.007000",
+            "type": "raw-point"
+          },
+          "type": "Feature"
+        },
+      ],
+      "type": "FeatureCollection"
+    }
+    """
+
+    geojson = {
+        'type': 'FeatureCollection',
+        'features': features
+    }
 
     ##################################################################################
     #
@@ -115,37 +169,15 @@ def predict(DEV_ID,use_test_server=False):
     #    else: 
     #        return yp, y
 
-    ##################################################################################
-    #
-    # 6. Form Geojson
-    #
-    ##################################################################################
+    #################################
+    # RETURN 
+    #################################
 
-    print "Form geojson, and return it ..."
-
-    return {
-    "features": [
-        {
-            "geometry": {
-                "coordinates": [
-                    dat[1], 
-                    dat[0]
-                ],
-                "type": "Point",
-            },
-            "properties": {
-                "type": "Prediction",
-                "activity": "UNSPECIFIED",
-                "predtype": "node-prediction at 1 minute from now",
-                "node_id": yp
-            },
-            "type": "Feature",
-        },
-    ],
-    "type": "FeatureCollection"
-    }
+    #from flask import jsonify
+    #return jsonify(geojson)
+    return geojson
 
 if __name__ == '__main__':
-    print predict(45,use_test_server=True)
+    print str(predict(45,use_test_server=True))
 
 
