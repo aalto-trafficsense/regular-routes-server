@@ -38,14 +38,14 @@ $(document).ready(function() {
 		},
 		title: title
 	    };
-	} else if (type === 'something_else') {
+	} else if (type === 'Position') {
 	    return {
 		icon: {
 		    path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
-		    scale: 3,
+		    scale: 5,
 		    fillColor: 'LightRed',
 		    fillOpacity: 1.0,
-		    strokeColor: 'Red',
+		    strokeColor: 'black',
 			strokeWeight: 1
 		},
 		title: title
