@@ -27,6 +27,8 @@ which will allow access to the database.  Scripts can be run like
 $ python run_build_models.py 98
 ```
 
+TODO: MENTION SQL FILES!
+
 There's a difference between the test server and the non-test server!
 
 For build models and making predictions from the API, see the calls in `devserver.py`.
@@ -37,14 +39,22 @@ For build models and making predictions from the API, see the calls in `devserve
 * Files beginning with `run_` can be run on the command line (useful for testing!), but also contain methods that can be called from the server api.
 * Files with `_utils` in the name contain utility methods (some are probably not used anymore)
 * `FF.py` contains the feature-function filter
+* TODO: MENTION SQL FILES!
 
 ## Building Models (`run_build_models.py`)
 
-1. build and extract the 'averaged location' trace in/from the database
+The method `train(device_id,use_test_server)` does the following for the specified `device_id` (using the test server if `use_test_server = True`):
+
+1. extract the `averaged_location` trace in/from the database
 2. filter trace 
 3. cluster points (and save to database)
 4. build model(s)
 5. dump model to disk
+
+The method `train_all()` does the following
+
+1. builds the `averaged_location` table in the database for all users (see `make_average_table.sql`)
+2. lists active device IDs (see `list_active_devices.sql`) and calls the `train(device_id)` method for each active device ID.
 
 ## Making Predictions (`run_prediction.py`)
 
@@ -115,10 +125,10 @@ It does the following:
 
 Low Hanging Fruit (ordered approximately by easyness and importance)
 
-- [ ] Add function to build model for all [active] users
-- [ ] Improve/add more information (time of prediction, expected time of arrival, etc) in the geojson string return from `predict`.
-- [ ] Output different forms of predictions (e.g., 5-min, 20-min destination, minute-by-minute route prediction as in the demo)
-- [ ] Fade out nodes over time (i.e., remove non-regular routes, use the last 2 weeks of data)
+- [x] Add function to build model for all [active] users
+- [x] Improve/add more information (time of prediction, prediction confidence, etc.) in the geojson string return from `predict`.
+- [x] Output different forms of predictions (e.g., 5-min, 20-min destination, minute-by-minute route prediction as in the demo)
+- [x] Fade out nodes over time (i.e., remove non-regular routes, use the last 2 weeks of data)
 - [ ] Move to real server
 - [ ] Use `user_id` instead of `device id` throughout
 - [ ] Use 'crowd nodes' instead of personal nodes
