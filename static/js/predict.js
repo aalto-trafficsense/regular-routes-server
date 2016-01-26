@@ -8,12 +8,18 @@ $(document).ready(function() {
     var map = new google.maps.Map(mapCanvas[0], mapOptions);
     map.data.setStyle(function(feature) {
 	var type = feature.getProperty('type');
-	var title = feature.getProperty('predtype');
+	var title = feature.getProperty('title');
 	if (type === 'Prediction') {
-	    var pointColor = 'magenta';
-	    switch(feature.getProperty('activity')) {
-	    case 'UNSPECIFIED':
-		pointColor = 'yellow';
+	    var pointColor = 'red';
+	    switch(feature.getProperty('minutes')) {
+	    case 1:
+		pointColor = 'white';
+		break;
+	    case 5:
+		pointColor = 'magenta';
+		break;
+	    case 30:
+		pointColor = 'blue';
 		break;
 	    default:
 		pointColor = 'black';
@@ -44,12 +50,13 @@ $(document).ready(function() {
 
 	$.getJSON('../predict/' + device_id, function(response) {
 	    map.data.addGeoJson(response);
-		if (response.features.length == 1) {
+		if (response.features.length > 1) {
+			var bounds = new google.maps.LatLngBounds();
 			response.features.forEach(function (feature) {
 				var coords = feature.geometry.coordinates;
-			    map.panTo(new google.maps.LatLng(coords[1],coords[0]));
+			    bounds.extend(new google.maps.LatLng(coords[1],coords[0]));
 			});
-			map.setZoom(18);
+			map.fitBounds(bounds);
 			mapCanvas.css('opacity', '');
 		}
 	});
