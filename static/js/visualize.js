@@ -64,7 +64,8 @@ $(document).ready(function() {
 		    scale: 3,
 		    fillColor: 'red',
 		    fillOpacity: 1.0,
-		    strokeColor: 'black'
+		    strokeColor: 'black',
+			strokeWeight: 1
 		},
 		title: title
 	    };
