@@ -12,11 +12,11 @@
 from numpy import *
 set_printoptions(precision=5, suppress=True)
 
-def train(DEV_ID,use_test_server=False,win_past=5,win_futr=5,mod="EML",lim='NOW()'):
+def train(DEV_ID,use_test_server=False):
     '''
         TRAIN A MODEL, DUMP IT TO DISK
         -------------------------------
-        1. obtain full trace PRIOR OR EQUAL TO 'lim'
+        1. obtain trace 
         2. filter
         3. cluster and snap full trace to clusters
             3.b save the clusters (personal nodes) to the database
@@ -85,15 +85,24 @@ def train(DEV_ID,use_test_server=False,win_past=5,win_futr=5,mod="EML",lim='NOW(
 
     ##################################################################################
     #
-    # 4. Build Model
+    # 4. Build Model(s)
     #
     ##################################################################################
-    print "Build Model"
+    print "Build Model(s)"
 
     from sklearn.ensemble import RandomForestClassifier
 
+    # Model 1 / Predict 1 min ahead
     h = RandomForestClassifier(n_estimators=100)
     h.fit(Z[0:-1],Y[1:])   
+
+    # Model 2 / Predict 5 min ahead
+    h5 = RandomForestClassifier(n_estimators=100)
+    h5.fit(Z[0:-5],Y[5:])
+
+    # Model 3 / Predict 30 min ahead
+    h30 = RandomForestClassifier(n_estimators=100)
+    h30.fit(Z[0:-30],Y[30:])
 
     ##################################################################################
     #
@@ -104,9 +113,12 @@ def train(DEV_ID,use_test_server=False,win_past=5,win_futr=5,mod="EML",lim='NOW(
 
     import joblib
     joblib.dump(h,  './pyfiles/prediction/dat/model-'+str(DEV_ID)+'.dat')
+    joblib.dump(h5,  './pyfiles/prediction/dat/model_5-'+str(DEV_ID)+'.dat')
+    joblib.dump(h30,  './pyfiles/prediction/dat/model_30-'+str(DEV_ID)+'.dat')
 
     return "OK! "+str(DEV_ID)+" Successfully built!"
 
+def train_all():
 
 if __name__ == '__main__':
     train(45,use_test_server=True)
