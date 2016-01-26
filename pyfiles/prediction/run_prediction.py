@@ -98,6 +98,8 @@ def predict(DEV_ID,use_test_server=False):
     #
     ##################################################################################
 
+    c.execute('SELECT max(time_stamp) as current FROM averaged_location WHERE device_id = %s', (str(DEV_ID),))
+    current = c.fetchall()[0][0]
 
     print "Getting coordinates for prediction (from cluster_centers table), turning into geojson ... ", 
     import json
@@ -116,8 +118,8 @@ def predict(DEV_ID,use_test_server=False):
                 'properties': {
                     "type": "Prediction",
                     "activity": "UNSPECIFIED",
-                    "title": "node prediction "+str(i)+" minute/s from now ("+str(row[1])+"), at "+str(py[i])+"% confidence.",
-                    "time": str(row[1]),
+                    "title": "node prediction "+str(i)+" minute/s from now ("+str(current)+"), at "+str(py[i])+"% confidence.",
+                    "time": str(current),
                     "minutes": i,
                     "node_id": yp[i],
                     "confidence": py[i]
@@ -132,7 +134,7 @@ def predict(DEV_ID,use_test_server=False):
         'properties': {
             "type": "Position",
             "activity": "UNSPECIFIED",
-            "title": "current location (at "+str(row[1])+")",
+            "title": "current location (at "+str(current)+")",
         }
     })
 
