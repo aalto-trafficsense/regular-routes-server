@@ -62,7 +62,7 @@ $(document).ready(function() {
 		icon: {
 		    path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
 		    scale: 3,
-		    fillColor: 'red',
+		    fillColor: 'gold',
 		    fillOpacity: 1.0,
 		    strokeColor: 'black',
 			strokeWeight: 1
