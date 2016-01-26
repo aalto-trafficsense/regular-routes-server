@@ -138,6 +138,23 @@ def train_all(use_test_server):
         train(int(row[0]),use_test_server)
 
 if __name__ == '__main__':
-    train_all(use_test_server=True)
-    #train(45,use_test_server=True)
+    DEV_ID = 45
+    use_test_server = False
+
+    import sys
+
+    if len(sys.argv) > 2:
+        use_test_server = (sys.argv[2] == 'test')
+    if len(sys.argv) > 1:
+        if sys.argv[1] == 'all':
+            train_all(use_test_server)
+        else:
+            DEV_ID = int(sys.argv[1])
+            train(DEV_ID,use_test_server)
+    else: 
+        print """Use: python run_build_models.py <DEV_ID> [test]
+    where 'test' indicates to use the test server, and DEV_ID is the device ID, or 'all' for all devices,
+       e.g., python run_build_models.py 45 test
+       e.g., python run_build_models.py all"""
+
 

@@ -165,6 +165,23 @@ def predict(DEV_ID,use_test_server=False):
     return geojson
 
 if __name__ == '__main__':
-    print str(predict(45,use_test_server=True))
+
+    DEV_ID = 45
+    use_test_server = False
+
+    import sys
+
+    if len(sys.argv) > 2:
+        use_test_server = (sys.argv[2] == 'test')
+    if len(sys.argv) > 1:
+        DEV_ID = int(sys.argv[1])
+        print str(predict(DEV_ID,use_test_server))
+    else: 
+        print """Use: python run_prediction.py <DEV_ID> [test]
+    where 'test' indicates to use the test server, and DEV_ID is the device ID,
+       e.g., python run_prediction.py 45 test
+       e.g., python run_prediction.py 45"""
+
+
 
 
