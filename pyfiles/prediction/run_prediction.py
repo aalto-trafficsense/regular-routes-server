@@ -116,7 +116,7 @@ def predict(DEV_ID,use_test_server=False):
                 'properties': {
                     "type": "Prediction",
                     "activity": "UNSPECIFIED",
-                    "title": "node prediction "+i+" minute/s from now ("+str(row[1])+"), at "+py[i]+"% confidence.",
+                    "title": "node prediction "+str(i)+" minute/s from now ("+str(row[1])+"), at "+str(py[i])+"% confidence.",
                     "time": str(row[1]),
                     "minutes": i,
                     "node_id": yp[i],
