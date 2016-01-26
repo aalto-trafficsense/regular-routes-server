@@ -11,37 +11,40 @@ $(document).ready(function() {
 	var title = feature.getProperty('title');
 	if (type === 'Prediction') {
 	    var pointColor = 'red';
+		var pointScale = 1;
 	    switch(feature.getProperty('minutes')) {
 	    case 1:
-		pointColor = 'white';
+		pointColor = 'DeepPink';
+			pointScale = 3;
 		break;
 	    case 5:
-		pointColor = 'magenta';
+		pointColor = 'Fuchsia';
+			pointScale = 5;
 		break;
 	    case 30:
-		pointColor = 'blue';
+		pointColor = 'FireBrick';
+			pointScale = 7;
 		break;
 	    default:
 		pointColor = 'black';
 	    } // end-of-switch
 	    return {
 		icon: {
-		    path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
-		    scale: 3,
-		    fillColor: pointColor,
-		    fillOpacity: 1.0,
-		    strokeColor: 'blue'
+		    path: google.maps.SymbolPath.CIRCLE,
+		    scale: pointScale,
+		    strokeColor: pointColor,
+		    strokeOpacity: 1.0,
 		},
 		title: title
 	    };
 	} else if (type === 'something_else') {
 	    return {
 		icon: {
-		    path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+		    path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
 		    scale: 3,
-		    fillColor: 'yellow',
+		    fillColor: 'LightRed',
 		    fillOpacity: 1.0,
-		    strokeColor: 'black'
+		    strokeColor: 'Red'
 		},
 		title: title
 	    };
