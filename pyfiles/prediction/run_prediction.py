@@ -86,9 +86,9 @@ def predict(DEV_ID,use_test_server=False):
     z = Z[-1].reshape(1,-1) # instance
     yp[1] = h.predict(z).astype(int)[0]
     py[1] = max(h.predict_proba(z)[0])
-    yp[5] = h5.predict(Z[-1].reshape(1,-1)).astype(int)[0]
+    yp[5] = h5.predict(z).astype(int)[0]
     py[5] = max(h5.predict_proba(z)[0])
-    yp[30] = h30.predict(Z[-1].reshape(1,-1)).astype(int)[0]
+    yp[30] = h30.predict(z).astype(int)[0]
     py[30] = max(h30.predict_proba(z)[0])
     print yp, py
 
@@ -123,6 +123,18 @@ def predict(DEV_ID,use_test_server=False):
                     "confidence": py[i]
                 }
             })
+
+    c.execute("SELECT ST_AsGeoJSON(ST_MakePoint(%s, %s)), NOW()", (z[0,2],z[0,1],))
+    row = c.fetchall()[0]
+    features.append({
+        'type': 'Feature',
+        'geometry': json.loads(row[0]),
+        'properties': {
+            "type": "Position",
+            "activity": "UNSPECIFIED",
+            "title": "current location (at "+str(row[1])+")",
+        }
+    })
 
     geojson = {
         'type': 'FeatureCollection',
