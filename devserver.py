@@ -99,12 +99,12 @@ def generate_csv_waypoints(rows):
     for row in rows:
         yield ';'.join(['"%s"' % (str(x)) for x in row]) + '\n'
 
-@app.route('/predict/<int:device_id>')
-def predict_dev(device_id):
+@app.route('/predictgeojson/<int:device_id>')
+def predictgeojson(device_id):
     return jsonify(predict(device_id,True))
 
-@app.route('/predicttest/<int:device_id>')
-def predict_test(device_id):
+@app.route('/predict/<int:device_id>')
+def predict_dev(device_id):
     return render_template('predict.html',
                            api_key=app.config['MAPS_API_KEY'],
                            device_id=device_id)
