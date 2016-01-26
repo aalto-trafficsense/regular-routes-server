@@ -14,15 +14,15 @@ $(document).ready(function() {
 		var pointScale = 1;
 	    switch(feature.getProperty('minutes')) {
 	    case 1:
-			pointColor = 'white';
+			pointColor = 'DeepPink';
 			pointScale = 3;
 			break;
 	    case 5:
-			pointColor = 'magenta';
+			pointColor = 'Fuchsia';
 			pointScale = 5;
 			break;
 	    case 30:
-			pointColor = 'blue';
+			pointColor = 'FireBrick';
 			pointScale = 7;
 			break;
 	    default:
@@ -32,11 +32,9 @@ $(document).ready(function() {
 		icon: {
 		    path: google.maps.SymbolPath.CIRCLE,
 		    scale: pointScale,
-			fillColor: pointColor,
-			fillOpacity: 0.3,
-		    strokeColor: black,
+		    strokeColor: pointColor,
 		    strokeOpacity: 1.0,
-			strokeWeight: 1
+			strokeWeight: 2
 		},
 		title: title
 	    };
