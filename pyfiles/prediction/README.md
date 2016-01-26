@@ -1,24 +1,85 @@
 # Documentation
 
-## Technologies/libraries used
+## Requirements
 
-* Python 2.7
-* `smopy` for obtaining OSM data (mainly for plotting, and measuring distances)
+Using `Python 2.7`, the following libraries are most essential (their dependencies are not included on the list):
+
 * `psycopg2` to connect to the database
 * `numpy` for vectors and matrices
-* `sklearn` for clustering and learning
-* `matplotlib` for plotting and saving animations (as mp4 files)
+* `sklearn` for clustering and learning (building models)
+* `joblib` saving a model to disk
+* `geopy.distance` for measuring distances between coordinates
 
-## Demo 
+For the demo, additionally,
 
-To run the demo, first simply connect to a server, possibly tunnelling through, e.g., 
+* `smopy` for obtaining OSM data (mainly for getting andplotting ontop of a map)
+* `matplotlib` for plotting and saving animations (as MP4 files)
+
+To run the scripts for testing purposes, they can be run locally, but first connect to a server, possibly tunnelling through, e.g., 
 
 ```sh
 laptop ~ $ ssh -L 5432:localhost:54322 <username>@kekkonen.niksula.hut.fi
 kekkonen ~ $ ssh -L 54322:localhost:5432 <username>@regularroutes.niksula.hut.fi
 ```
 
-then simply run `python run_demo.py <deviceID> [test]` where `test` specifies to use the test server. For example
+which will allow access to the database.  Scripts can be run like
+```sh
+$ python run_build_models.py 98
+```
+
+TODO: MENTION SQL FILES!
+
+There's a difference between the test server and the non-test server!
+
+For build models and making predictions from the API, see the calls in `devserver.py`.
+
+
+## Description of files
+
+* Files beginning with `run_` can be run on the command line (useful for testing!), but also contain methods that can be called from the server api.
+* Files with `_utils` in the name contain utility methods (some are probably not used anymore)
+* `FF.py` contains the feature-function filter
+* TODO: MENTION SQL FILES!
+
+## Building Models (`run_build_models.py`)
+
+The method `train(device_id,use_test_server)` does the following for the specified `device_id` (using the test server if `use_test_server = True`):
+
+1. extract the `averaged_location` trace in/from the database
+2. filter trace (filter out stationary segments, and pass through the feature-filter)
+3. cluster points (and save to the `cluster_centres` table)
+4. build model(s)
+5. dump model to disk
+
+The method `train_all(use_test_server)` does the following
+
+1. builds the `averaged_location` table in the database for all users (see `make_average_table.sql`)
+2. lists active device IDs (see `list_active_devices.sql`) and calls the `train(device_id)` method for each active device ID.
+
+Run this to see command line arguments available for testing:
+```sh
+/opt/regularroutes/server$ python pyfiles/prediction/run_build_models.py 
+```
+
+## Making Predictions (`run_prediction.py`)
+
+The method `predict(device_id,use_test_server)` does the following for the specified `device_id` (using the test server if `use_test_server = True`):
+
+1. load model(s) from disk
+2. update and select the recent 'averaged location' in/from the `averaged_location` table
+3. filter the segment (feature-filter only)
+4. make a prediction
+5. match the prediction (node ID) to node coordinates using database; form a geojson string with the result, and return it after the following step
+6. commit the prediction to the database 
+
+Run this to see command line arguments available for testing:
+```sh
+/opt/regularroutes/server$ python pyfiles/prediction/run_prediction.py 
+```
+
+## Demo (`run_demo.py`)
+
+Simply run `python run_demo.py <deviceID> [test]` where `test` specifies to use the test server. For example
 
 ```sh
 $ python run_demo.py 98
@@ -72,37 +133,29 @@ It does the following:
 	* if the hour cell in `Z[t]` corresponds to the end of the day, GOTO 5.
 8. [Export animation as `mp4`]
 
-## Server code to run nightly
-
-Significant development on prediction and data processing has rendered most of the other `run_` files outdated. However, I have since updated `run_build_models.py` which carries out most of the same process as `run_demo.py` (in fact it uses much of the same code) but instead dumps a model to disk (in the `dat` folder). 
-
-In other words, running
-```sh
-$ python run_build_models.py 98
-```
-will fetch all data for device `98`, cluster, filter, build the model and save it to `./dat/model-98.npy`.
-
 ## TODO (Unfinished and Future development)
 
-Low Hanging Fruit
+Low Hanging Fruit (ordered approximately by easyness and importance)
 
+- [x] Add function to build model for all active users (at least 5000 records and 3 days)
+- [x] Build multiple models and supply multiple predictions (1-min, 5-min, 30-min destinations)
+- [x] Add more information (time of prediction, prediction confidence, etc.) to the geojson prediction string
+- [x] Fade out nodes over time (remove non-regular routes): use only the last 2 weeks worth of data available
+- [ ] Move to real server
 - [ ] Use `user_id` instead of `device id` throughout
-- [ ] Output different forms of predictions (e.g., 5-min, 20-min destination, minute-by-minute route prediction as in the demo)
-- [ ] Fade out nodes over time (i.e., remove non-regular routes)
-- [ ] Use crowd nodes instead of personal nodes
-- [ ] Improvement of engineered/recursive features in `FF.py`
+- [ ] Use **crowd nodes** instead of personal nodes
+- [ ] Use the travel *mode* in the input (as a predictive feature)
 - [ ] Analysis of a decision tree model used in prediction, to see how the model is being created from the features
-- [ ] Clustering could possibly be separated into `run_clustering.py`
-- [ ] Use the travel *mode* in the input 
+- [ ] Improvement of the engineered/recurrent features in `FF.py` (see previous point)
+- [ ] Try different clustering methods, or try using the waypoints as clusters
+- [ ] Crowd prediction: display it along side ordinary predictions
 
-Medium-Term
+Long Term (paper material)
 
-- [ ] use travel *mode* in the _output_, and visualize it with a different colour
-- [ ] crowd prediction: display it along side ordinar predictions
-
-Long Term
-
-- [ ] evaluate the worth of different features wrt their predictive power
+- [ ] Use travel *mode* in the _output_ (i.e., predict it), and visualize it with a different colour
+- [ ] Refactor everything for a more scalable solution (not remaking the location table from scratch each night, not loading models from disk each time predictions are needed, update models incrementally instead of rebuilding, etc.)
+- [ ] Study how to measure prediction quantitively
+- [ ] Using the just-above-mentioned study, evaluate the value of different features wrt their predictive power 
 
 ## Summary
 

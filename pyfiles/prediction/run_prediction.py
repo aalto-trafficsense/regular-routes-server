@@ -18,7 +18,7 @@ set_printoptions(precision=5, suppress=True)
 
 def predict(DEV_ID,use_test_server=False):
     '''
-        1. load model from disk
+        1. load model(s) from disk
         2. obtain a recent part of the trace
         3. filter it
         4. make a prediction 
@@ -32,10 +32,11 @@ def predict(DEV_ID,use_test_server=False):
     #
     ##################################################################################
 
-    print "Load model from disk ..."
+    print "Load model(s) from disk ..."
     import joblib
-    fname = "./pyfiles/prediction/dat/model-"+str(DEV_ID)+".dat"
-    h = joblib.load( fname)
+    h = joblib.load("./pyfiles/prediction/dat/model-"+str(DEV_ID)+".dat")
+    h5 = joblib.load("./pyfiles/prediction/dat/model_5-"+str(DEV_ID)+".dat")
+    h30 = joblib.load("./pyfiles/prediction/dat/model_30-"+str(DEV_ID)+".dat")
 
     ##################################################################################
     #
@@ -78,10 +79,18 @@ def predict(DEV_ID,use_test_server=False):
     #
     ##################################################################################
 
-    print "Prediction (node): " ,
+    print "Prediction(s) (node): " ,
 
-    yp = h.predict(Z[-1].reshape(1,-1)).astype(int)[0]
-    print yp
+    yp = {} # store predictions
+    py = {} # store confidences on the predictions
+    z = Z[-1].reshape(1,-1) # instance
+    yp[1] = h.predict(z).astype(int)[0]
+    py[1] = max(h.predict_proba(z)[0])
+    yp[5] = h5.predict(Z[-1].reshape(1,-1)).astype(int)[0]
+    py[5] = max(h5.predict_proba(z)[0])
+    yp[30] = h30.predict(Z[-1].reshape(1,-1)).astype(int)[0]
+    py[30] = max(h30.predict_proba(z)[0])
+    print yp, py
 
     ##################################################################################
     #
@@ -89,54 +98,31 @@ def predict(DEV_ID,use_test_server=False):
     #
     ##################################################################################
 
-    print "Getting coordinates for prediction (from cluster_centers table): ", 
-    #c.execute('SELECT longitude,latitude FROM cluster_centers WHERE device_id = %s AND cluster_id = %s', (DEV_ID,yp,))
-    #dat = array(c.fetchall(),dtype={'names':['lon', 'lat'], 'formats':['f4', 'f4']})[0]
-    #c.execute('SELECT ST_MakePoint(longitude, latitude) FROM cluster_centers WHERE device_id = %s AND cluster_id = %s', (DEV_ID,yp,))
-    sql = 'SELECT ST_AsGeoJSON(location) FROM cluster_centers WHERE device_id = %s AND cluster_id = %s'
-    #print 'SELECT ST_AsGeoJSON(location) FROM cluster_centers WHERE device_id = %s AND cluster_id = %s' % (DEV_ID, yp)
-    c.execute(sql, (DEV_ID,yp,))
 
-    print "Form geojson code ..."
+    print "Getting coordinates for prediction (from cluster_centers table), turning into geojson ... ", 
     import json
 
     features = []
+    for i in [1,5,30]:
 
-    rows = c.fetchall()
-    for row in rows:
-        features.append({
-            'type': 'Feature',
-            'geometry': json.loads(row[0]),
-            'properties': {
-                "type": "Prediction",
-                "activity": "UNSPECIFIED",
-                "predtype": "node-prediction at 1 minute from now",
-                "node_id": yp
-            }
-        })
+        sql = 'SELECT ST_AsGeoJSON(location),NOW() as time FROM cluster_centers WHERE device_id = %s AND cluster_id = %s'
+        c.execute(sql, (DEV_ID,yp[i],))
 
-    """ FORMAT SHOULD LOOK LIKE THIS:
-    {
-      "features": [
-        {
-          "geometry": {
-            "coordinates": [
-              24.705304,
-              60.170879
-            ],
-            "type": "Point"
-          },
-          "properties": {
-            "activity": "STILL",
-            "title": "accuracy: 20\nactivities: {type:STILL, conf:100}\n2015-03-02 00:00:04.007000",
-            "type": "raw-point"
-          },
-          "type": "Feature"
-        },
-      ],
-      "type": "FeatureCollection"
-    }
-    """
+        rows = c.fetchall()
+        for row in rows:
+            features.append({
+                'type': 'Feature',
+                'geometry': json.loads(row[0]),
+                'properties': {
+                    "type": "Prediction",
+                    "activity": "UNSPECIFIED",
+                    "title": "node prediction "+str(i)+" minute/s from now ("+str(row[1])+"), at "+str(py[i])+"% confidence.",
+                    "time": str(row[1]),
+                    "minutes": i,
+                    "node_id": yp[i],
+                    "confidence": py[i]
+                }
+            })
 
     geojson = {
         'type': 'FeatureCollection',
@@ -151,7 +137,8 @@ def predict(DEV_ID,use_test_server=False):
 
     print "Commit prediction"
     sql = "INSERT INTO predictions (device_id, cluster_id, time_stamp, time_index) VALUES (%s, %s, NOW(), %s)"
-    c.execute(sql, (DEV_ID, yp, 1,))
+    for i in [1,5,30]:
+        c.execute(sql, (DEV_ID, yp[i], i,))
     conn.commit()
 
     #    if commit_result:
@@ -178,6 +165,23 @@ def predict(DEV_ID,use_test_server=False):
     return geojson
 
 if __name__ == '__main__':
-    print str(predict(45,use_test_server=True))
+
+    DEV_ID = 45
+    use_test_server = False
+
+    import sys
+
+    if len(sys.argv) > 2:
+        use_test_server = (sys.argv[2] == 'test')
+    if len(sys.argv) > 1:
+        DEV_ID = int(sys.argv[1])
+        print str(predict(DEV_ID,use_test_server))
+    else: 
+        print """Use: python run_prediction.py <DEV_ID> [test]
+    where 'test' indicates to use the test server, and DEV_ID is the device ID,
+       e.g., python run_prediction.py 45 test
+       e.g., python run_prediction.py 45"""
+
+
 
 

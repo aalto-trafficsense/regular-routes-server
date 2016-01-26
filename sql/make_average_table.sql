@@ -1,5 +1,3 @@
-\i create_average_table.sql
-
 INSERT INTO averaged_location
     SELECT
         device_id,

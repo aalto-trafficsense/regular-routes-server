@@ -21,6 +21,22 @@ def do_cluster(X, N_clusters=10):
     nodes = h.cluster_centers_
     return nodes
 
+def snap(run,stops):
+    '''
+        SNAP
+        =======
+        snap points in 'run' to points in 'stops', return the indices.
+    '''
+    T = run.shape[0]
+    y = zeros(T,dtype=int)
+    for t in range(T):
+        #print t, "/", T
+        p = run[t,:]
+        dvec = sqrt((stops[:,0]-p[0])**2 + (stops[:,1]-p[1])**2)
+        i = argmin(dvec)
+        y[t] = i 
+    return y
+
 def do_snapping(X, nodes):
     """
         SNAPPING: snap all lon/lat points in X to a cluster, return as Y.  
@@ -28,7 +44,6 @@ def do_snapping(X, nodes):
         NOTE: it would also be a possibility to create and use an extra column in X (instead of Y).
     """
     print "Snapping trace to these ", len(nodes)," waypoints"
-    from utils import snap
     print X.shape,nodes.shape
     Y = snap(X[:,0:2],nodes).astype(int)
 
