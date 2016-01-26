@@ -13,3 +13,4 @@ CREATE TABLE averaged_location (
   accuracy float
   --waypoint_id bigint
 );
+
