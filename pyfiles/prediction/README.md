@@ -46,24 +46,36 @@ For build models and making predictions from the API, see the calls in `devserve
 The method `train(device_id,use_test_server)` does the following for the specified `device_id` (using the test server if `use_test_server = True`):
 
 1. extract the `averaged_location` trace in/from the database
-2. filter trace 
-3. cluster points (and save to database)
+2. filter trace (filter out stationary segments, and pass through the feature-filter)
+3. cluster points (and save to the `cluster_centres` table)
 4. build model(s)
 5. dump model to disk
 
-The method `train_all()` does the following
+The method `train_all(use_test_server)` does the following
 
 1. builds the `averaged_location` table in the database for all users (see `make_average_table.sql`)
 2. lists active device IDs (see `list_active_devices.sql`) and calls the `train(device_id)` method for each active device ID.
 
+Run this to see command line arguments available for testing:
+```sh
+/opt/regularroutes/server$ python pyfiles/prediction/run_build_models.py 
+```
+
 ## Making Predictions (`run_prediction.py`)
 
-1. load model from disk
-2. update and select the recent 'averaged location'
+The method `predict(device_id,use_test_server)` does the following for the specified `device_id` (using the test server if `use_test_server = True`):
+
+1. load model(s) from disk
+2. update and select the recent 'averaged location' in/from the `averaged_location` table
 3. filter the segment (feature-filter only)
 4. make a prediction
 5. match the prediction (node ID) to node coordinates using database; form a geojson string with the result, and return it after the following step
 6. commit the prediction to the database 
+
+Run this to see command line arguments available for testing:
+```sh
+/opt/regularroutes/server$ python pyfiles/prediction/run_prediction.py 
+```
 
 ## Demo (`run_demo.py`)
 
@@ -125,22 +137,23 @@ It does the following:
 
 Low Hanging Fruit (ordered approximately by easyness and importance)
 
-- [x] Add function to build model for all [active] users
-- [x] Improve/add more information (time of prediction, prediction confidence, etc.) in the geojson string return from `predict`.
-- [x] Output different forms of predictions (e.g., 5-min, 20-min destination, minute-by-minute route prediction as in the demo)
-- [x] Fade out nodes over time (i.e., remove non-regular routes, use the last 2 weeks of data)
+- [x] Add function to build model for all active users (at least 5000 records and 3 days)
+- [x] Build multiple models and supply multiple predictions (1-min, 5-min, 30-min destinations)
+- [x] Add more information (time of prediction, prediction confidence, etc.) to the geojson prediction string
+- [x] Fade out nodes over time (remove non-regular routes): use only the last 2 weeks worth of data available
 - [ ] Move to real server
 - [ ] Use `user_id` instead of `device id` throughout
-- [ ] Use 'crowd nodes' instead of personal nodes
+- [ ] Use **crowd nodes** instead of personal nodes
+- [ ] Use the travel *mode* in the input (as a predictive feature)
 - [ ] Analysis of a decision tree model used in prediction, to see how the model is being created from the features
+- [ ] Improvement of the engineered/recurrent features in `FF.py` (see previous point)
 - [ ] Try different clustering methods, or try using the waypoints as clusters
-- [ ] Improvement of the engineered/recurrent features in `FF.py` 
-- [ ] Use the travel *mode* in the input 
-- [ ] Use travel *mode* in the _output_, and visualize it with a different colour
-- [ ] Crowd prediction: display it along side ordinar predictions
+- [ ] Crowd prediction: display it along side ordinary predictions
 
-Long Term (paper material!)
+Long Term (paper material)
 
+- [ ] Use travel *mode* in the _output_ (i.e., predict it), and visualize it with a different colour
+- [ ] Refactor everything for a more scalable solution (not remaking the location table from scratch each night, not loading models from disk each time predictions are needed, update models incrementally instead of rebuilding, etc.)
 - [ ] Study how to measure prediction quantitively
 - [ ] Using the just-above-mentioned study, evaluate the value of different features wrt their predictive power 
 
