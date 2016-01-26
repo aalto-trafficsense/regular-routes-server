@@ -115,10 +115,12 @@ It does the following:
 
 Low Hanging Fruit (ordered approximately by easyness and importance)
 
+- [ ] Add function to build model for all [active] users
 - [ ] Improve/add more information (time of prediction, expected time of arrival, etc) in the geojson string return from `predict`.
-- [ ] Use `user_id` instead of `device id` throughout
 - [ ] Output different forms of predictions (e.g., 5-min, 20-min destination, minute-by-minute route prediction as in the demo)
-- [ ] Fade out nodes over time (i.e., remove non-regular routes)
+- [ ] Fade out nodes over time (i.e., remove non-regular routes, use the last 2 weeks of data)
+- [ ] Move to real server
+- [ ] Use `user_id` instead of `device id` throughout
 - [ ] Use 'crowd nodes' instead of personal nodes
 - [ ] Analysis of a decision tree model used in prediction, to see how the model is being created from the features
 - [ ] Try different clustering methods, or try using the waypoints as clusters
