@@ -15,16 +15,9 @@ set_printoptions(precision=5, suppress=True)
 def train(DEV_ID,use_test_server=False):
     '''
         TRAIN A MODEL, DUMP IT TO DISK
-        -------------------------------
-        1. obtain trace 
-        2. filter
-        3. cluster and snap full trace to clusters
-            3.b save the clusters (personal nodes) to the database
-        4. build model
-        5. dump the model to disk
     '''
 
-    print "----------------\n\n\n---- BEGIN\n\n\n---------------------\n"
+    print "WARNING: The averaged_location table is no longer built automatically for each user individually! Call train_all() for this to happen."
 
     ##################################################################################
     #
@@ -37,14 +30,8 @@ def train(DEV_ID,use_test_server=False):
     conn = get_conn(use_test_server) 
     c = conn.cursor()
 
-    if not use_test_server:
-        print "Building averaged_location table with new data."
-        sql = open('../../sql/make_average_table.sql', 'r').read()
-        c.execute(sql)
-        conn.commit()
-
-    print "Extracting trace"
-    c.execute('SELECT hour,minute,day_of_week,longitude,latitude FROM averaged_location WHERE device_id = %s', (str(DEV_ID),))
+    print "Extracting trace (limited to at most 2 weeks worth of data!)"
+    c.execute('SELECT hour,minute,day_of_week,longitude,latitude FROM averaged_location WHERE device_id = %s LIMIT 1209600', (str(DEV_ID),))
     dat = array(c.fetchall(),dtype={'names':['H', 'M', 'DoW', 'lon', 'lat'], 'formats':['f4', 'f4', 'i4', 'f4','f4']})
     X = column_stack([dat['lon'],dat['lat'],dat['H']+(dat['M']/60.),dat['DoW']])
 
@@ -118,8 +105,39 @@ def train(DEV_ID,use_test_server=False):
 
     return "OK! "+str(DEV_ID)+" Successfully built!"
 
-def train_all():
+def train_all(use_test_server):
+
+    from db_utils import get_conn, get_cursor
+
+    conn = get_conn(use_test_server) 
+    c = conn.cursor()
+
+    ##################################################################################
+    #
+    # 1. Build the averaged_location table
+    #
+    ##################################################################################
+    print "Building averaged_location table from scratch ..."
+    sql = open('./sql/create_averaged_location.sql', 'r').read()
+    c.execute(sql)
+    sql = open('./sql/make_average_table.sql', 'r').read()
+    c.execute(sql)
+    conn.commit()
+
+    ##################################################################################
+    #
+    # 2. List active device IDs, and train models for each device
+    #
+    ##################################################################################
+    print "Getting active device IDs ..."
+    sql = open('./sql/list_active_devices.sql', 'r').read()
+    c.execute(sql)
+    rows = c.fetchall()
+    for row in rows:
+        print "Training models for device ", row[0]
+        train(int(row[0]),use_test_server)
 
 if __name__ == '__main__':
-    train(45,use_test_server=True)
+    train_all(use_test_server=True)
+    #train(45,use_test_server=True)
 
