@@ -48,7 +48,7 @@ $(document).ready(function() {
 	}
     });
 
-	$.getJSON('../predict/' + device_id, function(response) {
+	$.getJSON('../predictgeojson/' + device_id, function(response) {
 	    map.data.addGeoJson(response);
 		if (response.features.length > 1) {
 			var bounds = new google.maps.LatLngBounds();
