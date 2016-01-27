@@ -13,11 +13,11 @@ $(document).ready(function() {
 	    var pointColor = 'red';
 		var pointScale = 1;
 	    switch(feature.getProperty('minutes')) {
-	    case 1:
+	    case 5:
 			pointColor = 'DeepPink';
 			pointScale = 3;
 			break;
-	    case 5:
+	    case 15:
 			pointColor = 'Fuchsia';
 			pointScale = 5;
 			break;
