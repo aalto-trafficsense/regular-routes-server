@@ -79,17 +79,12 @@ def train(DEV_ID,use_test_server=False):
 
     from sklearn.ensemble import RandomForestClassifier
 
-    # Model 1 / Predict 1 min ahead
-    h = RandomForestClassifier(n_estimators=100)
-    h.fit(Z[0:-5],Y[5:])   
-
-    # Model 2 / Predict 5 min ahead
-    h5 = RandomForestClassifier(n_estimators=100)
-    h5.fit(Z[0:-15],Y[15:])
-
-    # Model 3 / Predict 30 min ahead
-    h30 = RandomForestClassifier(n_estimators=100)
-    h30.fit(Z[0:-30],Y[30:])
+    model_minutes = [5,15,30]
+    h = {}
+    for i in model_minutes:
+        # Model to Predict i minutes ahead
+        h[i] = RandomForestClassifier(n_estimators=100)
+        h[i].fit(Z[0:-i],Y[i:])   
 
     ##################################################################################
     #
@@ -99,9 +94,8 @@ def train(DEV_ID,use_test_server=False):
     print "Dump to Disk"
 
     import joblib
-    joblib.dump(h,  './pyfiles/prediction/dat/model-'+str(DEV_ID)+'.dat')
-    joblib.dump(h5,  './pyfiles/prediction/dat/model_5-'+str(DEV_ID)+'.dat')
-    joblib.dump(h30,  './pyfiles/prediction/dat/model_30-'+str(DEV_ID)+'.dat')
+    for i in model_minutes:
+        joblib.dump(h[i], "./pyfiles/prediction/dat/model_"+str(i)+"-"+str(DEV_ID)+".dat") 
 
     return "OK! "+str(DEV_ID)+" Successfully built!"
 
