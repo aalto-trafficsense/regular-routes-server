@@ -90,6 +90,7 @@ It does the following:
 1. Get OSM data (using `smopy` library) and a png image for the specified bounding box
 2. [Set up plots, animation]
 3. Connect to database, create and fill `averaged_location` table (run `make_average_table.sql`)
+    *(NB: Actually this part is not automatic for the test server, to save time, with the `averaged_location` table becoming larger.)*
 4. Load trace from the database into a an array, 
 	```
 	SELECT hour,minute,day_of_week,longitude,latitude FROM averaged_location ...
