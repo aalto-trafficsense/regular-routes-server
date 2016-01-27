@@ -34,9 +34,10 @@ def predict(DEV_ID,use_test_server=False):
 
     print "Load model(s) from disk ..."
     import joblib
-    h = joblib.load("./pyfiles/prediction/dat/model-"+str(DEV_ID)+".dat")
-    h5 = joblib.load("./pyfiles/prediction/dat/model_5-"+str(DEV_ID)+".dat")
-    h30 = joblib.load("./pyfiles/prediction/dat/model_30-"+str(DEV_ID)+".dat")
+    model_minutes = [5,15,30]
+    h = {}
+    for i in model_minutes:
+        h[i] = joblib.load("./pyfiles/prediction/dat/model_"+str(i)+"-"+str(DEV_ID)+".dat")
 
     ##################################################################################
     #
@@ -84,12 +85,10 @@ def predict(DEV_ID,use_test_server=False):
     yp = {} # store predictions
     py = {} # store confidences on the predictions
     z = Z[-1].reshape(1,-1) # instance
-    yp[1] = h.predict(z).astype(int)[0]
-    py[1] = max(h.predict_proba(z)[0])
-    yp[5] = h5.predict(z).astype(int)[0]
-    py[5] = max(h5.predict_proba(z)[0])
-    yp[30] = h30.predict(z).astype(int)[0]
-    py[30] = max(h30.predict_proba(z)[0])
+
+    for i in model_minutes:
+        yp[i] = h[i].predict(z).astype(int)[0]
+        py[i] = max(h[i].predict_proba(z)[0])
     print yp, py
 
     ##################################################################################
@@ -105,7 +104,7 @@ def predict(DEV_ID,use_test_server=False):
     import json
 
     features = []
-    for i in [1,5,30]:
+    for i in model_minutes:
 
         sql = 'SELECT ST_AsGeoJSON(location),NOW() as time FROM cluster_centers WHERE device_id = %s AND cluster_id = %s'
         c.execute(sql, (DEV_ID,yp[i],))
@@ -151,7 +150,7 @@ def predict(DEV_ID,use_test_server=False):
 
     print "Commit prediction"
     sql = "INSERT INTO predictions (device_id, cluster_id, time_stamp, time_index) VALUES (%s, %s, NOW(), %s)"
-    for i in [1,5,30]:
+    for i in model_minutes:
         c.execute(sql, (DEV_ID, yp[i], i,))
     conn.commit()
 

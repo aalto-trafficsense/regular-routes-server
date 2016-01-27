@@ -22,19 +22,22 @@ import os.path
 DEV_ID = 45
 use_test_server = False
 
-if len(sys.argv) > 1:
-    DEV_ID = int(sys.argv[1])
 if len(sys.argv) > 2:
     use_test_server = (sys.argv[2] == 'test')
     DEV_ID = int(sys.argv[1])
+if len(sys.argv) > 1:
+    DEV_ID = int(sys.argv[1])
+else:
+    print "specify device id, and 'test' if you want to use the test server"
+    print "e.g.: python run_demo.py 45 test"
+    exit(1)
 
-min_metres = 30       # relative movement threshold for not-filtering
-T_h = 5
-T_p = 3             # how far to predict (route) into the future
-T_b = 20            # number of steps to consider a break in trasport
+T_p = 3            # how far to predict (route) into the future
+T_h = 5            # number of steps (minutes) to display of up-till-now trajectory
 T_g = 5            # how far ahead to predict (destination) in the future
+T_b = 20           # number of steps (minutes) to consider a break in trasport
+min_metres = 30    # relative movement threshold for not-filtering
 
-timer = 0
 from FF import FF
 
 ##################################################################################
@@ -71,32 +74,7 @@ map = joblib.load(FILE_M)
 #
 ##################################################################################
 
-#class centerer():
-#
-#    bx = None
-#
-#    def __init__(self, bx):
-#        self.bx = bx
-#
-#    def center(self,x,min_x,max_x):
-#        ''' GPS TO COORD '''
-#        return (x - min_x) / (max_x - min_x)
-#
-#    def uncenter(self,x,min_x,max_x):
-#        return x * ( max_x - min_x ) + min_x
-#
-#    def coord_center(self,xy):
-#        ''' GPS 2 ML '''
-#        c_xy = zeros(xy.shape)
-#        c_xy[0] = self.center(xy[0],self.bx[0],self.bx[2])
-#        c_xy[1] = self.center(xy[1],self.bx[1],self.bx[3])
-#        return c_xy
-#
-#cc = centerer(bx)
-
 def t2hr(tt):
-    #hh = int(tt * 24.)
-    #mm = int(((tt * 24) - hh) * 60)
     hh = int(tt)
     mm = int((tt - hh) * 60)
     return "%02dh%02d" % (hh,mm)
