@@ -105,7 +105,7 @@ def predict(DEV_ID,use_test_server=False):
     import json
 
     features = []
-    for i in [1,5,30]:
+    for i in [5,15,30]:
 
         sql = 'SELECT ST_AsGeoJSON(location),NOW() as time FROM cluster_centers WHERE device_id = %s AND cluster_id = %s'
         c.execute(sql, (DEV_ID,yp[i],))
