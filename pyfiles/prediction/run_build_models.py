@@ -81,11 +81,11 @@ def train(DEV_ID,use_test_server=False):
 
     # Model 1 / Predict 1 min ahead
     h = RandomForestClassifier(n_estimators=100)
-    h.fit(Z[0:-1],Y[1:])   
+    h.fit(Z[0:-5],Y[5:])   
 
     # Model 2 / Predict 5 min ahead
     h5 = RandomForestClassifier(n_estimators=100)
-    h5.fit(Z[0:-5],Y[5:])
+    h5.fit(Z[0:-15],Y[15:])
 
     # Model 3 / Predict 30 min ahead
     h30 = RandomForestClassifier(n_estimators=100)
