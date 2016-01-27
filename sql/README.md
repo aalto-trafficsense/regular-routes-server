@@ -1,18 +1,18 @@
 # A Note (from Jesse)
 
-These files,
+These files were there to start with:
 
 	delete_duplicate_device_data.sql
 	snapping.sql
 
-were there to start with. I added
+I added these:
 
-	make_average_table.sql
+    create_averaged_location.sql      # <-- averaged location stored in this table
+    make_average_table.sql            # <-- ... and this is the script to fill it with data from device_data
+    select_averaged_location.sql      # <-- ... to select from it
+    update_averaged_location.sql      # <-- ... to update it (without building from scratch)
+    make_predictions_table.sql        # <-- predictions stored in this table
+    list_active_devices.sql           # <-- this script determines which devices are considered 'active'
+    make_cluster_table.sql            # <-- personal nodes stored in this table
 
-which is the averaged location table, used by the Demo (`run_demo.py`). These other files:
-
-	make_cluster_table.sql
-	make_predictions_table.sql
-	select_averaged_location.sql
-
-were being constructed for use in a live system, although they were currently undergoing development.
+... some of which need to be run manually, others are called automatically by the python code.
