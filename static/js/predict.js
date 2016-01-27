@@ -27,6 +27,7 @@ $(document).ready(function() {
 			break;
 	    default:
 			pointColor = 'black';
+			pointScale = 10;
 	    } // end-of-switch
 	    return {
 		icon: {

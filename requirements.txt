@@ -1,6 +1,6 @@
+numpy==1.9.2
 Flask==0.10.1
 Flask-SQLAlchemy==2.0
-numpy==1.9.2
 scipy==0.9.0
 sklearn
 joblib==0.8.3
