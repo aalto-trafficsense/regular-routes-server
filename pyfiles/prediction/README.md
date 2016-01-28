@@ -142,7 +142,9 @@ Low Hanging Fruit (ordered approximately by easyness and importance)
 - [x] Build multiple models and supply multiple predictions (1-min, 5-min, 30-min destinations)
 - [x] Add more information (time of prediction, prediction confidence, etc.) to the geojson prediction string
 - [x] Fade out nodes over time (remove non-regular routes): use only the last 2 weeks worth of data available
-- [ ] Move to real server
+- [x] Move to real server
+- [ ] **Should include at least some stationary segments** for the production models! Otherwise prediction is really bad during the day.						 
+		(note: including all stationary segments may lead to overfitting and/or slow build times since there are so many).
 - [ ] Use `user_id` instead of `device id` throughout
 - [ ] Use environmental variables insteado of the `use_test_server` boolean variable in python scripts
 - [ ] Use **crowd nodes** instead of personal nodes
@@ -151,6 +153,7 @@ Low Hanging Fruit (ordered approximately by easyness and importance)
 - [ ] Improvement of the engineered/recurrent features in `FF.py` (see previous point)
 - [ ] Try different clustering methods, or try using the waypoints as clusters
 - [ ] Crowd prediction: display it along side ordinary predictions
+- [ ] Basic distance metric to get an idea of predictive performance. Kimmo suggests `d[t] = |pred[t] - true[t]|`.
 
 Long Term (paper material)
 
