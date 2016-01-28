@@ -101,7 +101,7 @@ def generate_csv_waypoints(rows):
 
 @app.route('/predictgeojson/<int:device_id>')
 def predictgeojson(device_id):
-    return jsonify(predict(device_id,True))
+    return jsonify(predict(device_id,False)) # False = production server, True = test server
 
 @app.route('/predict/<int:device_id>')
 def predict_dev(device_id):
