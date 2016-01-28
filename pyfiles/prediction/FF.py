@@ -55,20 +55,18 @@ class FF():
         self.b = 0 # buffer entry position
 
     def phi(self,x):
-        ##### TODO: WILL ALSO WANT TO CHECK TOD COMPARED TO THE LAST TOD
-        ##### IF THERE IS A BIG GAP, THEN WE ARE FILTERING .. AND ASSUME PREVIOUS POINTS WERE STATIONARY (MAY WORK ANYWAY?)
-        #print x, "->",
 
         z = zeros(self.N_h)    # nodes
-        z[BIAS] = 1.         # output bias node
+        z[BIAS] = 1.           # output bias node (not needed for decision trees, but anyway..)
 
         _z = self.Z[0]
 
         FIVE_MINUTES = 5./60.
         if abs(x[TOD] - _z[XSTAT][TOD]) > FIVE_MINUTES:
             print "[FF.py] WARNING: There was a gap of ",abs(x[TOD] - _z[XSTAT][TOD])," hours since the previous measurement. (This is the first one, the device has been turned off, or part of the trace is missing)."
-            #print "_x", _z[XSTAT]
-            #print " x", x
+            ####
+            #### TODO: CHECK DISTANCE FROM LAST POINT, AND THEN AVERAGE SENSIBLY ACROSS TIME TO GET AVERAGE SPEED, ETC.
+            ####
             _z[XSTAT] = x[:]
             _z[XSTAT][TOD] = x[TOD] - FIVE_MINUTES
 
