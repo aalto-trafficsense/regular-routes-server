@@ -144,6 +144,7 @@ Low Hanging Fruit (ordered approximately by easyness and importance)
 - [x] Fade out nodes over time (remove non-regular routes): use only the last 2 weeks worth of data available
 - [ ] Move to real server
 - [ ] Use `user_id` instead of `device id` throughout
+- [ ] Use environmental variables insteado of the `use_test_server` boolean variable in python scripts
 - [ ] Use **crowd nodes** instead of personal nodes
 - [ ] Use the travel *mode* in the input (as a predictive feature)
 - [ ] Analysis of a decision tree model used in prediction, to see how the model is being created from the features
