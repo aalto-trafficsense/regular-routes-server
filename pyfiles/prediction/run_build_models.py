@@ -46,7 +46,7 @@ def train(DEV_ID,use_test_server=False):
 
     from pred_utils import do_movement_filtering, do_feature_filtering
 
-    X = do_movement_filtering(X,30) # to within 30 metres
+    #X = do_movement_filtering(X,30) # to within 30 metres
     Z = do_feature_filtering(X)
 
     ##################################################################################
