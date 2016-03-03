@@ -220,6 +220,9 @@ def energymap_device_geojson():
         response.headers['Content-Type'] = 'application/json'
         return response
 
+    # Debug-code:
+    user_id = 14
+
     points = data_points_filtered(user_id, datetime.datetime.fromordinal(date_start.toordinal()),
                                   datetime.datetime.fromordinal(date_end.toordinal()))
     # points = data_points_filtered(user_id, date_start, date_end)
@@ -227,15 +230,27 @@ def energymap_device_geojson():
     features = []
     for point in points:
         point_geo = json.loads(point['geojson'])
-        features.append({
-            'type': 'Feature',
-            'geometry': point_geo,
-            'properties': {
-                'type': 'raw-point',
-                'activity': str(point['activity']),
-                'title': 'activity: %s' % point["activity"]
-            }
-        })
+        if str(point['line_type']) == '':
+            features.append({
+                'type': 'Feature',
+                'geometry': point_geo,
+                'properties': {
+                    'type': 'raw-point',
+                    'activity': str(point['activity']),
+                    'title': 'activity: %s' % point["activity"]
+                }
+            })
+        # Public transport recognized, use line-type instead
+        else:
+            features.append({
+                'type': 'Feature',
+                'geometry': point_geo,
+                'properties': {
+                    'type': 'raw-point',
+                    'activity': str(point['line_type']),
+                    'title': 'activity: %s' % point["line_type"]
+                }
+            })
     geojson = {
         'type': 'FeatureCollection',
         'features': features

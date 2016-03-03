@@ -37,6 +37,20 @@ $(document).ready(function() {
 	    case 'IN_VEHICLE':
 		pointColor = '#dd0020';
 		break;
+		// A: Train
+		case 'TRAIN':
+		pointColor = '#f7f700';
+		break;
+        // B: Subway, Tram
+		case 'SUBWAY':
+		case 'TRAM':
+		pointColor = '#f6bd00';
+		break;
+        // C: Bus, Ferry
+		case 'FERRY':
+		case 'BUS':
+		pointColor = '#e66313';
+		break;
 	    case 'TILTING':
 		pointColor = 'blue';
 		break;

@@ -347,8 +347,9 @@ def data_points_filtered(user_id, datetime_start, datetime_end):
     qstring = '''
         SELECT id,
             ST_AsGeoJSON(coordinate) AS geojson,
+            time,
             activity,
-            time
+            line_type
         FROM device_data_filtered
         WHERE user_id = :user_id
         AND time >= :time_start
