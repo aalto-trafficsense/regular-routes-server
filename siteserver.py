@@ -221,7 +221,7 @@ def energymap_device_geojson():
         return response
 
     # Debug-code:
-    user_id = 14
+    # user_id = 14
 
     points = data_points_filtered(user_id, datetime.datetime.fromordinal(date_start.toordinal()),
                                   datetime.datetime.fromordinal(date_end.toordinal()))
