@@ -230,7 +230,7 @@ def energymap_device_geojson():
     features = []
     for point in points:
         point_geo = json.loads(point['geojson'])
-        if str(point['line_type']) == '':
+        if point["line_type"] is None:
             features.append({
                 'type': 'Feature',
                 'geometry': point_geo,
@@ -248,7 +248,7 @@ def energymap_device_geojson():
                 'properties': {
                     'type': 'raw-point',
                     'activity': str(point['line_type']),
-                    'title': 'activity: %s' % point["line_type"]
+                    'title': 'public_transport: %s' % point["line_type"]
                 }
             })
     geojson = {
