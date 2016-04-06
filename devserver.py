@@ -99,6 +99,46 @@ def generate_csv_waypoints(rows):
     for row in rows:
         yield ';'.join(['"%s"' % (str(x)) for x in row]) + '\n'
 
+
+@app.route('/waypoints')
+def map_waypoints():
+    return render_template('waypoints.html', api_key=app.config['MAPS_API_KEY'])
+
+
+@app.route('/waypoints/geojson')
+def map_waypoints_geojson():
+    # XXX shows random 1k points when too many, should show clusters
+    maxpts = 1000
+    bounds = json.loads(request.args.get('bounds'))
+    res = db.engine.execute(
+        text('''
+            SELECT ST_AsGeoJSON(geo)
+            FROM waypoints
+            WHERE
+                ST_Y(geo::geometry) >= :lat0 AND
+                ST_Y(geo::geometry) <= :lat1 AND
+                ST_X(geo::geometry) >= :lon0 AND
+                ST_X(geo::geometry) <= :lon1
+            LIMIT :limit'''),
+        lat0=bounds['south'],
+        lat1=bounds['north'],
+        lon0=bounds['west'],
+        lon1=bounds['east'],
+        limit=maxpts)
+    features = [{
+            'type': 'Feature',
+            'geometry': json.loads(row[0]),
+            'properties': { 'type': 'route-point' },
+        }
+        for row in res
+    ]
+    geojson = {
+        'type': 'FeatureCollection',
+        'features': features
+    }
+    return jsonify(geojson)
+
+
 @app.route('/predictgeojson/<int:device_id>')
 def predictgeojson(device_id):
     return jsonify(predict(device_id,False)) # False = production server, True = test server
