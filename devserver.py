@@ -107,31 +107,65 @@ def map_waypoints():
 
 @app.route('/waypoints/geojson')
 def map_waypoints_geojson():
-    # XXX shows random 1k points when too many, should show clusters
-    maxpts = 1000
+    gridsz = 5 # XXX arbitrary
+    maxpts = 1000 # XXX arbitrary ...ish, finishes in <10s on some machine
+
     bounds = json.loads(request.args.get('bounds'))
+    lat0=bounds['south']
+    lat1=bounds['north']
+    lon0=bounds['west']
+    lon1=bounds['east']
     res = db.engine.execute(
         text('''
-            SELECT ST_AsGeoJSON(geo)
+            SELECT * FROM ( -- no alias in HAVING with pg...
+            SELECT
+                count(id) npt,
+                width_bucket(ST_Y(geo::geometry), :lat0, :lat1, :gridsz) wby,
+                width_bucket(ST_X(geo::geometry), :lon0, :lon1, :gridsz) wbx
             FROM waypoints
-            WHERE
-                ST_Y(geo::geometry) >= :lat0 AND
-                ST_Y(geo::geometry) <= :lat1 AND
-                ST_X(geo::geometry) >= :lon0 AND
-                ST_X(geo::geometry) <= :lon1
-            LIMIT :limit'''),
+            GROUP BY wby, wbx) t
+            WHERE wby > 0 AND wby <= :gridsz AND wbx > 0 AND wbx <= :gridsz'''),
         lat0=bounds['south'],
         lat1=bounds['north'],
         lon0=bounds['west'],
         lon1=bounds['east'],
-        limit=maxpts)
-    features = [{
-            'type': 'Feature',
-            'geometry': json.loads(row[0]),
-            'properties': { 'type': 'route-point' },
-        }
-        for row in res
-    ]
+        gridsz=gridsz)
+    features = []
+    for row in res:
+        if row['npt'] > maxpts / gridsz / gridsz:
+            features.append({
+                'type': 'Feature',
+                'geometry': {
+                    'type': 'Point',
+                    'coordinates': [
+                        lon0+(lon1-lon0)/gridsz*(row['wbx']-.5),
+                        lat0+(lat1-lat0)/gridsz*(row['wby']-.5)
+                ]},
+                'properties': {
+                    'type': 'route-point-cluster',
+                    'title': "%i points" % row['npt']
+            }})
+        else:
+            # XXX query up to gridsz^2 times, not that many but kinda bummer
+            res = db.engine.execute(
+                text('''
+                    SELECT ST_AsGeoJSON(geo)
+                    FROM waypoints
+                    WHERE
+                        ST_Y(geo::geometry) >= :lat0 AND
+                        ST_Y(geo::geometry) <= :lat1 AND
+                        ST_X(geo::geometry) >= :lon0 AND
+                        ST_X(geo::geometry) <= :lon1'''),
+                lat0=lat0+(lat1-lat0)/gridsz*(row['wby']-1),
+                lat1=lat0+(lat1-lat0)/gridsz*row['wby'],
+                lon0=lon0+(lon1-lon0)/gridsz*(row['wbx']-1),
+                lon1=lon0+(lon1-lon0)/gridsz*row['wbx'])
+            for row in res:
+                features.append({
+                    'type': 'Feature',
+                    'geometry': json.loads(row[0]),
+                    'properties': { 'type': 'route-point' },
+                })
     geojson = {
         'type': 'FeatureCollection',
         'features': features
