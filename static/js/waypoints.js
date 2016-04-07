@@ -25,7 +25,7 @@ $(document).ready(function() {
 	    return {
 		icon: {
 		    path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
-		    scale: 15,
+		    scale: 20,
 		    fillColor: 'gold',
 		    fillOpacity: 0.2,
 		    strokeColor: 'black',
