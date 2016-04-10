@@ -162,7 +162,7 @@ def map_waypoints_geojson():
     for cell in unclustered:
         res = db.engine.execute(
             text('''
-                SELECT ST_AsGeoJSON(geo)
+                SELECT id, ST_AsGeoJSON(geo) geojson
                 FROM waypoints
                 WHERE
                     ST_Y(geo::geometry) >= :lat0 AND
@@ -173,8 +173,10 @@ def map_waypoints_geojson():
         for row in res:
             features.append({
                 'type': 'Feature',
-                'geometry': json.loads(row[0]),
-                'properties': { 'type': 'route-point' }
+                'geometry': json.loads(row['geojson']),
+                'properties': {
+                    'type': 'route-point',
+                    'title': 'id: %i' % row['id'] }
             })
     geojson = {
         'type': 'FeatureCollection',
