@@ -45,3 +45,8 @@ jore_bus_regex = re.compile("^(1|2|4)...")
 
 jore_tram_replace_regex = re.compile("^.0*")
 jore_bus_replace_regex = re.compile("^.0*")
+
+
+# Maximum radius (m) and minimum duration (s) for detecting a trip endpoint.
+DEST_DURATION_MIN = 300
+DEST_RADIUS_MAX = 100

@@ -158,6 +158,64 @@ def dict_groups(dicts, keys):
         yield gkey, group
 
 
+def trace_destinations(points, distance, interval):
+
+    def duration(dest):
+        return (dest[1]['time'] - dest[0]['time']).total_seconds()
+
+    # from consequtive overlapping destinations, select the one with longest duration
+    best = None
+    for dest in destinations_raw(points, distance, interval):
+        if not best:
+            best = dest
+            continue
+
+        if not dest[0]['time'] <= best[1]['time']:
+            yield best
+            best = dest
+            continue
+
+        if duration(dest) > duration(best):
+            best = dest
+
+    if best:
+        yield best
+
+
+def destinations_raw(points, distance, interval):
+
+    def dist(p0, p1):
+        return get_distance_between_coordinates(
+            json.loads(p0["geojson"])["coordinates"],
+            json.loads(p1["geojson"])["coordinates"])
+
+    tail = None
+    tail_iter = iter(points)
+
+    # make destinations of data snapshot ends, can't know time spent there
+    dest = len(points) and (points[0], points[0])
+
+    for head in points:
+        # pull tail into max location range
+        while not tail or dist(head, tail) > distance:
+            if dest:
+                yield dest
+            dest = None
+            tail = next(tail_iter)
+
+        # extend head to min time range
+        if (head['time'] - tail['time']).total_seconds() <= interval:
+            continue
+
+        # if we make it here that's a valid destination
+        dest = tail, head
+
+    if dest:
+        yield dest
+    elif len(points):
+        yield points[-1], points[-1]
+
+
 def trace_linestrings(points, keys=(), feature_properties=()):
     """Render sequence of points as geojson linestring features.
 

@@ -6,7 +6,9 @@ from flask import Flask, jsonify, request, render_template, Response
 from oauth2client.client import *
 from sqlalchemy.sql import text
 
-from pyfiles.common_helpers import simplify, trace_linestrings
+from pyfiles.common_helpers import (
+    simplify, trace_destinations, trace_linestrings)
+from pyfiles.constants import DEST_DURATION_MIN, DEST_RADIUS_MAX
 from pyfiles.database_interface import init_db, db_engine_execute, data_points_snapping
 from pyfiles.prediction.run_prediction import predict
 
@@ -258,6 +260,30 @@ def visualize_device_geojson(device_id):
                 }
             })
 
+    for dest in trace_destinations(
+            points, distance=DEST_RADIUS_MAX, interval=DEST_DURATION_MIN):
+        features.append({
+            'type': 'Feature',
+            'geometry': json.loads(dest[0]['geojson']),
+            'properties': {
+                'type': 'dest-start',
+                'title': str(dest[0]['time'])}})
+        features.append({
+            'type': 'Feature',
+            'geometry': json.loads(dest[1]['geojson']),
+            'properties': {
+                'type': 'dest-end',
+                'title': str(dest[1]['time'])}})
+        features.append({
+            'type': 'Feature',
+            'geometry': {
+                'type': 'LineString',
+                'coordinates': [
+                    json.loads(x['geojson'])['coordinates'] for x in dest ]},
+            'properties': {
+                'type': 'dest-line',
+                'title': str(dest[1]['time'])}})
+
     simplified = [
         dict(x) for x in simplify(points, maxpts=maxpts, mindist=mindist)]
     for p in simplified:
@@ -288,6 +314,7 @@ def generate_csv(rows):
 
     for row in rows:
         yield ';'.join(['"%s"' % (to_str(x)) for x in row]) + '\n'
+
 
 # App starting point:
 if __name__ == '__main__':
