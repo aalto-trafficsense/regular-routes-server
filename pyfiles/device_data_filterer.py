@@ -161,6 +161,72 @@ class DeviceDataFilterer:
 
 
     def analyse_unfiltered_data(self, device_data_rows, user_id):
+        device_data_queue = []
+        chosen_activity = "NOT_SET"
+        previous_time = None
+        for p, a in self._activity_filter(device_data_rows, user_id):
+            if a != chosen_activity and chosen_activity != "NOT_SET":
+                self._flush_device_data_queue(
+                    device_data_queue, chosen_activity, user_id)
+                device_data_queue = []
+            device_data_queue.append(p)
+            if a != "NOT_SET":
+                chosen_activity = a
+        # XXX the MAX_POINT_TIME_DIFFERENCE limit for extending activity
+
+        if chosen_activity != "NOT_SET":
+            self._flush_device_data_queue(
+                device_data_queue, chosen_activity, user_id)
+
+
+    def _activity_filter(self, device_data_rows, user_id):
+
+        def activities(point):
+            return {
+                point["activity_1"]: point["activity_1_conf"],
+                point["activity_2"]: point["activity_2_conf"],
+                point["activity_3"]: point["activity_3_conf"]}
+
+        def dseconds(p0, p1):
+            return (p1["time"] - p0["time"]).total_seconds()
+
+        good_activities = (
+            'IN_VEHICLE', 'ON_BICYCLE', 'RUNNING', 'WALKING', 'ON_FOOT'
+            'STILL')
+        on_foot_activities = ('RUNNING', 'WALKING')
+
+        def best_activity(activities):
+            on_foot = False
+            for activity, cconf in activities.most_common():
+                if activity == "ON_FOOT":
+                    on_foot = True
+                elif on_foot and activity not in on_foot_activities:
+                    pass
+                elif activity in good_activities:
+                    return activity
+            if on_foot:
+                return "WALKING"
+            return "NOT_SET"
+
+        points = device_data_rows.fetchall()
+        from collections import Counter
+        probs = Counter()
+        head = tail = 0
+        halfwin = ACTIVITY_WIN / 2
+        np = len(points)
+        for i in range(np):
+            while head < np and dseconds(points[i], points[head]) < halfwin:
+                probs.update(activities(points[head]))
+                head += 1
+            while tail < np and dseconds(points[tail], points[i]) > halfwin:
+                probs.subtract(activities(points[tail]))
+                tail += 1
+            yield points[i], best_activity(probs)
+            # existing filter also drops trips with no good activity
+            # device overlap decision also
+
+
+    def analyse_unfiltered_data_OLD(self, device_data_rows, user_id):
         rows = device_data_rows.fetchall()
         if len(rows) == 0:
             return

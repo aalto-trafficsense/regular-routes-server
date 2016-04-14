@@ -35,6 +35,9 @@ MAXIMUM_MASS_TRANSIT_MISSES = 1
 # Must be equal or greater than MASS_TRANSIT_MATCH_SAMPLES
 CONSECUTIVE_DIFFERENCE_LIMIT = 6
 
+# Size in seconds of window for deciding activity.
+ACTIVITY_WIN = 60
+
 
 #Regexes for the HSL api
 jore_ferry_regex = re.compile("^1019")
