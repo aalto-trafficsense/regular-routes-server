@@ -270,7 +270,7 @@ def get_ratings_from_rows(filtered_data_rows, user_id):
             previous_location = current_location
             continue
 
-        distance = get_distance_between_coordinates(previous_location, current_location)
+        distance = get_distance_between_coordinates(previous_location, current_location) / 1000.0
 
         previous_location = current_location
 
