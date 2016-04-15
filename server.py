@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+raise Exception("OBSOLETE server.py -> {api,dev,site}server.py")
+
 import random
 import string
 import hashlib
