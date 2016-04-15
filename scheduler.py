@@ -386,17 +386,13 @@ def generate_rankings(time):
     for user_id in total_distances:
         totals.append((user_id, total_co2[user_id] / total_distances[user_id]))
     totals_sorted = sorted(totals, key=lambda average_co2: average_co2[1])
-    update_query = ""
-    for i in range(len(totals_sorted)):
-        update_query += '''
-            INSERT INTO travelled_distances
-            (user_id, time, ranking)
-            VALUES
-            ({0}, :time, {1});
-        '''.format(totals_sorted[i][0], i + 1)
-    if update_query != "":
-        db.engine.execute(text(update_query), time=time)
-
+    batch = [
+        {   "user_id": totals_sorted[i][0],
+            "time": time,
+            "ranking": i + 1 }
+        for i in range(len(totals_sorted))]
+    if batch:
+        db.engine.execute(travelled_distances_table.insert(batch))
 
 
 def retrieve_hsl_data():
