@@ -53,7 +53,10 @@ global_statistics_table = None
 def init_db(app):
     global db
     db = SQLAlchemy(app)
+
+    # chicken, meet egg
     metadata = db.metadata
+    metadata.bind = db.engine
 
     # Run session storage also on SQLAlchemy
     store = SQLAlchemyStore(db.engine, metadata, 'kv_session')
@@ -72,8 +75,8 @@ def init_db(app):
                                server_default=func.current_timestamp()),
                         Index('idx_users_user_id', 'user_id'))
 
-    if not users_table.exists(bind=db.engine):
-        users_table.create(bind=db.engine)
+    if not users_table.exists():
+        users_table.create()
         """ create legacy user that can be used to link existing data that was added
             before user objects were added to some user.
         """
@@ -129,7 +132,7 @@ def init_db(app):
                               Index('idx_device_data_filtered_time', 'time'),
                               Index('idx_device_data_filtered_user_id_time', 'user_id', 'time'))
 
-    device_data_filtered_table.create(bind=db.engine, checkfirst=True)
+    device_data_filtered_table.create(checkfirst=True)
 
     # travelled distances per day per device
     global travelled_distances_table
@@ -150,8 +153,8 @@ def init_db(app):
                               UniqueConstraint('time', 'user_id', name="unique_user_id_and_time_on_travelled_distances"),
                               Index('idx_travelled_distances_time', 'time'),
                               Index('idx_travelled_distances_device_id_time', 'user_id', 'time'))
-    if not travelled_distances_table.exists(bind=db.engine):
-        travelled_distances_table.create(bind=db.engine, checkfirst=True)
+    if not travelled_distances_table.exists():
+        travelled_distances_table.create(checkfirst=True)
         db.engine.execute(text('''
             CREATE RULE "travelled_distances_table_duplicate_update" AS ON INSERT TO "travelled_distances"
             WHERE EXISTS(SELECT 1 FROM travelled_distances
@@ -177,8 +180,8 @@ def init_db(app):
                               Index('idx_mass_transit_data_time_coordinate', 'time', 'coordinate'))
 
 
-    if not mass_transit_data_table.exists(bind=db.engine):
-        mass_transit_data_table.create(bind=db.engine, checkfirst=True)
+    if not mass_transit_data_table.exists():
+        mass_transit_data_table.create(checkfirst=True)
         db.engine.execute(text('''
             CREATE RULE "mass_transit_data_table_duplicate_ignore" AS ON INSERT TO "mass_transit_data"
             WHERE EXISTS(SELECT 1 FROM mass_transit_data
@@ -194,10 +197,10 @@ def init_db(app):
                               Column('past_week_certificates_number', Integer, nullable=False),
                               Column('total_distance', Float, nullable=False), #Daily amount of distance
                               Index('idx_global_statistics_time', 'time'),)
-    global_statistics_table.create(bind=db.engine, checkfirst=True)
+    global_statistics_table.create(checkfirst=True)
 
 
-    metadata.create_all(bind=db.engine, checkfirst=True)
+    metadata.create_all(checkfirst=True)
 
     return db, store
 
