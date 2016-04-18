@@ -6,7 +6,13 @@ import urllib2
 import geoalchemy2 as ga2
 import math
 from pyfiles import svg_generation
-from pyfiles.database_interface import init_db
+from pyfiles.database_interface import \
+    init_db, \
+    get_distinct_device_ids, \
+    get_filtered_device_data_points, \
+    data_points_by_user_id, \
+    data_points_snapping, \
+    data_points_filtered
 from pyfiles.device_data_filterer import DeviceDataFilterer
 from pyfiles.energy_rating import EnergyRating
 from pyfiles.constants import *
@@ -315,94 +321,6 @@ def get_max_time_from_table(time_column_name, table_name, id_field_name, id):
         time = time_row["time"]
     return time
 
-
-def get_distinct_device_ids(datetime_start, datetime_end):
-    return db.engine.execute(text('''
-        SELECT DISTINCT device_id
-        FROM device_data
-        WHERE time >= :date_start
-        AND time < :date_end;
-    '''), date_start=str(datetime_start), date_end=str(datetime_end))
-
-
-def get_filtered_device_data_points(user_id, datetime_start, datetime_end):
-    query = '''
-        SELECT time,
-            ST_AsGeoJSON(coordinate) AS geojson,
-            activity,
-            line_type,
-            line_name
-        FROM device_data_filtered
-        WHERE user_id = :user_id
-        AND time >= :time_start
-        AND time < :time_end
-        ORDER BY time ASC
-    '''
-    points =  db.engine.execute(text(query), user_id=user_id, time_start=datetime_start, time_end=datetime_end)
-    return points
-
-def data_points_by_user_id(user_id, datetime_start, datetime_end):
-    query = '''
-        SELECT device_id,
-            ST_AsGeoJSON(coordinate) AS geojson,
-            activity_1, activity_1_conf,
-            activity_2, activity_2_conf,
-            activity_3, activity_3_conf,
-            waypoint_id,
-            time
-        FROM device_data
-        WHERE device_id IN (SELECT id FROM devices
-                                 WHERE user_id = :user_id)
-        AND time >= :time_start
-        AND time < :time_end
-        ORDER BY time ASC
-    '''
-    points =  db.engine.execute(text(query), user_id=user_id, time_start=datetime_start, time_end=datetime_end)
-    return points
-
-def data_points_snapping(device_id, datetime_start, datetime_end):
-    qstart = '''
-        SELECT id,
-            ST_AsGeoJSON(coordinate) AS geojson,
-            accuracy,
-            activity_1, activity_1_conf,
-            activity_2, activity_2_conf,
-            activity_3, activity_3_conf,
-            waypoint_id,
-            time
-        FROM device_data
-    '''
-    if device_id == 0:
-        qstring = qstart + '''
-        WHERE time >= :time_start
-        AND time < :time_end
-        ORDER BY time ASC
-    '''
-        points = db.engine.execute(text(qstring), time_start=datetime_start, time_end=datetime_end)
-    else:
-        qstring = qstart + '''
-        WHERE device_id = :device_id
-        AND time >= :time_start
-        AND time < :time_end
-        ORDER BY time ASC
-    '''
-        points =  db.engine.execute(text(qstring), device_id=device_id, time_start=datetime_start, time_end=datetime_end)
-    return points
-
-def data_points_filtered(user_id, datetime_start, datetime_end):
-    qstring = '''
-        SELECT id,
-            ST_AsGeoJSON(coordinate) AS geojson,
-            activity,
-            time
-        FROM device_data_filtered
-        WHERE user_id = :user_id
-        AND time >= :time_start
-        AND time < :time_end
-        ORDER BY time ASC
-    '''
-    points =  db.engine.execute(text(qstring), user_id=user_id, time_start=datetime_start, time_end=datetime_end)
-    return points
 
 def main_loop():
     while 1:
