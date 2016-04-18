@@ -1,34 +1,22 @@
+import datetime
+from datetime import timedelta
 
 import json
-import hashlib
+import os
+import sys
+import time
 import re
 import urllib2
-import geoalchemy2 as ga2
-import math
-from pyfiles import svg_generation
-from pyfiles.database_interface import \
-    init_db, \
-    get_distinct_device_ids, \
-    get_filtered_device_data_points, \
-    data_points_by_user_id, \
-    data_points_snapping, \
-    data_points_filtered
+from pyfiles.database_interface import(
+    init_db, get_filtered_device_data_points, data_points_by_user_id)
 from pyfiles.device_data_filterer import DeviceDataFilterer
 from pyfiles.energy_rating import EnergyRating
 from pyfiles.constants import *
-from pyfiles.common_helpers import *
-from datetime import date, timedelta
+from pyfiles.common_helpers import get_distance_between_coordinates
 from apscheduler.schedulers.background import BackgroundScheduler
-from flask import Flask, abort, jsonify, request, render_template, Response
-from flask.ext.sqlalchemy import SQLAlchemy
-from oauth2client.client import *
-from oauth2client.crypt import AppIdentityError
-from sqlalchemy import MetaData, Table, Column, ForeignKey, Enum, BigInteger, Integer, String, Index, UniqueConstraint, Date, \
-    Float
-from sqlalchemy.dialects.postgres import DOUBLE_PRECISION, TIMESTAMP, UUID
-from sqlalchemy.exc import DataError
-from sqlalchemy.sql import text, func, column, table, select
-from uuid import uuid4
+from flask import Flask
+from sqlalchemy.sql import text
+
 import logging
 logging.basicConfig()
 
