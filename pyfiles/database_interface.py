@@ -53,7 +53,7 @@ global_statistics_table = None
 def init_db(app):
     global db
     db = SQLAlchemy(app)
-    metadata = MetaData()
+    metadata = db.metadata
 
     # Run session storage also on SQLAlchemy
     store = SQLAlchemyStore(db.engine, metadata, 'kv_session')
