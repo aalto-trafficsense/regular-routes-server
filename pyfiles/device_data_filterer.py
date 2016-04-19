@@ -1,15 +1,19 @@
 import json
 
 from pyfiles.common_helpers import get_distance_between_coordinates
+
 from pyfiles.constants import (
     ACTIVITY_WIN,
     CONSECUTIVE_DIFFERENCE_LIMIT,
     MAXIMUM_MASS_TRANSIT_MISSES,
     MAX_DIFFERENT_DEVICE_TIME_DIFFERENCE,
+    MAX_MASS_TRANSIT_DISTANCE_DIFFERENCE,
+    MAX_MASS_TRANSIT_TIME_DIFFERENCE,
     MAX_POINT_TIME_DIFFERENCE,
     NUMBER_OF_MASS_TRANSIT_MATCH_SAMPLES)
+
 from pyfiles.database_interface import (
-    device_data_filtered_table_insert, get_mass_transit_points)
+    device_data_filtered_table_insert, match_mass_transit_live)
 from pyfiles.mass_transit_match_planner import (
     find_same_journey_time_this_week, match_tripleg_with_publictransport, TripMatchedWithPlannerResult, PlannedTrip, minSpeeds)
 
@@ -162,6 +166,35 @@ class DeviceDataFilterer:
         if activity != "IN_VEHICLE":
             return None, None
 
+        device = device_data_queue[0]["device_id"]
+        tstart = device_data_queue[0]["time"]
+        tend = device_data_queue[-1]["time"]
+
+        matches = match_mass_transit_live(
+            device, tstart, tend,
+            MAX_MASS_TRANSIT_TIME_DIFFERENCE,
+            MAX_MASS_TRANSIT_DISTANCE_DIFFERENCE).fetchall()
+
+        print tstart, tend, device, len(device_data_queue)
+        for x in matches:
+            print "%4i %.2f %s" % (x[0], x[1], x[2:])
+        print
+
+        hitreq = ((1.0*
+                NUMBER_OF_MASS_TRANSIT_MATCH_SAMPLES
+              - MAXIMUM_MASS_TRANSIT_MISSES)
+          / NUMBER_OF_MASS_TRANSIT_MATCH_SAMPLES)
+
+        if matches and matches[0]["hitrate"] >= hitreq:
+            # could only fetch winner from db
+            return matches[0]["line_type"], matches[0]["line_name"]
+
+        return None, None
+
+
+    def _match_mass_transit_live_OLD(self, activity, device_data_queue):
+        if activity != "IN_VEHICLE":
+            return None, None
 
         vehicle_data = {} # Contains the line name and line type of a vehicle id
         match_counts = {} # Contains the number of matches per vehicle id

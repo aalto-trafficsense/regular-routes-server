@@ -373,6 +373,84 @@ def get_mass_transit_points(device_data_sample):
                                      MAX_MATCH_DISTANCE=MAX_MASS_TRANSIT_DISTANCE_DIFFERENCE)
     return mass_transit_points
 
+
+def match_mass_transit_live(device, tstart, tend, tradius, dradius):
+    """Find mass transit vehicles near user during a trip leg.
+
+    Arguments:
+    device -- device_data.device_id
+    tstart -- start timestamp of leg
+    tend -- end timestamp of leg
+    tradius -- slack allowed in seconds between device and vehicle data point
+    dradius -- slack allowed in metres between device and vehicle data point
+
+    Result columns:
+    revsum -- each metre inside dradius counts toward the summed distance score
+    hitrate -- fraction of times device and vehicle within dradius and tradius
+    vehicle_ref, line_type, line_name -- as in mass_transit_data
+    """
+
+    return db.engine.execute(
+        text("""
+
+-- find the relevant device data points
+WITH trace AS (
+    SELECT coordinate, id, time, row_number() OVER (ORDER BY time) rn
+    FROM device_data
+    WHERE device_id = :device AND time >= :tstart AND time <= :tend),
+
+-- rough bbox margin meters to degrees of lon at lat, so overshoots on latitude
+m2lon AS (
+    SELECT :dradius
+        / cos(pi() * max(abs(ST_Y(coordinate::geometry))) / 180)
+        / 110574 AS x
+    FROM trace),
+
+-- bounding box for mass transit data, expand not symmetric in m but that's ok
+bbox AS (
+    SELECT ST_Expand(ST_Extent(coordinate::geometry), (SELECT x from m2lon)) x
+    FROM trace),
+
+-- bound the mass transit data in time and space
+boxed AS (
+    SELECT coordinate, vehicle_ref, line_type, line_name, time
+    FROM mass_transit_data
+    WHERE time > timestamp :tstart - interval ':tradius seconds'
+        AND time < timestamp :tend + interval ':tradius seconds'
+        AND coordinate::geometry @ (SELECT x FROM bbox)),
+
+-- only nearest sample of each vehicle so no inflation from reporting more
+-- often, or from randomly switching to a different line_name all the time
+nearest AS (
+    SELECT
+        max(:dradius - ST_Distance(m.coordinate, d.coordinate)) revdist,
+        d.id,
+        m.vehicle_ref,
+        mode() WITHIN GROUP (ORDER BY m.line_type) line_type,
+        mode() WITHIN GROUP (ORDER BY m.line_name) line_name
+    FROM boxed m JOIN trace d
+    ON abs(extract(epoch from (m.time - d.time))) <= :tradius
+        AND ST_Distance(m.coordinate, d.coordinate) <= :dradius
+    GROUP BY d.id, m.vehicle_ref)
+
+-- sum and count over user location trace. some vehicles' line_name and other
+-- fields flip randomly, pick most frequent
+    SELECT
+        sum(revdist) revsum,
+        1.0 * count(*) / (SELECT count(*) FROM trace) hitrate,
+        vehicle_ref,
+        mode() WITHIN GROUP (ORDER BY line_type) line_type,
+        mode() WITHIN GROUP (ORDER BY line_name) line_name
+    FROM nearest
+    GROUP BY vehicle_ref order by hitrate desc, revsum desc"""),
+
+        device=device,
+        tstart=tstart,
+        tend=tend,
+        tradius=tradius,
+        dradius=dradius)
+
+
 def verify_user_id(user_id):
     if user_id is None or user_id == '':
         print 'empty user_id'
