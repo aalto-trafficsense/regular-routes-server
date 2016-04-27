@@ -7,7 +7,7 @@ from oauth2client.client import *
 from sqlalchemy.sql import text
 
 from pyfiles.common_helpers import (
-    simplify, trace_destinations, trace_linestrings)
+    simplify, timedelta_str, trace_destinations, trace_linestrings)
 from pyfiles.constants import DEST_DURATION_MIN, DEST_RADIUS_MAX
 from pyfiles.database_interface import init_db, db_engine_execute, data_points_snapping
 from pyfiles.prediction.run_prediction import predict
@@ -267,13 +267,17 @@ def visualize_device_geojson(device_id):
             'geometry': json.loads(dest[0]['geojson']),
             'properties': {
                 'type': 'dest-start',
-                'title': str(dest[0]['time'])}})
+                'title': '%s\n%s' % (
+                    str(dest[0]['time']),
+                    timedelta_str(dest[-1]['time'] - dest[0]['time']))}})
         features.append({
             'type': 'Feature',
             'geometry': json.loads(dest[1]['geojson']),
             'properties': {
                 'type': 'dest-end',
-                'title': str(dest[1]['time'])}})
+                'title': '%s\n%s' % (
+                    timedelta_str(dest[-1]['time'] - dest[0]['time']),
+                    str(dest[-1]['time']))}})
         features.append({
             'type': 'Feature',
             'geometry': {

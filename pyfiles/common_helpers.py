@@ -158,6 +158,26 @@ def dict_groups(dicts, keys):
         yield gkey, group
 
 
+def timedelta_str(td):
+    """Format timedelta using its two most signifigant units."""
+    rv = []
+    rem = td.total_seconds()
+    for first, notfirst, mul in [
+            ("%.2fs", "%02is", 60),
+            ("%im",   "%02im", 60),
+            ("%ih",   "%02ih", 24),
+            ("%id",   "%02id", 30),
+            ("%im",   "%02im", 12),
+            ("%iy",   "%iy",   None) ]:
+        div, rem = mul and divmod(rem, mul) or (None, rem)
+        if not div:
+            rv = [ first % rem ] + rv
+            break
+        rv = [ notfirst % rem ] + rv
+        rem = div
+    return "%6s" % ''.join(rv[:2])
+
+
 def trace_destinations(points, distance, interval):
 
     def duration(dest):
