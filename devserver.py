@@ -272,7 +272,7 @@ def visualize_device_geojson(device_id):
                     timedelta_str(dest[-1]['time'] - dest[0]['time']))}})
         features.append({
             'type': 'Feature',
-            'geometry': json.loads(dest[1]['geojson']),
+            'geometry': json.loads(dest[-1]['geojson']),
             'properties': {
                 'type': 'dest-end',
                 'title': '%s\n%s' % (
@@ -286,7 +286,7 @@ def visualize_device_geojson(device_id):
                     json.loads(x['geojson'])['coordinates'] for x in dest ]},
             'properties': {
                 'type': 'dest-line',
-                'title': str(dest[1]['time'])}})
+                'title': '%s\n%s' % (dest[0]['time'], dest[-1]['time'])}})
 
     simplified = [
         dict(x) for x in simplify(points, maxpts=maxpts, mindist=mindist)]

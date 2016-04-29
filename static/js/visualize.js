@@ -22,6 +22,20 @@ $(document).ready(function() {
 	scaleControl: true
     };
     var map = new google.maps.Map(mapCanvas[0], mapOptions);
+
+    var infoWindow = new google.maps.InfoWindow;
+    function showTitlePopup(event) {
+        var pre = document.createElement('pre');
+        var title = event.feature.getProperty('title');
+        if (typeof(title) == 'undefined')
+            return;
+        pre.innerHTML = title;
+        infoWindow.setContent(pre);
+        infoWindow.setPosition(event.latLng);
+        infoWindow.open(map);
+    }
+    map.data.addListener('click', showTitlePopup);
+
     map.data.setStyle(function(feature) {
 	var type = feature.getProperty('type');
 	var title = feature.getProperty('title');
