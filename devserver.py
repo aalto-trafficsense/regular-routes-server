@@ -6,8 +6,10 @@ from flask import Flask, jsonify, request, render_template, Response
 from oauth2client.client import *
 from sqlalchemy.sql import text
 
+from pyfiles.common_helpers import simplify, trace_linestrings
 from pyfiles.database_interface import init_db, db_engine_execute, data_points_snapping
 from pyfiles.prediction.run_prediction import predict
+
 import json
 
 import logging
@@ -211,7 +213,7 @@ def visualize_device_geojson(device_id):
 
     date_end = date_start + timedelta(hours=24)
 
-    points = data_points_snapping(device_id, date_start, date_end)
+    points = data_points_snapping(device_id, date_start, date_end).fetchall()
 
     features = []
     waypoints = set()
@@ -252,6 +254,13 @@ def visualize_device_geojson(device_id):
                     'type': 'route-point'
                 }
             })
+
+    # arbitrary max number of points for testing simplify
+    simplified = [dict(x) for x in simplify(points, maxpts=500)]
+    for p in simplified:
+        p['activity'] = p['activity_1'] # as expected by trace_linestrings
+    features += trace_linestrings(simplified, {'type': 'trace-line'})
+
     geojson = {
         'type': 'FeatureCollection',
         'features': features

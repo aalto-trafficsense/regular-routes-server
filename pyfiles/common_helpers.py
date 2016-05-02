@@ -137,3 +137,39 @@ def simplify(points, maxpts=None, distance=None, interpolate=False):
         rv.append(node.value)
         node = node.after
     return rv
+
+
+def trace_linestrings(points, feature_properties={}):
+    """Render a points as geojson linestring features.
+
+    points -- [{
+        activity: string,
+        line_type: string optional overrides activity,
+        geojson: json.dumps({coordinates: [lon, lat]})} ...]
+    feature_properties -- added to each feature's properties object
+    """
+
+    # collect by same activity for line coloring
+    streaks = []
+    previous = None
+    for p in points:
+        activity = "line_type" in p and p["line_type"] or p["activity"]
+        if previous and activity == streaks[-1]["activity"]:
+            streaks[-1]["points"].append(p)
+        else:
+            start = previous and [previous, p] or [p]
+            streaks.append({"activity": activity, "points": start})
+        previous = p
+
+    for streak in streaks:
+        activity = streak["activity"]
+        properties = dict(feature_properties)
+        properties.update({"activity": activity})
+        yield {
+            "type": "Feature",
+            "geometry": {
+                "type": "LineString",
+                "coordinates": [
+                    json.loads(x["geojson"])["coordinates"]
+                    for x in streak["points"]]},
+            "properties": properties}

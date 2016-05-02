@@ -7,6 +7,10 @@ $(document).ready(function() {
 	hiddenName: true,
 	onClose: function() {
 	    update(this.get('select', 'yyyy-mm-dd'));
+
+	    // don't pop up calendar when document refocused
+	    // https://github.com/amsul/pickadate.js/issues/160
+	    date.blur();
 	}
     });
     date.pickadate('picker').open();
@@ -20,9 +24,8 @@ $(document).ready(function() {
     map.data.setStyle(function(feature) {
 	var type = feature.getProperty('type');
 	var title = feature.getProperty('title');
-	if (type === 'raw-point') {
-	    var pointColor = 'magenta';
-	    switch(feature.getProperty('activity')) {
+	var pointColor = 'magenta';
+	switch(feature.getProperty('activity')) {
 	    case 'ON_BICYCLE':
 		pointColor = '#008c58';
 		break;
@@ -47,7 +50,8 @@ $(document).ready(function() {
 		break;
 	    default:
 		pointColor = 'black';
-	    } // end-of-switch
+	} // end-of-switch
+	if (type === 'raw-point') {
 	    return {
 		icon: {
 		    path: google.maps.SymbolPath.CIRCLE,
@@ -69,6 +73,13 @@ $(document).ready(function() {
 		},
 		title: title
 	    };
+	} else if (type === 'trace-line') {
+	    return {
+		strokeColor: pointColor,
+
+		// white is rather invisible at low opacity
+		strokeOpacity: (pointColor == 'white' && .8 || .2)
+	    };
 	}
     });
 
@@ -88,8 +99,14 @@ $(document).ready(function() {
 		if (response.features.length > 1) {
 			var bounds = new google.maps.LatLngBounds();
 			response.features.forEach(function (feature) {
-				var coords = feature.geometry.coordinates;
-		    	bounds.extend(new google.maps.LatLng(coords[1],coords[0]));
+			    // coordinates may be a pair or a list of pairs
+			    var coordlist = feature.geometry.coordinates;
+			    if (! (coordlist[0] instanceof Array))
+				coordlist = [coordlist];
+			    coordlist.forEach(function (coords) {
+				bounds.extend(new google.maps.LatLng(
+				    coords[1], coords[0]));
+			    });
 			});
 			map.fitBounds(bounds);
 		}
