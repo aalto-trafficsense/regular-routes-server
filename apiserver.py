@@ -4,8 +4,10 @@ from uuid import uuid4
 
 from flask import Flask, abort, jsonify, request
 from oauth2client.client import *
-from sqlalchemy.sql import text
+from sqlalchemy.sql import and_, func, select, text
 import json
+
+from pyfiles.common_helpers import simplify
 
 from pyfiles.database_interface import init_db, db_engine_execute, users_table_insert, users_table_update, devices_table_insert, device_data_table_insert
 from pyfiles.database_interface import verify_user_id, update_last_activity, get_users_table_id_for_device, get_device_table_id
@@ -260,6 +262,64 @@ def maintenance_snapping():
         sql = sql_file.read()
         result = db_engine_execute(text(sql))
         return 'Snapping was done to %d data points' % (result.rowcount)
+
+
+@app.route('/trace/<session_token>')
+def trace(session_token):
+    maxpts = int(request.args.get("maxpts") or 0)
+    date = request.args.get("date")
+
+    if date:
+        start = datetime.datetime.strptime(date, '%Y-%m-%d').replace(
+            hour=0, minute=0, second=0, microsecond=0)
+    else:
+        start = datetime.datetime.now() - datetime.timedelta(hours=24)
+    end = start + datetime.timedelta(hours=24)
+
+    device_data = db.metadata.tables["device_data"]
+    devices = db.metadata.tables["devices"]
+
+    query = select(
+        [   func.ST_AsGeoJSON(device_data.c.coordinate).label("geojson"),
+            device_data.c.activity_1.label("activity")],
+        and_(
+            devices.c.token == session_token,
+            device_data.c.time >= start,
+            device_data.c.time <= end),
+        device_data.join(devices))
+
+    points = db.engine.execute(query).fetchall()
+    if maxpts and (len(points) > maxpts):
+        points = simplify(points, maxpts=maxpts)
+
+    # collect by same activity for line coloring
+    streaks = []
+    previous = None
+    for p in points:
+        if previous and p["activity"] == previous["activity"]:
+            streaks[-1].append(p)
+        else:
+            streaks.append(previous and [previous, p] or [p])
+        previous = p
+
+    features = []
+    for streak in streaks:
+        activity = streak[-1]["activity"]
+        features.append({
+            "type": "Feature",
+            "geometry": {
+                "type": "LineString",
+                "coordinates": [
+                    json.loads(x["geojson"])["coordinates"] for x in streak]},
+            "properties": {
+                "activity": activity}})
+
+    geojson = {
+        "type": "FeatureCollection",
+        "features": features}
+
+    return jsonify(geojson)
+
 
 @app.route('/svg/<session_token>')
 def svg(session_token):
