@@ -266,10 +266,13 @@ def maintenance_snapping():
 
 @app.route('/trace/<session_token>')
 def trace(session_token):
-    maxpts = int(request.args.get("maxpts") or 0)
+    # get data for specified date, or last 12h if unspecified
     date = request.args.get("date")
 
-    # get data for specified date, or last 12h if unspecified
+    # passed on to simplify
+    maxpts = int(request.args.get("maxpts") or 0)
+    mindist = int(request.args.get("mindist") or 0)
+
     if date:
         start = datetime.datetime.strptime(date, '%Y-%m-%d').replace(
             hour=0, minute=0, second=0, microsecond=0)
@@ -307,9 +310,7 @@ def trace(session_token):
         device_data.join(devices))
     points += db.engine.execute(query)
 
-    if maxpts and (len(points) > maxpts):
-        points = simplify(points, maxpts=maxpts)
-
+    points = simplify(points, maxpts=maxpts, mindist=mindist)
     geojson = {
         'type': 'FeatureCollection',
         'features': list(trace_linestrings(points))

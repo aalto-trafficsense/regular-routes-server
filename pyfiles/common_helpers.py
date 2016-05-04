@@ -37,18 +37,19 @@ class Equirectangular:
         return lon, lat
 
 
-def simplify(points, maxpts=None, distance=None, interpolate=False):
+def simplify(points, maxpts=None, mindist=None, interpolate=False):
     """Simplify location trace by removing geometrically redundant points.
 
     points -- [{
         "geojson": json.dumps({"coordinates": [lon, lat]}),
         "time": datetime} ...]
     maxpts -- simplify until given number of points remain
-    distance -- omit points contributing no greater than given offset
+    mindist -- omit points contributing no greater than given offset
     interpolate -- use distance from interpolated point, else from line
     """
 
-    if not points:
+    # avoid building heap if input already conformant
+    if (not points or not mindist and (not maxpts or len(points) <= maxpts)):
         return points
 
     ballpark = json.loads(points[0]['geojson'])['coordinates']
@@ -121,9 +122,11 @@ def simplify(points, maxpts=None, distance=None, interpolate=False):
         node.heap_entry = heap_entry
     heapify(heap)
 
-    while heap and (not maxpts or len(heap) > maxpts - 2):
+    while heap:
         m, node = heappop(heap)
-        if distance and m > distance:
+        # 3 == the endpoints not in heap, plus the one item popped above
+        if ((not maxpts or len(heap) <= maxpts - 3)
+                and (not mindist or m > mindist)):
             break
         node.unlink()
         for neighbor in node.before, node.after:
@@ -139,14 +142,14 @@ def simplify(points, maxpts=None, distance=None, interpolate=False):
     return rv
 
 
-def trace_linestrings(points, feature_properties={}):
+def trace_linestrings(points, feature_properties=None):
     """Render a points as geojson linestring features.
 
     points -- [{
         activity: string,
         line_type: string optional overrides activity,
         geojson: json.dumps({coordinates: [lon, lat]})} ...]
-    feature_properties -- added to each feature's properties object
+    feature_properties -- dict added to each feature's properties object
     """
 
     # collect by same activity for line coloring
@@ -163,7 +166,7 @@ def trace_linestrings(points, feature_properties={}):
 
     for streak in streaks:
         activity = streak["activity"]
-        properties = dict(feature_properties)
+        properties = feature_properties and dict(feature_properties) or dict()
         properties.update({"activity": activity})
         yield {
             "type": "Feature",
