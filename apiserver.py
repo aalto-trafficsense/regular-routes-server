@@ -264,8 +264,8 @@ def maintenance_snapping():
         return 'Snapping was done to %d data points' % (result.rowcount)
 
 
-@app.route('/trace/<session_token>')
-def trace(session_token):
+@app.route('/path/<session_token>')
+def path(session_token):
     # get data for specified date, or last 12h if unspecified
     date = request.args.get("date")
 
