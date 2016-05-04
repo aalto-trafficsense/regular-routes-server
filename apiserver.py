@@ -269,26 +269,44 @@ def trace(session_token):
     maxpts = int(request.args.get("maxpts") or 0)
     date = request.args.get("date")
 
+    # get data for specified date, or last 12h if unspecified
     if date:
         start = datetime.datetime.strptime(date, '%Y-%m-%d').replace(
             hour=0, minute=0, second=0, microsecond=0)
     else:
-        start = datetime.datetime.now() - datetime.timedelta(hours=24)
+        start = datetime.datetime.now() - datetime.timedelta(hours=12)
     end = start + datetime.timedelta(hours=24)
 
+    filtered_data = db.metadata.tables["device_data_filtered"]
     device_data = db.metadata.tables["device_data"]
     devices = db.metadata.tables["devices"]
+    users = db.metadata.tables["users"]
 
+    # use filtered data if available
+    query = select(
+        [   func.ST_AsGeoJSON(filtered_data.c.coordinate).label("geojson"),
+            filtered_data.c.activity,
+            filtered_data.c.time],
+        and_(
+            devices.c.token == session_token,
+            filtered_data.c.time >= start,
+            filtered_data.c.time <= end),
+        filtered_data.join(users).join(devices))
+    points = db.engine.execute(query).fetchall()
+    if points:
+        start = points[-1]["time"]
+
+    # fall back on unfiltered for the missing part
     query = select(
         [   func.ST_AsGeoJSON(device_data.c.coordinate).label("geojson"),
             device_data.c.activity_1.label("activity")],
         and_(
             devices.c.token == session_token,
-            device_data.c.time >= start,
+            device_data.c.time > start,
             device_data.c.time <= end),
         device_data.join(devices))
+    points += db.engine.execute(query)
 
-    points = db.engine.execute(query).fetchall()
     if maxpts and (len(points) > maxpts):
         points = simplify(points, maxpts=maxpts)
 
