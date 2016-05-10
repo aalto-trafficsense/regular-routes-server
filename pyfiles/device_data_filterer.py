@@ -116,70 +116,7 @@ class DeviceDataFilterer:
         return line_data[0], line_data[1] # line_type, line_name
 
 
-
-
-    def _analyse_row_activities(self, row):
-        good_activities = ('IN_VEHICLE', 'ON_BICYCLE', 'RUNNING', 'WALKING', 'ON_FOOT')
-        current_activity = "NOT_SET"
-        act_1 = row["activity_1"]
-        act_2 = row["activity_2"]
-        act_3 = row["activity_3"]
-        conf_1 = row["activity_1_conf"]
-        conf_2 = row["activity_2_conf"]
-        conf_3 = row["activity_3_conf"]
-        if self._is_duplicate_unsure_row(act_1, act_2, act_3, conf_1, conf_2, conf_3):
-            return current_activity
-        if conf_3 > 0 and act_3 in good_activities:
-            current_activity = act_3
-        if conf_2 > 0 and act_2 in good_activities:
-            current_activity = act_2
-        if conf_1 > 0 and act_1 in good_activities:
-            current_activity = act_1
-        if current_activity == "ON_FOOT": #The dictionary performs this check in get_best_activity
-            current_activity = "WALKING"
-        return current_activity
-
-    def _is_duplicate_unsure_row(self, act_1, act_2, act_3, conf_1, conf_2, conf_3):
-
-        if (conf_1 < 100 and
-                self.previous_activity_1 == act_1 and
-                self.previous_activity_2 == act_2 and
-                self.previous_activity_3 == act_3 and
-                self.previous_activity_1_conf == conf_1 and
-                self.previous_activity_2_conf == conf_2 and
-                self.previous_activity_3_conf == conf_3):
-            return True
-
-        self.previous_activity_1 = act_1
-        self.previous_activity_2 = act_2
-        self.previous_activity_3 = act_3
-        self.previous_activity_1_conf = conf_1
-        self.previous_activity_2_conf = conf_2
-        self.previous_activity_3_conf = conf_3
-
-        return False
-
-
-    def analyse_unfiltered_data(self, device_data_rows, user_id):
-        device_data_queue = []
-        chosen_activity = "NOT_SET"
-        previous_time = None
-        for p, a in self._activity_filter(device_data_rows, user_id):
-            if a != chosen_activity and chosen_activity != "NOT_SET":
-                self._flush_device_data_queue(
-                    device_data_queue, chosen_activity, user_id)
-                device_data_queue = []
-            device_data_queue.append(p)
-            if a != "NOT_SET":
-                chosen_activity = a
-        # XXX the MAX_POINT_TIME_DIFFERENCE limit for extending activity
-
-        if chosen_activity != "NOT_SET":
-            self._flush_device_data_queue(
-                device_data_queue, chosen_activity, user_id)
-
-
-    def _activity_filter(self, device_data_rows, user_id):
+    def _analyse_activities(self, points):
 
         def activities(point):
             return {
@@ -190,9 +127,7 @@ class DeviceDataFilterer:
         def dseconds(p0, p1):
             return (p1["time"] - p0["time"]).total_seconds()
 
-        good_activities = (
-            'IN_VEHICLE', 'ON_BICYCLE', 'RUNNING', 'WALKING', 'ON_FOOT'
-            'STILL')
+        good_activities = ('IN_VEHICLE', 'ON_BICYCLE', 'RUNNING', 'WALKING')
         on_foot_activities = ('RUNNING', 'WALKING')
 
         def best_activity(activities):
@@ -208,7 +143,6 @@ class DeviceDataFilterer:
                 return "WALKING"
             return "NOT_SET"
 
-        points = device_data_rows.fetchall()
         from collections import Counter
         probs = Counter()
         head = tail = 0
@@ -222,11 +156,9 @@ class DeviceDataFilterer:
                 probs.subtract(activities(points[tail]))
                 tail += 1
             yield points[i], best_activity(probs)
-            # existing filter also drops trips with no good activity
-            # device overlap decision also
 
 
-    def analyse_unfiltered_data_OLD(self, device_data_rows, user_id):
+    def analyse_unfiltered_data(self, device_data_rows, user_id):
         rows = device_data_rows.fetchall()
         if len(rows) == 0:
             return
@@ -239,8 +171,7 @@ class DeviceDataFilterer:
         match_counter = 0
         different_activity_counter = 0
 
-        for i in xrange(len(rows)):
-            current_row = rows[i]
+        for current_row, current_activity in self._analyse_activities(rows):
             if (current_row["time"] - previous_time).total_seconds() > MAX_POINT_TIME_DIFFERENCE:
                 if chosen_activity != "NOT_SET": #if false, no good activity was found
                     self._flush_device_data_queue(device_data_queue, chosen_activity, user_id)
@@ -250,8 +181,6 @@ class DeviceDataFilterer:
                 previous_activity = "NOT_SET"
                 chosen_activity = "NOT_SET"
                 match_counter = 0
-
-            current_activity = self._analyse_row_activities(current_row)
 
             if previous_device_id != current_row["device_id"] and \
                             (current_row["time"] - previous_time).total_seconds() < MAX_DIFFERENT_DEVICE_TIME_DIFFERENCE:
