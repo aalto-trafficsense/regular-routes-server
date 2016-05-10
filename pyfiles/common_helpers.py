@@ -41,7 +41,7 @@ def point_interval(p0, p1):
     return (p1["time"] - p0["time"]).total_seconds()
 
 
-def simplify(points, maxpts=None, mindist=None, interpolate=False):
+def simplify_geometry(points, maxpts=None, mindist=None, interpolate=False):
     """Simplify location trace by removing geometrically redundant points.
 
     points -- [{
@@ -82,9 +82,6 @@ def simplify(points, maxpts=None, mindist=None, interpolate=False):
         p_ref = [p[i] - ref[i] for i in dim]
         return sum(p_ref[i]**2 for i in dim)**.5
 
-    def dseconds(p0, p1):
-        return (p1["time"] - p0["time"]).total_seconds()
-
     def linedist(p0, p1, p2):
         """Distance of p1 from line segment between p0 and p2."""
         m0, m1, m2 = (
@@ -97,8 +94,17 @@ def simplify(points, maxpts=None, mindist=None, interpolate=False):
         m0, m1, m2 = (
             projector.d2m(*json.loads(x['geojson'])['coordinates'])
             for x in (p0, p1, p2))
-        fraction = dseconds(p0, p1) / dseconds(p0, p2)
+        fraction = point_interval(p0, p1) / point_interval(p0, p2)
         return distance_point_lineseg(m1, (m0, m2), fraction)
+
+    f = interpolate and timedist or linedist
+    return simplify(points, f, maxpts, mindist)
+
+
+def simplify(points, metric, maxpts=None, minmetric=None):
+    """Remove points in order of lowest metric(predecessor, point, successor)
+    until it reaches minmetric, and number of points is no greater than
+    maxpts."""
 
     class Dll:
         def __init__(self, value, before=None, after=None):
@@ -111,17 +117,16 @@ def simplify(points, maxpts=None, mindist=None, interpolate=False):
             if self.after:
                 self.after.before = self.before
 
+    def node_metric(node):
+        return metric(node.before.value, node.value, node.after.value)
+
     linked = [Dll(x) for x in points]
     for i in range(1, len(linked)):
         linked[i].before = linked[i-1]
     for i in range(len(linked) - 1):
         linked[i].after = linked[i+1]
 
-    f = interpolate and timedist or linedist
-    def metric(node):
-        return f(node.before.value, node.value, node.after.value)
-
-    heap = [[metric(node), node] for node in linked[1:-1]]
+    heap = [[node_metric(node), node] for node in linked[1:-1]]
     for node, heap_entry in zip(linked[1:-1], heap):
         node.heap_entry = heap_entry
     heapify(heap)
@@ -130,12 +135,12 @@ def simplify(points, maxpts=None, mindist=None, interpolate=False):
         m, node = heappop(heap)
         # 3 == the endpoints not in heap, plus the one item popped above
         if ((not maxpts or len(heap) <= maxpts - 3)
-                and (not mindist or m > mindist)):
+                and (not minmetric or m > minmetric)):
             break
         node.unlink()
         for neighbor in node.before, node.after:
             if hasattr(neighbor, "heap_entry"):
-                neighbor.heap_entry[0] = metric(neighbor)
+                neighbor.heap_entry[0] = node_metric(neighbor)
         heapify(heap)
 
     node = linked[0]

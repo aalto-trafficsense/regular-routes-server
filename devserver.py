@@ -6,7 +6,7 @@ from flask import Flask, jsonify, request, render_template, Response
 from oauth2client.client import *
 from sqlalchemy.sql import text
 
-from pyfiles.common_helpers import simplify, trace_linestrings
+from pyfiles.common_helpers import simplify_geometry, trace_linestrings
 from pyfiles.database_interface import init_db, db_engine_execute, data_points_snapping
 from pyfiles.prediction.run_prediction import predict
 
@@ -259,7 +259,8 @@ def visualize_device_geojson(device_id):
             })
 
     simplified = [
-        dict(x) for x in simplify(points, maxpts=maxpts, mindist=mindist)]
+        dict(x) for x in simplify_geometry(
+            points, maxpts=maxpts, mindist=mindist)]
     for p in simplified:
         p['activity'] = p['activity_1']
     features += trace_linestrings(

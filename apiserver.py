@@ -8,7 +8,7 @@ from sqlalchemy.sql import and_, func, literal, select, text
 import json
 
 from pyfiles.common_helpers import (
-    simplify, trace_linestrings, trace_split_sparse)
+    simplify_geometry, trace_linestrings, trace_split_sparse)
 from pyfiles.constants import MAX_POINT_TIME_DIFFERENCE
 from pyfiles.database_interface import init_db, db_engine_execute, users_table_insert, users_table_update, devices_table_insert, device_data_table_insert
 from pyfiles.database_interface import verify_user_id, update_last_activity, get_users_table_id_for_device, get_device_table_id
@@ -270,7 +270,7 @@ def path(session_token):
     # get data for specified date, or last 12h if unspecified
     date = request.args.get("date")
 
-    # passed on to simplify
+    # passed on to simplify_geometry
     maxpts = int(request.args.get("maxpts") or 0)
     mindist = int(request.args.get("mindist") or 0)
 
@@ -326,7 +326,7 @@ def path(session_token):
     features = []
     for points in segments:
         # simplify the path geometry by dropping redundant points
-        points = simplify(points, maxpts=maxpts, mindist=mindist)
+        points = simplify_geometry(points, maxpts=maxpts, mindist=mindist)
 
         # merge line_type into activity
         points = [dict(p) for p in points] # rowproxies are not so mutable
