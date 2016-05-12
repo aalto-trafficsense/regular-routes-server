@@ -44,7 +44,8 @@ $(document).ready(function() {
     google.maps.event.addListener(map, 'idle', function() {
         var bounds = map.getBounds();
         $.getJSON(
-            '../waypoints/geojson?bounds=' + JSON.stringify(bounds.toJSON()),
+            'waypoints/geojson',
+            { bounds: JSON.stringify(bounds.toJSON()) },
             function(response) {
                 map.data.forEach(function(feature) {
                     map.data.remove(feature);
