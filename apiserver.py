@@ -294,7 +294,8 @@ def path(session_token):
             devices.c.token == session_token,
             filtered_data.c.time >= start,
             filtered_data.c.time <= end),
-        filtered_data.join(users).join(devices))
+        filtered_data.join(users).join(devices),
+        order_by=filtered_data.c.time)
     points = db.engine.execute(query).fetchall()
     if points:
         start = points[-1]["time"]
@@ -307,7 +308,8 @@ def path(session_token):
             devices.c.token == session_token,
             device_data.c.time > start,
             device_data.c.time <= end),
-        device_data.join(devices))
+        device_data.join(devices),
+        order_by=device_data.c.time)
     points += db.engine.execute(query)
 
     points = simplify(points, maxpts=maxpts, mindist=mindist)
