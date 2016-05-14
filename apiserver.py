@@ -289,6 +289,7 @@ def path(session_token):
     query = select(
         [   func.ST_AsGeoJSON(filtered_data.c.coordinate).label("geojson"),
             filtered_data.c.activity,
+            filtered_data.c.line_type,
             filtered_data.c.time],
         and_(
             devices.c.token == session_token,
