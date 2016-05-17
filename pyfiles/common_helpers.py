@@ -142,32 +142,41 @@ def simplify(points, maxpts=None, mindist=None, interpolate=False):
     return rv
 
 
-def trace_linestrings(points, feature_properties=None):
-    """Render a points as geojson linestring features.
+def dict_groups(dicts, keys):
+    """Group consecutive dicts that are equal in given keys."""
+    gkey = None
+    group = []
+    for d in dicts:
+        dkey = dict((k, d[k]) for k in keys if k in d)
+        if dkey != gkey:
+            if gkey is not None:
+                yield gkey, group
+            gkey = dkey
+            group = []
+        group.append(d)
+    if gkey is not None:
+        yield gkey, group
+
+
+def trace_linestrings(points, feature_properties=()):
+    """Render sequence of points as geojson linestring features.
 
     points -- [{
-        activity: string,
-        line_type: string optional overrides activity,
+        activity/line_type/line_name separate linestrings when changed,
         geojson: json.dumps({coordinates: [lon, lat]})} ...]
     feature_properties -- dict added to each feature's properties object
     """
 
     # collect by same activity for line coloring
-    streaks = []
-    previous = None
-    for p in points:
-        activity = "line_type" in p and p["line_type"] or p["activity"]
-        if previous and activity == streaks[-1]["activity"]:
-            streaks[-1]["points"].append(p)
-        else:
-            start = previous and [previous, p] or [p]
-            streaks.append({"activity": activity, "points": start})
-        previous = p
+    groups = dict_groups(points, ("activity", "line_type", "line_name"))
+    streaks = [{"properties": g[0], "points": g[1]} for g in groups]
+
+    # start line from last point of prior streak
+    for i in range(1, len(streaks)):
+        streaks[i]["points"].insert(0, streaks[i-1]["points"][-1])
 
     for streak in streaks:
-        activity = streak["activity"]
-        properties = feature_properties and dict(feature_properties) or dict()
-        properties.update({"activity": activity})
+        streak["properties"].update(feature_properties)
         yield {
             "type": "Feature",
             "geometry": {
@@ -175,4 +184,4 @@ def trace_linestrings(points, feature_properties=None):
                 "coordinates": [
                     json.loads(x["geojson"])["coordinates"]
                     for x in streak["points"]]},
-            "properties": properties}
+            "properties": streak["properties"]}

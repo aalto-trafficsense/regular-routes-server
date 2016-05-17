@@ -4,7 +4,7 @@ from uuid import uuid4
 
 from flask import Flask, abort, jsonify, request
 from oauth2client.client import *
-from sqlalchemy.sql import and_, func, select, text
+from sqlalchemy.sql import and_, func, literal, select, text
 import json
 
 from pyfiles.common_helpers import simplify, trace_linestrings
@@ -290,6 +290,7 @@ def path(session_token):
         [   func.ST_AsGeoJSON(filtered_data.c.coordinate).label("geojson"),
             filtered_data.c.activity,
             filtered_data.c.line_type,
+            filtered_data.c.line_name,
             filtered_data.c.time],
         and_(
             devices.c.token == session_token,
@@ -304,7 +305,9 @@ def path(session_token):
     # fall back on unfiltered for the missing part
     query = select(
         [   func.ST_AsGeoJSON(device_data.c.coordinate).label("geojson"),
-            device_data.c.activity_1.label("activity")],
+            device_data.c.activity_1.label("activity"),
+            literal(None).label("line_type"),
+            literal(None).label("line_name")],
         and_(
             devices.c.token == session_token,
             device_data.c.time > start,
@@ -313,7 +316,16 @@ def path(session_token):
         order_by=device_data.c.time)
     points += db.engine.execute(query)
 
+    # simplify the path geometry by dropping redundant points
     points = simplify(points, maxpts=maxpts, mindist=mindist)
+
+    # merge line_type into activity
+    points = [dict(p) for p in points] # rowproxies are not so mutable
+    for p in points:
+        if p.get("line_type"):
+            p["activity"] = p["line_type"]
+        del p["line_type"]
+
     geojson = {
         'type': 'FeatureCollection',
         'features': list(trace_linestrings(points))
