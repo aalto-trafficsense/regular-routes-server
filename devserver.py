@@ -210,8 +210,11 @@ def visualize_device_geojson(device_id):
         date_start = datetime.datetime.strptime(request.args['date'], '%Y-%m-%d').replace(hour=0, minute=0, second=0, microsecond=0)
     else:
         date_start = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-
     date_end = date_start + timedelta(hours=24)
+
+    # these args can be given to test simplify on the linestring rendering
+    maxpts = int(request.args.get("maxpts") or 0)
+    mindist = int(request.args.get("mindist") or 0)
 
     points = data_points_snapping(device_id, date_start, date_end).fetchall()
 
@@ -255,11 +258,12 @@ def visualize_device_geojson(device_id):
                 }
             })
 
-    # arbitrary max number of points for testing simplify
-    simplified = [dict(x) for x in simplify(points, maxpts=500)]
+    simplified = [
+        dict(x) for x in simplify(points, maxpts=maxpts, mindist=mindist)]
     for p in simplified:
-        p['activity'] = p['activity_1'] # as expected by trace_linestrings
-    features += trace_linestrings(simplified, {'type': 'trace-line'})
+        p['activity'] = p['activity_1']
+    features += trace_linestrings(
+        simplified, ('activity',), {'type': 'trace-line'})
 
     geojson = {
         'type': 'FeatureCollection',

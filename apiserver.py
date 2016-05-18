@@ -328,7 +328,7 @@ def path(session_token):
 
     geojson = {
         'type': 'FeatureCollection',
-        'features': list(trace_linestrings(points))
+        'features': list(trace_linestrings(points, ('activity', 'line_name')))
     }
 
     return jsonify(geojson)

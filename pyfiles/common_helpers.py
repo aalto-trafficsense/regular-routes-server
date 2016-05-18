@@ -158,17 +158,16 @@ def dict_groups(dicts, keys):
         yield gkey, group
 
 
-def trace_linestrings(points, feature_properties=()):
+def trace_linestrings(points, keys=(), feature_properties=()):
     """Render sequence of points as geojson linestring features.
 
-    points -- [{
-        activity/line_type/line_name separate linestrings when changed,
-        geojson: json.dumps({coordinates: [lon, lat]})} ...]
+    points -- [{geojson: json.dumps({coordinates: [lon, lat]})} ...]
+    keys -- render separate linestring when these values change in points
     feature_properties -- dict added to each feature's properties object
     """
 
     # collect by same activity for line coloring
-    groups = dict_groups(points, ("activity", "line_type", "line_name"))
+    groups = dict_groups(points, keys)
     streaks = [{"properties": g[0], "points": g[1]} for g in groups]
 
     # start line from last point of prior streak
