@@ -220,6 +220,10 @@ def visualize_device_geojson(device_id):
 
     points = data_points_snapping(device_id, date_start, date_end).fetchall()
 
+    points = [dict(x) for x in points]
+    for p in points:
+        p['activity'] = p['activity_1']
+
     features = []
     waypoints = set()
     for point in points:
@@ -290,8 +294,7 @@ def visualize_device_geojson(device_id):
 
     simplified = [
         dict(x) for x in simplify(points, maxpts=maxpts, mindist=mindist)]
-    for p in simplified:
-        p['activity'] = p['activity_1']
+
     features += trace_linestrings(
         simplified, ('activity',), {'type': 'trace-line'})
 

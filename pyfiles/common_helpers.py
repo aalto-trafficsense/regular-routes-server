@@ -1,6 +1,7 @@
 import json
-from math import cos, pi
+from datetime import timedelta
 from heapq import heapify, heappop
+from math import cos, pi
 
 
 def get_distance_between_coordinates(coord1, coord2):
@@ -35,6 +36,19 @@ class Equirectangular:
         lat = self.lat + y / Equirectangular.latscale
         lon = self.lon + x / self.lonscale
         return lon, lat
+
+
+def point_coordinates(p):
+    return json.loads(p["geojson"])["coordinates"]
+
+
+def point_distance(p0, p1):
+    return get_distance_between_coordinates(
+        point_coordinates(p0), point_coordinates(p1))
+
+
+def point_interval(p0, p1):
+    return (p1["time"] - p0["time"]).total_seconds()
 
 
 def simplify(points, maxpts=None, mindist=None, interpolate=False):
@@ -158,26 +172,6 @@ def dict_groups(dicts, keys):
         yield gkey, group
 
 
-def timedelta_str(td):
-    """Format timedelta using its two most signifigant units."""
-    rv = []
-    rem = td.total_seconds()
-    for first, notfirst, mul in [
-            ("%.2fs", "%02is", 60),
-            ("%im",   "%02im", 60),
-            ("%ih",   "%02ih", 24),
-            ("%id",   "%02id", 30),
-            ("%im",   "%02im", 12),
-            ("%iy",   "%iy",   None) ]:
-        div, rem = mul and divmod(rem, mul) or (None, rem)
-        if not div:
-            rv = [ first % rem ] + rv
-            break
-        rv = [ notfirst % rem ] + rv
-        rem = div
-    return "%6s" % ''.join(rv[:2])
-
-
 def trace_destinations(points, distance, interval):
 
     def duration(dest):
@@ -236,6 +230,40 @@ def destinations_raw(points, distance, interval):
         yield points[-1], points[-1]
 
 
+def trace_discard_sidesteps(points, factor=2):
+    """Discard points in trace that make the distance between their neighbors
+    suspiciously long compared to the straight line. This works more completely
+    if discard_unmoved is applied first to remove repeats bogus locations."""
+
+    buf = [] # buffer for point and its neighbors
+    for p in points:
+        buf.append(p)
+        if len(buf) < 3:
+            continue
+        if (point_distance(buf[0], buf[1]) + point_distance(buf[1], buf[2])
+                <= factor * point_distance(buf[0], buf[2])):
+            yield buf.pop(0)
+            continue
+        buf.pop(1)
+    for p in buf:
+        yield p
+
+
+def trace_discard_unmoved(points):
+    """Discard points in trace where the accuracy radius includes the
+    previously accepted point, so no clear evidence of movement."""
+
+    previous = None
+    for p in points:
+        if previous:
+            if point_distance(previous, p) <= p["accuracy"]:
+                continue
+            yield previous
+        previous = p
+    if previous:
+        yield previous
+
+
 def trace_linestrings(points, keys=(), feature_properties=()):
     """Render sequence of points as geojson linestring features.
 
@@ -262,3 +290,131 @@ def trace_linestrings(points, keys=(), feature_properties=()):
                     json.loads(x["geojson"])["coordinates"]
                     for x in streak["points"]]},
             "properties": streak["properties"]}
+
+
+def bounds_overlap(bounds0, bounds1):
+    for a, b in (bounds0, bounds1), (bounds1, bounds0):
+        if (       a["west"] >= b["east"]
+                or a["east"] <= b["west"]
+                or a["south"] >= b["north"]
+                or a["north"] <= b["south"]):
+            return False
+    return True
+
+
+def bounds_size(bounds):
+    projector = Equirectangular(bounds["west"], bounds["south"])
+    p0 = projector.d2m(bounds["west"], bounds["south"])
+    p1 = projector.d2m(bounds["east"], bounds["north"])
+    return [c1 - c0 for c0, c1 in zip(p0, p1)]
+
+
+def bounds_union(bounds0, bounds1):
+    return {
+        "west": min(bounds0["west"], bounds1["west"]),
+        "east": max(bounds0["east"], bounds1["east"]),
+        "south": min(bounds0["south"], bounds1["south"]),
+        "north": max(bounds0["north"], bounds1["north"])}
+
+
+def timedelta_str(td):
+    """Format timedelta (or seconds) using its two most signifigant units."""
+    rv = []
+    rem = td.total_seconds() if isinstance(td, timedelta) else td
+    for first, notfirst, mul in [
+            ("%.2fs", "%02is", 60),
+            ("%im",   "%02im", 60),
+            ("%ih",   "%02ih", 24),
+            ("%id",   "%02id", 30),
+            ("%im",   "%02im", 12),
+            ("%iy",   "%iy",   None) ]:
+        div, rem = mul and divmod(rem, mul) or (None, rem)
+        if not div:
+            rv = [ first % rem ] + rv
+            break
+        rv = [ notfirst % rem ] + rv
+        rem = div
+    return "%6s" % ''.join(rv[:2])
+
+
+def trace_regular_destinations(points, maxpts, distance, interval):
+    """Get at most maxpts of regular destinations in points trace. Distance and
+    interval thresholds passed on to trace_destinations."""
+
+    points = trace_discard_sidesteps(trace_discard_unmoved(points))
+    groups = [
+        {   "bounds": {
+                "west": min(point_coordinates(p)[0] for p in visit),
+                "east": max(point_coordinates(p)[0] for p in visit),
+                "south": min(point_coordinates(p)[1] for p in visit),
+                "north": max(point_coordinates(p)[1] for p in visit)},
+            "visits": [visit]}
+        for visit in trace_destinations(points, distance, interval)]
+
+    for g in groups:
+        print "dest {} {} {} {}\xc3\x97{}".format(
+            g["visits"][0][0]["time"], g["visits"][0][-1]["time"],
+            len(g["visits"][0]),
+            *(int(x) for x in bounds_size(g["bounds"])))
+
+        d = g["visits"][0]
+        if d[0]["time"] > d[-1]["time"]:
+            for p in d:
+                print p["time"]
+
+    print len(groups)
+
+    merged = True
+    while merged:
+        merged = False
+        for g0 in groups:
+            i1 = iter(groups)
+            for g1 in i1:
+                if g0 is g1:
+                    break
+            for g1 in i1: # items subsequent to g0
+                if bounds_overlap(g0["bounds"], g1["bounds"]):
+                    g0["bounds"] = bounds_union(g0["bounds"], g1["bounds"])
+                    print "EAT %i\xc3\x97%i" % tuple(bounds_size(g0["bounds"]))
+                    g0["visits"] += g1["visits"]
+                    groups.remove(g1)
+                    merged = True
+                    break
+            if merged:
+                break
+
+    print len(groups)
+
+    for g in groups:
+        g["total_stay"] = sum(point_interval(v[0], v[-1]) for v in g["visits"])
+        coords = []
+        entries = []
+        exits = []
+        for v in g["visits"]:
+            coords += [point_coordinates(p) for p in v]
+            entries.append((v[0]["time"] - v[0]["time"].replace(
+                hour=0, minute=0, second=0, microsecond=0)).total_seconds())
+            exits.append((v[-1]["time"] - v[-1]["time"].replace(
+                hour=0, minute=0, second=0, microsecond=0)).total_seconds())
+        g["avg_coords"] = [
+            c / len(coords) for c in map(lambda *x: sum(x), *coords)]
+
+        # XXX these averages are bogus over midnight, natch
+        g["avg_entry"] = sum(entries) / len(entries)
+        g["avg_exit"] = sum(exits) / len(exits)
+
+    for g in sorted(groups, key=lambda x: x["total_stay"], reverse=True):
+        enhm = "%02i:%02i" % divmod(g["avg_entry"]/60, 60)
+        exhm = "%02i:%02i" % divmod(g["avg_exit"]/60, 60)
+        bbsz = "%3s\xc3\x97%s" % tuple(int(x) for x in bounds_size(g["bounds"]))
+#        print "%s %s %s %.3f/%.3f %8s %s" % (
+        print "{} {} {} {:.3f}/{:.3f} {:8s} {}".format(
+            timedelta_str(g["total_stay"]),
+            enhm,
+            exhm,
+            g["avg_coords"][1],
+            g["avg_coords"][0],
+            bbsz,
+            g["bounds"])
+
+    return groups

@@ -118,8 +118,8 @@ $(document).ready(function() {
 	} else if (type === 'dest-line') {
 	    return {
 		strokeColor: '#66F',
-		strokeOpacity: .6,
 		strokeWeight: 30,
+		strokeOpacity: 0.4,
 		title: title
 	    };
 	}
