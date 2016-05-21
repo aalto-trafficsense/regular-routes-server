@@ -203,6 +203,13 @@ def destinations_raw(points, distance, interval):
             json.loads(p0["geojson"])["coordinates"],
             json.loads(p1["geojson"])["coordinates"])
 
+    if not points:
+        return
+
+    # worst-case inaccurate point pair can break up a destination, but only if
+    # helped by epsilon of real movement
+    points = trace_discard_inaccurate(points, distance / 2)
+
     tail = None
     tail_iter = iter(points)
 
@@ -228,6 +235,11 @@ def destinations_raw(points, distance, interval):
         yield dest
     elif len(points):
         yield points[-1], points[-1]
+
+
+def trace_discard_inaccurate(points, accuracy):
+    """Discard points in trace whose accuracy is worse than given radius."""
+    return (p for p in points if p["accuracy"] <= accuracy)
 
 
 def trace_discard_sidesteps(points, factor=2):
@@ -341,7 +353,6 @@ def trace_regular_destinations(points, maxpts, distance, interval):
     """Get at most maxpts of regular destinations in points trace. Distance and
     interval thresholds passed on to trace_destinations."""
 
-    points = trace_discard_sidesteps(trace_discard_unmoved(points))
     groups = [
         {   "bounds": {
                 "west": min(point_coordinates(p)[0] for p in visit),
@@ -375,7 +386,6 @@ def trace_regular_destinations(points, maxpts, distance, interval):
             for g1 in i1: # items subsequent to g0
                 if bounds_overlap(g0["bounds"], g1["bounds"]):
                     g0["bounds"] = bounds_union(g0["bounds"], g1["bounds"])
-                    print "EAT %i\xc3\x97%i" % tuple(bounds_size(g0["bounds"]))
                     g0["visits"] += g1["visits"]
                     groups.remove(g1)
                     merged = True
