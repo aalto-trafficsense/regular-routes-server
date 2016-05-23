@@ -1,6 +1,8 @@
 import json
+
 from datetime import timedelta
 from heapq import heapify, heappop
+from itertools import tee
 from math import cos, pi
 
 
@@ -174,67 +176,32 @@ def dict_groups(dicts, keys):
 
 def trace_destinations(points, distance, interval):
 
-    def duration(dest):
-        return (dest[1]['time'] - dest[0]['time']).total_seconds()
-
-    # from consequtive overlapping destinations, select the one with longest duration
-    best = None
-    for dest in destinations_raw(points, distance, interval):
-        if not best:
-            best = dest
-            continue
-
-        if not dest[0]['time'] <= best[1]['time']:
-            yield best
-            best = dest
-            continue
-
-        if duration(dest) > duration(best):
-            best = dest
-
-    if best:
-        yield best
-
-
-def destinations_raw(points, distance, interval):
-
-    def dist(p0, p1):
-        return get_distance_between_coordinates(
-            json.loads(p0["geojson"])["coordinates"],
-            json.loads(p1["geojson"])["coordinates"])
-
-    if not points:
-        return
-
     # worst-case inaccurate point pair can break up a destination, but only if
     # helped by epsilon of real movement
     points = trace_discard_inaccurate(points, distance / 2)
 
-    tail = None
-    tail_iter = iter(points)
+    points, heads = tee(points, 2)
+    dest = head = dend = None
 
-    # make destinations of data snapshot ends, can't know time spent there
-    dest = len(points) and (points[0], points[0])
-
-    for head in points:
-        # pull tail into max location range
-        while not tail or dist(head, tail) > distance:
-            if dest:
-                yield dest
+    for point in points:
+        if dest is not None:
+            dest.append(point)
+        if point is dend:
+            yield dest
             dest = None
-            tail = next(tail_iter)
-
-        # extend head to min time range
-        if (head['time'] - tail['time']).total_seconds() <= interval:
+        if head and point_distance(point, head) > distance:
             continue
 
-        # if we make it here that's a valid destination
-        dest = tail, head
+        for head in heads:
+            if point_distance(point, head) > distance:
+                break
+            if point_interval(point, head) >= interval:
+                if dest is None:
+                    dest = []
+                dend = head
 
     if dest:
         yield dest
-    elif len(points):
-        yield points[-1], points[-1]
 
 
 def trace_discard_inaccurate(points, accuracy):
