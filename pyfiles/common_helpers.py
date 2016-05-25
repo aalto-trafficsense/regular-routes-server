@@ -1,7 +1,7 @@
 import json
 
 from datetime import timedelta
-from heapq import heapify, heappop
+from heapq import heapify, heappop, heappush
 from itertools import tee
 from math import cos, pi
 
@@ -316,10 +316,111 @@ def timedelta_str(td):
     return "%6s" % ''.join(rv[:2])
 
 
-def trace_regular_destinations(points, maxpts, distance, interval):
+def trace_regular_destinations(
+        points, threshold_distance, threshold_interval, maxpts):
     """Get at most maxpts of regular destinations in points trace. Distance and
     interval thresholds passed on to trace_destinations."""
 
+    dests = [
+        {   "coordinates": tuple(
+                sum(c) / len(visit)
+                for c in zip(*(point_coordinates(p) for p in visit))),
+            "visits": [visit]}
+        for visit in trace_destinations(
+            points, threshold_distance, threshold_interval)]
+
+    def dest_dist(d0, d1):
+        return get_distance_between_coordinates(
+            d0["coordinates"], d1["coordinates"])
+
+    def dest_weighted_center(*destinations):
+        weighted = [
+            tuple(len(d["visits"]) * c for c in d["coordinates"])
+            for d in destinations]
+        total = sum(len(d["visits"]) for d in destinations)
+        return tuple(sum(c) / total for c in zip(*weighted))
+
+    def heapitem(d0, dests):
+        """Find nearest neighbor for d0 as sortable [distance, nearest, d0]"""
+        return (min([dest_dist(d0, d1),
+                     d1] for d1 in dests if d1 is not d0)
+                  + [d0])
+
+    if len(dests) == 1:
+        heap = [[None, None, dests[0]]]
+    else:
+        heap = [heapitem(d0, dests) for d0 in dests]
+    heapify(heap)
+
+    while heap:
+        item = heappop(heap)
+        distance, d1, d0 = item
+        print distance
+        if distance is None or distance >= threshold_distance * 2:
+            heappush(heap, item) # unspill the milk
+            break
+        for i in range(len(heap)):
+            if heap[i][2] is d1:
+                del heap[i] # heapify later
+                break
+        merged = {
+            "coordinates": dest_weighted_center(d0, d1),
+            "visits": d0["visits"] + d1["visits"]}
+        for item in heap:
+            if item[1] in [d0, d1]:
+                item[:] = heapitem(item[2], (x[2] for x in heap))
+                continue
+            distance = dest_dist(item[2], merged)
+            if item[0] > distance:
+                item[0:2] = distance, merged
+        heappush(heap, heapitem(merged, (x[2] for x in heap)))
+        heapify(heap)
+
+    groups = [x[2] for x in heap]
+    for g in groups:
+        g["total_stay"] = sum(point_interval(v[0], v[-1]) for v in g["visits"])
+        coords = []
+        entries = []
+        exits = []
+        for v in g["visits"]:
+            coords += [point_coordinates(p) for p in v]
+            entries.append((v[0]["time"] - v[0]["time"].replace(
+                hour=0, minute=0, second=0, microsecond=0)).total_seconds())
+            exits.append((v[-1]["time"] - v[-1]["time"].replace(
+                hour=0, minute=0, second=0, microsecond=0)).total_seconds())
+        g["avg_coords"] = [
+            c / len(coords) for c in map(lambda *x: sum(x), *coords)]
+
+        # XXX these averages are bogus over midnight, natch
+        g["avg_entry"] = sum(entries) / len(entries)
+        g["avg_exit"] = sum(exits) / len(exits)
+
+    r = 0
+    for g in sorted(groups, key=lambda x: x["total_stay"], reverse=True):
+        enhm = "%02i:%02i" % divmod(g["avg_entry"]/60, 60)
+        exhm = "%02i:%02i" % divmod(g["avg_exit"]/60, 60)
+#        bbsz = "%3s\xc3\x97%s" % tuple(int(x) for x in bounds_size(g["bounds"]))
+#        print "%s %s %s %.3f/%.3f %8s %s" % (
+        r += 1
+        g["rank"] = r
+        print "{} {} {} {:.3f}/{:.3f} {:.3f}".format(
+            timedelta_str(g["total_stay"]),
+            enhm,
+            exhm,
+            g["avg_coords"][1],
+            g["avg_coords"][0],
+            get_distance_between_coordinates(g["avg_coords"], g["coordinates"]))
+
+    for r, g in enumerate(sorted(groups, key=lambda x: x["total_stay"], reverse=True)):
+        g["duration_rank"] = r + 1
+
+    for r, g in enumerate(sorted(groups, key=lambda x: len(x["visits"]), reverse=True)):
+        g["visits_rank"] = r + 1
+
+    return groups
+
+
+def leftovers(points, distance, interval, maxpts):
     groups = [
         {   "bounds": {
                 "west": min(point_coordinates(p)[0] for p in visit),

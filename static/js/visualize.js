@@ -122,6 +122,18 @@ $(document).ready(function() {
 		strokeOpacity: 0.4,
 		title: title
 	    };
+	} else if (type === 'regular-destination') {
+	    return {
+		icon: {
+		    path: google.maps.SymbolPath.CIRCLE,
+		    scale: 3 * feature.getProperty('visits')^.5,
+		    strokeColor: 'darkred',
+		    strokeWeight: 1,
+                    fillColor: 'darkred',
+                    fillOpacity: 0.2
+		},
+		title: title
+	    };
 	}
     });
 

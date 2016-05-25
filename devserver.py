@@ -4,10 +4,14 @@ from datetime import timedelta
 
 from flask import Flask, jsonify, request, render_template, Response
 from oauth2client.client import *
-from sqlalchemy.sql import text
+from sqlalchemy.sql import and_, func, select, text
 
 from pyfiles.common_helpers import (
-    simplify, timedelta_str, trace_destinations, trace_linestrings)
+    simplify,
+    timedelta_str,
+    trace_destinations,
+    trace_linestrings,
+    trace_regular_destinations)
 from pyfiles.constants import DEST_DURATION_MIN, DEST_RADIUS_MAX
 from pyfiles.database_interface import init_db, db_engine_execute, data_points_snapping
 from pyfiles.prediction.run_prediction import predict
@@ -294,9 +298,38 @@ def visualize_device_geojson(device_id):
 
     simplified = [
         dict(x) for x in simplify(points, maxpts=maxpts, mindist=mindist)]
-
     features += trace_linestrings(
         simplified, ('activity',), {'type': 'trace-line'})
+
+    device_data = db.metadata.tables["device_data"]
+    longwin_start = date_end - datetime.timedelta(days=30) # XXX arbitrary
+    query = select(
+        [   func.ST_AsGeoJSON(device_data.c.coordinate).label("geojson"),
+            device_data.c.accuracy,
+            device_data.c.time],
+        and_(
+            device_data.c.device_id == device_id,
+            device_data.c.time > longwin_start,
+            device_data.c.time <= date_end),
+        device_data,
+        order_by=device_data.c.time)
+    longwin = db.engine.execute(query)
+
+    for d in trace_regular_destinations(
+            longwin, DEST_RADIUS_MAX, DEST_DURATION_MIN, 0):
+        features.append({
+            'type': 'Feature',
+            'geometry': {
+                'type': 'Point',
+                'coordinates': d["coordinates"]},
+            'properties': {
+                'visits': len(d["visits"]),
+                'type': 'regular-destination',
+                'title': "{} visits (rank {}), {} total (rank {})".format(
+                    len(d["visits"]),
+                    d["visits_rank"],
+                    timedelta_str(d["total_stay"]),
+                    d["duration_rank"])}})
 
     geojson = {
         'type': 'FeatureCollection',
