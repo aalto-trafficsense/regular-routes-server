@@ -314,8 +314,8 @@ def timedelta_str(td):
 
 
 def trace_regular_destinations(
-        points, threshold_distance, threshold_interval, maxpts):
-    """Get _at most maxpts (not implemented)_ of regular destinations in points
+        points, threshold_distance, threshold_interval):
+    """Find regular destinations in location
     trace. Distance and interval thresholds passed on to trace_destinations."""
 
     dests = [
@@ -378,7 +378,7 @@ def trace_regular_destinations(
 
     groups = [x[2] for x in heap]
     for g in groups:
-        g["total_stay"] = sum(point_interval(v[0], v[-1]) for v in g["visits"])
+        g["total_time"] = sum(point_interval(v[0], v[-1]) for v in g["visits"])
         coords = []
         entries = []
         exits = []
@@ -388,31 +388,17 @@ def trace_regular_destinations(
                 hour=0, minute=0, second=0, microsecond=0)).total_seconds())
             exits.append((v[-1]["time"] - v[-1]["time"].replace(
                 hour=0, minute=0, second=0, microsecond=0)).total_seconds())
-        g["avg_coords"] = [
-            c / len(coords) for c in map(lambda *x: sum(x), *coords)]
 
-        # XXX these averages are bogus over midnight, natch
-        g["avg_entry"] = sum(entries) / len(entries)
-        g["avg_exit"] = sum(exits) / len(exits)
+    for r, g in enumerate(sorted(
+            groups,
+            key=lambda x: (x["total_time"], len(x["visits"])),
+            reverse=True)):
+        g["total_time_rank"] = r + 1
 
-    r = 0
-    for g in sorted(groups, key=lambda x: x["total_stay"], reverse=True):
-        enhm = "%02i:%02i" % divmod(g["avg_entry"]/60, 60)
-        exhm = "%02i:%02i" % divmod(g["avg_exit"]/60, 60)
-#        bbsz = "%3s\xc3\x97%s" % tuple(int(x) for x in bounds_size(g["bounds"]))
-#        print "%s %s %s %.3f/%.3f %8s %s" % (
-        r += 1
-#        print "{} {} {} {:.3f}/{:.3f}".format(
-#            timedelta_str(g["total_stay"]),
-#            enhm,
-#            exhm,
-#            g["coordinates"][1],
-#            g["coordinates"][0])
-
-    for r, g in enumerate(sorted(groups, key=lambda x: x["total_stay"], reverse=True)):
-        g["duration_rank"] = r + 1
-
-    for r, g in enumerate(sorted(groups, key=lambda x: len(x["visits"]), reverse=True)):
+    for r, g in enumerate(sorted(
+            groups,
+            key=lambda x: (len(x["visits"]), x["total_time"]),
+            reverse=True)):
         g["visits_rank"] = r + 1
 
     return groups

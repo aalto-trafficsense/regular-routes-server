@@ -316,7 +316,7 @@ def visualize_device_geojson(device_id):
     longwin = db.engine.execute(query)
 
     for d in trace_regular_destinations(
-            longwin, DEST_RADIUS_MAX, DEST_DURATION_MIN, 0):
+            longwin, DEST_RADIUS_MAX, DEST_DURATION_MIN):
         features.append({
             'type': 'Feature',
             'geometry': {
@@ -328,8 +328,8 @@ def visualize_device_geojson(device_id):
                 'title': "{} visits (rank {}), {} total (rank {})".format(
                     len(d["visits"]),
                     d["visits_rank"],
-                    timedelta_str(d["total_stay"]),
-                    d["duration_rank"])}})
+                    timedelta_str(d["total_time"]),
+                    d["total_time_rank"])}})
 
     geojson = {
         'type': 'FeatureCollection',

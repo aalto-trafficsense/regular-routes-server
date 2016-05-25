@@ -54,7 +54,7 @@ def user_regular_destinations(user, start=start, end=end, noisy=False):
     points = db.engine.execute(query)
 
     dests = trace_regular_destinations(
-        points, DEST_RADIUS_MAX, DEST_DURATION_MIN, 0)
+        points, DEST_RADIUS_MAX, DEST_DURATION_MIN)
     if not noisy:
         return dests
 

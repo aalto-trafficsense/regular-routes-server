@@ -8,8 +8,16 @@ from sqlalchemy.sql import and_, func, literal, select, text
 import json
 
 from pyfiles.common_helpers import (
-    simplify_geometry, trace_linestrings, trace_split_sparse)
-from pyfiles.constants import MAX_POINT_TIME_DIFFERENCE
+    simplify_geometry,
+    trace_linestrings,
+    trace_regular_destinations,
+    trace_split_sparse)
+
+from pyfiles.constants import (
+    DEST_DURATION_MIN,
+    DEST_RADIUS_MAX,
+    MAX_POINT_TIME_DIFFERENCE)
+
 from pyfiles.database_interface import init_db, db_engine_execute, users_table_insert, users_table_update, devices_table_insert, device_data_table_insert
 from pyfiles.database_interface import verify_user_id, update_last_activity, get_users_table_id_for_device, get_device_table_id
 from pyfiles.database_interface import get_device_table_id_for_session, get_users_table_id, get_session_token_for_device, get_user_id_from_device_id
@@ -211,6 +219,44 @@ def data_post():
         device_data_table_insert(batch)
     return jsonify({
     })
+
+
+@app.route('/destinations/<session_token>')
+def destinations(session_token):
+    devices = db.metadata.tables["devices"]
+    device_data = db.metadata.tables["device_data"]
+
+    start = datetime.datetime.now() - datetime.timedelta(days=30)
+    query = select(
+        [   func.ST_AsGeoJSON(device_data.c.coordinate).label("geojson"),
+            device_data.c.accuracy,
+            device_data.c.time],
+        and_(
+            devices.c.token == session_token,
+            device_data.c.time > start),
+        device_data.join(devices),
+        order_by=device_data.c.time)
+    points = db.engine.execute(query)
+
+    dests = trace_regular_destinations(
+        points, DEST_RADIUS_MAX, DEST_DURATION_MIN)
+
+    for d in dests:
+        d["visits"] = len(d["visits"])
+
+    dests.sort(key=lambda x: x["visits_rank"])
+
+    geojson = {
+        "type": "FeatureCollection",
+        "features": [
+            {   "type": "Feature",
+                "geometry": {
+                    "type": "Point",
+                    "coordinates": d["coordinates"]},
+                "properties": d}
+            for d in dests]}
+
+    return jsonify(geojson)
 
 
 """
