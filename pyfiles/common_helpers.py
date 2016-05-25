@@ -201,6 +201,9 @@ def trace_destinations(points, distance, interval):
     # helped by epsilon of real movement
     points = trace_discard_inaccurate(points, distance / 2)
 
+    # prevent false faraway location points breaking up visits
+    points = trace_discard_sidesteps(points, 2)
+
     points, heads = tee(points, 2)
     dest = head = dend = None
 
