@@ -318,8 +318,8 @@ def timedelta_str(td):
 
 def trace_regular_destinations(
         points, threshold_distance, threshold_interval, maxpts):
-    """Get at most maxpts of regular destinations in points trace. Distance and
-    interval thresholds passed on to trace_destinations."""
+    """Get _at most maxpts (not implemented)_ of regular destinations in points
+    trace. Distance and interval thresholds passed on to trace_destinations."""
 
     dests = [
         {   "coordinates": tuple(
@@ -355,7 +355,6 @@ def trace_regular_destinations(
     while heap:
         item = heappop(heap)
         distance, d1, d0 = item
-        print distance
         if distance is None or distance >= threshold_distance * 2:
             heappush(heap, item) # unspill the milk
             break
@@ -402,14 +401,12 @@ def trace_regular_destinations(
 #        bbsz = "%3s\xc3\x97%s" % tuple(int(x) for x in bounds_size(g["bounds"]))
 #        print "%s %s %s %.3f/%.3f %8s %s" % (
         r += 1
-        g["rank"] = r
-        print "{} {} {} {:.3f}/{:.3f} {:.3f}".format(
+        print "{} {} {} {:.3f}/{:.3f}".format(
             timedelta_str(g["total_stay"]),
             enhm,
             exhm,
-            g["avg_coords"][1],
-            g["avg_coords"][0],
-            get_distance_between_coordinates(g["avg_coords"], g["coordinates"]))
+            g["coordinates"][1],
+            g["coordinates"][0])
 
     for r, g in enumerate(sorted(groups, key=lambda x: x["total_stay"], reverse=True)):
         g["duration_rank"] = r + 1
