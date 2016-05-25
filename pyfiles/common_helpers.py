@@ -296,6 +296,39 @@ def trace_linestrings(points, keys=(), feature_properties=()):
             "properties": streak["properties"]}
 
 
+def datetime_range_str(dt0, dt1, resolution=2, formats=(
+        "%Y-%m-%d", " ", "%H:%M", ":", "%S.%u")):
+    """Format datetime range start and end according to formats without repeated
+    parts in the end string. %u stands for the microsecond part. Every other
+    format is considered a separator. The number of formats included is minimum
+    resolution and at least one divergent, all if resolution -1."""
+
+    s0 = []
+    s1 = []
+    diverged = False
+    issep = True
+    sep = ""
+    for f in formats:
+        issep = not issep
+        if issep:
+            sep = f
+            continue
+        if not resolution and diverged:
+            break
+        resolution -= 1
+        f0, f1 = [f.replace("%u", str(dt.microsecond)) for dt in (dt0, dt1)]
+        p0 = dt0.strftime(f0)
+        p1 = dt1.strftime(f1)
+        if p0 != p1:
+            diverged = True
+        if not diverged:
+            s0 += [sep, p0]
+            continue
+        s0 += [sep, p0]
+        s1 += [sep, p1]
+    return "".join(s0[1:]), "".join(s1[1:])
+
+
 def timedelta_str(td):
     """Format timedelta (or seconds) using its two most signifigant units."""
     rv = []

@@ -7,11 +7,13 @@ from oauth2client.client import *
 from sqlalchemy.sql import and_, func, select, text
 
 from pyfiles.common_helpers import (
+    datetime_range_str,
     simplify_geometry,
     timedelta_str,
     trace_destinations,
     trace_linestrings,
     trace_regular_destinations)
+
 from pyfiles.constants import DEST_DURATION_MIN, DEST_RADIUS_MAX
 from pyfiles.database_interface import init_db, db_engine_execute, data_points_snapping
 from pyfiles.prediction.run_prediction import predict
@@ -317,6 +319,17 @@ def visualize_device_geojson(device_id):
 
     for d in trace_regular_destinations(
             longwin, DEST_RADIUS_MAX, DEST_DURATION_MIN):
+        title = "{} visits (rank {}), {} total (rank {})".format(
+                    len(d["visits"]),
+                    d["visits_rank"],
+                    timedelta_str(d["total_time"]),
+                    d["total_time_rank"])
+        visits = sorted(d["visits"], key=lambda x: x[0]["time"])
+        vislist = [
+            " - ".join(datetime_range_str(v[0]["time"], v[-1]["time"]))
+            for v in visits[-10:]] # XXX arbitrary
+        title += "\n" + "\n".join(vislist)
+
         features.append({
             'type': 'Feature',
             'geometry': {
@@ -325,11 +338,7 @@ def visualize_device_geojson(device_id):
             'properties': {
                 'visits': len(d["visits"]),
                 'type': 'regular-destination',
-                'title': "{} visits (rank {}), {} total (rank {})".format(
-                    len(d["visits"]),
-                    d["visits_rank"],
-                    timedelta_str(d["total_time"]),
-                    d["total_time_rank"])}})
+                'title': title}})
 
     geojson = {
         'type': 'FeatureCollection',
