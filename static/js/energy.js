@@ -8,6 +8,10 @@ $(document).ready(function() {
 	hiddenName: true,
 	onClose: function() {
 	    update(this.get('select', 'yyyy-mm-dd'));
+
+	    // don't pop up calendar when document refocused
+	    // https://github.com/amsul/pickadate.js/issues/160
+	    date.blur();
 	}
     });
     date.pickadate('picker').open();
