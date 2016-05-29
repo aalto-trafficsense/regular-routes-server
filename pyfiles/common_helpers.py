@@ -399,7 +399,7 @@ def trace_regular_destinations(
         distance, d1, d0 = item = heappop(heap)
 
         # if shortest edge is long enough, unpop and stop
-        if distance is None or distance >= threshold_distance * 2:
+        if distance is None or distance >= threshold_distance:
             heappush(heap, item) # unspill the milk
             break
 
