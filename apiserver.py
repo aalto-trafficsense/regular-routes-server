@@ -314,7 +314,10 @@ def path(session_token):
             device_data.c.time <= end),
         device_data.join(devices),
         order_by=device_data.c.time)
-    points += db.engine.execute(query)
+
+    # don't mix filtered and unfiltered data if getting path for specific date
+    if not points or not date:
+        points += db.engine.execute(query)
 
     # simplify the path geometry by dropping redundant points
     points = simplify(points, maxpts=maxpts, mindist=mindist)
