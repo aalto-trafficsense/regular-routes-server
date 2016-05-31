@@ -37,6 +37,10 @@ class Equirectangular:
         return lon, lat
 
 
+def point_interval(p0, p1):
+    return (p1["time"] - p0["time"]).total_seconds()
+
+
 def simplify(points, maxpts=None, mindist=None, interpolate=False):
     """Simplify location trace by removing geometrically redundant points.
 
@@ -175,6 +179,8 @@ def trace_linestrings(points, keys=(), feature_properties=()):
         streaks[i]["points"].insert(0, streaks[i-1]["points"][-1])
 
     for streak in streaks:
+        if len(streak["points"]) < 2:
+            continue # one point does not make a line
         streak["properties"].update(feature_properties)
         yield {
             "type": "Feature",
@@ -184,3 +190,17 @@ def trace_linestrings(points, keys=(), feature_properties=()):
                     json.loads(x["geojson"])["coordinates"]
                     for x in streak["points"]]},
             "properties": streak["properties"]}
+
+
+def trace_split_sparse(points, interval):
+    """"Split location trace where interval between points exceeds given
+    threshold interval."""
+
+    segment = []
+    for p in points:
+        if segment and point_interval(segment[-1], p) > interval:
+            yield segment
+            segment = []
+        segment.append(p)
+    if segment:
+        yield segment

@@ -7,8 +7,9 @@ from oauth2client.client import *
 from sqlalchemy.sql import and_, func, literal, select, text
 import json
 
-from pyfiles.common_helpers import simplify, trace_linestrings
-
+from pyfiles.common_helpers import (
+    simplify, trace_linestrings, trace_split_sparse)
+from pyfiles.constants import MAX_POINT_TIME_DIFFERENCE
 from pyfiles.database_interface import init_db, db_engine_execute, users_table_insert, users_table_update, devices_table_insert, device_data_table_insert
 from pyfiles.database_interface import verify_user_id, update_last_activity, get_users_table_id_for_device, get_device_table_id
 from pyfiles.database_interface import get_device_table_id_for_session, get_users_table_id, get_session_token_for_device, get_user_id_from_device_id
@@ -319,22 +320,24 @@ def path(session_token):
     if not points or not date:
         points += db.engine.execute(query)
 
-    # simplify the path geometry by dropping redundant points
-    points = simplify(points, maxpts=maxpts, mindist=mindist)
+    # don't draw lines over too long intervals, separate trip on either side
+    segments = trace_split_sparse(points, MAX_POINT_TIME_DIFFERENCE)
 
-    # merge line_type into activity
-    points = [dict(p) for p in points] # rowproxies are not so mutable
-    for p in points:
-        if p.get("line_type"):
-            p["activity"] = p["line_type"]
-        del p["line_type"]
+    features = []
+    for points in segments:
+        # simplify the path geometry by dropping redundant points
+        points = simplify(points, maxpts=maxpts, mindist=mindist)
 
-    geojson = {
-        'type': 'FeatureCollection',
-        'features': list(trace_linestrings(points, ('activity', 'line_name')))
-    }
+        # merge line_type into activity
+        points = [dict(p) for p in points] # rowproxies are not so mutable
+        for p in points:
+            if p.get("line_type"):
+                p["activity"] = p["line_type"]
+                del p["line_type"]
 
-    return jsonify(geojson)
+        features += trace_linestrings(points, ('activity', 'line_name'))
+
+    return jsonify({'type': 'FeatureCollection', 'features': features})
 
 
 @app.route('/svg/<session_token>')
