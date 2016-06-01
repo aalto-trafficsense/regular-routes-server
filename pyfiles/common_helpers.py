@@ -37,11 +37,25 @@ class Equirectangular:
         return lon, lat
 
 
+def point_coordinates(p):
+    return json.loads(p["geojson"])["coordinates"]
+
+
+def point_distance(p0, p1):
+    return get_distance_between_coordinates(
+        point_coordinates(p0), point_coordinates(p1))
+
+
 def point_interval(p0, p1):
     return (p1["time"] - p0["time"]).total_seconds()
 
 
-def simplify_geometry(points, maxpts=None, mindist=None, interpolate=False):
+def simplify_geometry(
+        points,
+        maxpts=None,
+        mindist=None,
+        interpolate=False,
+        keep_activity=False):
     """Simplify location trace by removing geometrically redundant points.
 
     points -- [{
@@ -50,6 +64,7 @@ def simplify_geometry(points, maxpts=None, mindist=None, interpolate=False):
     maxpts -- simplify until given number of points remain
     mindist -- omit points contributing no greater than given offset
     interpolate -- use distance from interpolated point, else from line
+    keep_activity -- keep last moved>mindist point of each continuous activity
     """
 
     # avoid building heap if input already conformant
@@ -97,8 +112,18 @@ def simplify_geometry(points, maxpts=None, mindist=None, interpolate=False):
         fraction = point_interval(p0, p1) / point_interval(p0, p2)
         return distance_point_lineseg(m1, (m0, m2), fraction)
 
-    f = interpolate and timedist or linedist
-    return simplify(points, f, maxpts, mindist)
+    dist = interpolate and timedist or linedist
+
+    def keeping_activity(p0, p1, p2):
+        """Sortable (bool, dist) metric"""
+        changes = p1["activity"] != p2["activity"]
+        moved = point_distance(p0, p1) > mindist
+        return (changes and moved, dist(p0, p1, p2))
+
+    metric = keep_activity and keeping_activity or dist
+    minmetric = keep_activity and (False, mindist) or mindist
+
+    return simplify(points, metric, maxpts, minmetric)
 
 
 def simplify(points, metric, maxpts=None, minmetric=None):
@@ -192,8 +217,7 @@ def trace_linestrings(points, keys=(), feature_properties=()):
             "geometry": {
                 "type": "LineString",
                 "coordinates": [
-                    json.loads(x["geojson"])["coordinates"]
-                    for x in streak["points"]]},
+                    point_coordinates(x) for x in streak["points"]]},
             "properties": streak["properties"]}
 
 

@@ -326,7 +326,8 @@ def path(session_token):
     features = []
     for points in segments:
         # simplify the path geometry by dropping redundant points
-        points = simplify_geometry(points, maxpts=maxpts, mindist=mindist)
+        points = simplify_geometry(
+            points, maxpts=maxpts, mindist=mindist, keep_activity=True)
 
         # merge line_type into activity
         points = [dict(p) for p in points] # rowproxies are not so mutable

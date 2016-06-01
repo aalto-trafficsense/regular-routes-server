@@ -258,11 +258,10 @@ def visualize_device_geojson(device_id):
                 }
             })
 
-    simplified = [
-        dict(x) for x in simplify_geometry(
-            points, maxpts=maxpts, mindist=mindist)]
-    for p in simplified:
-        p['activity'] = p['activity_1']
+    points = [dict(
+        p.items() + [("activity", p["activity_1"])]) for p in points]
+    simplified = simplify_geometry(
+            points, maxpts=maxpts, mindist=mindist, keep_activity=True)
     features += trace_linestrings(
         simplified, ('activity',), {'type': 'trace-line'})
 
