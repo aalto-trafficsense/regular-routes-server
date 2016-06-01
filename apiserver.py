@@ -303,21 +303,20 @@ def path(session_token):
     if points:
         start = points[-1]["time"]
 
-    # fall back on unfiltered for the missing part
-    query = select(
-        [   func.ST_AsGeoJSON(device_data.c.coordinate).label("geojson"),
-            device_data.c.activity_1.label("activity"),
-            literal(None).label("line_type"),
-            literal(None).label("line_name")],
-        and_(
-            devices.c.token == session_token,
-            device_data.c.time > start,
-            device_data.c.time <= end),
-        device_data.join(devices),
-        order_by=device_data.c.time)
-
-    # don't mix filtered and unfiltered data if getting path for specific date
+    # fall back on unfiltered for the missing part, don't mix if specific date
     if not points or not date:
+        query = select(
+            [   func.ST_AsGeoJSON(device_data.c.coordinate).label("geojson"),
+                device_data.c.activity_1.label("activity"),
+                literal(None).label("line_type"),
+                literal(None).label("line_name"),
+                device_data.c.time],
+            and_(
+                devices.c.token == session_token,
+                device_data.c.time > start,
+                device_data.c.time <= end),
+            device_data.join(devices),
+            order_by=device_data.c.time)
         points += db.engine.execute(query)
 
     # don't draw lines over too long intervals, separate trip on either side
