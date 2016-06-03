@@ -18,3 +18,4 @@ Werkzeug==0.8.3
 itsdangerous==0.17
 python-gflags==2.0
 wsgiref==0.1.2
+requests

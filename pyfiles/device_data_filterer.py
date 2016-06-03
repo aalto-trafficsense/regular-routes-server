@@ -337,7 +337,7 @@ class DeviceDataFilterer:
         # mehrdad: files ...........
         self.file_triplegs.close()    
         
-        updated_fraction = int(round( (float(self.user_invehicle_triplegs_updated)/self.user_invehicle_triplegs) * 100))
+        updated_fraction = self.user_invehicle_triplegs and int(round( (float(self.user_invehicle_triplegs_updated)/self.user_invehicle_triplegs) * 100))
         
         filename = "user_{0}_stats_invehicle.csv".format(user_id)        
         self.file_finalstats = open(filename, 'a')

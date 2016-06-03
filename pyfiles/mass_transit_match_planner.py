@@ -95,7 +95,7 @@ def match_tripleg_with_publictransport(fromPlace, toPlace, trip_starttime, trip_
     
     # query journey planner ----------:
     print "Query to journey planner:"
-    apiurl = 'http://beta.digitransit.fi/otp/routers/hsl/plan'
+    apiurl = 'http://api.digitransit.fi/routing/v1/routers/hsl/plan'
     querystr = "fromPlace={0}&toPlace={1}&date={2}&time={3}&numItineraries={4}&maxWalkDistance={5}"\
 			    .format(fromPlace, toPlace, datetime.date(trip_starttime_earlier), datetime.time(trip_starttime_earlier), numItineraries, maxWalkDistance, maxTransfers);
     #querystr = "fromPlace=60.170718,24.930221&toPlace=60.250214,25.009566&date=2016/04/26&time=17:16:03&numItineraries=4&maxWalkDistance=500" # ******
@@ -244,10 +244,12 @@ def main_function(): # note: function to be called if want to run this file inde
 
     fromPlace="60.170718,24.930221"
     toPlace="60.250214,25.009566"
-    i_starttime = datetime.strptime('2016/04/26 17:20:03', '%Y/%m/%d %H:%M:%S')
-    i_endtime = datetime.strptime('2016/04/26 17:54:01', '%Y/%m/%d %H:%M:%S')
+    i_starttime = datetime.strptime('2016/05/26 17:20:03', '%Y/%m/%d %H:%M:%S')
+    i_endtime = datetime.strptime('2016/05/26 17:54:01', '%Y/%m/%d %H:%M:%S')
 
 
     match_tripleg_with_publictransport(fromPlace, toPlace, i_starttime, i_endtime)
 
 
+if __name__ == "__main__":
+    main_function()
