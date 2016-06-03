@@ -1,10 +1,11 @@
 import json
+import unicodedata
 
 from pyfiles.constants import *
 from pyfiles.common_helpers import *
 from database_interface import get_mass_transit_points
 from pyfiles.database_interface import init_db, device_data_filtered_table_insert
-
+from pyfiles.mass_transit_match_planner import *
 
 class DeviceDataFilterer:
 
@@ -15,16 +16,101 @@ class DeviceDataFilterer:
         self.previous_activity_1_conf = 0
         self.previous_activity_2_conf = 0
         self.previous_activity_3_conf = 0
+        self.user_invehicle_triplegs = 0 # mehrdad: count in_vehicle trip-legs detected for each user
+        self.user_invehicle_triplegs_updated = 0
+        self.file_triplegs = None
+        self.file_finalstats = None
 
+	# mehrdad: note: works on one trip-leg with specific activity of specific userid (trip-legs found by analyze_unfiltered_data())
     def _flush_device_data_queue(self, device_data_queue, activity, user_id):
         if len(device_data_queue) == 0:
             return
         filtered_device_data = []
 
+		# mehrdad: note: trip-leg matching code shoud go somewhere here: 
+		# check 1:
         line_type, line_name = self._match_mass_transit_line(activity, device_data_queue)
 
+           
+	    # mehrdad: temp and more: 	    
+        # check 2: recheck detected , for this trip-leg
+        HSL_ERROR_CODE_DATE_TOO_FAR = 406
+            
+        if activity == "IN_VEHICLE":    # TODO : only for IN_VEHICLE activity? ... but maybe a bus or tram ride is sometimnes misdetected as CYCLING or WALK?
+            self.user_invehicle_triplegs += 1
+            trip_leg_points = len(device_data_queue)                                  
+            print ""
+            line_name_str = "None"
+            if line_name: line_name_str = line_name.encode('utf-8')
+            print "----- TRIP-LEG (in_vehicle) #", self.user_invehicle_triplegs ,"(from first filter detection): ", user_id, activity, line_type, line_name_str
+            print "trip-leg starts. ends: ", device_data_queue[0]['time'], " --> ", device_data_queue[trip_leg_points-1]['time'] \
+                    , "(poitns in this trip leg:", trip_leg_points, ")"
+            
+            # detect starting point and end point of the trip-leg":
+            start_row = device_data_queue[0]
+            end_row = device_data_queue[trip_leg_points-1]
+
+            # do the rest ...:
+            start_location = json.loads(start_row["geojson"])["coordinates"]
+            end_location = json.loads(end_row["geojson"])["coordinates"]
+            start_time  = start_row['time']
+            end_time  = end_row['time']
+            distance = get_distance_between_coordinates(start_location, end_location)
+            duration = end_time - start_time
+            avgspeed = distance/duration.total_seconds()
+            print "distance:", distance, "meters,   ", "duration:", duration, ",   ", "avgspeed:",avgspeed, "m/s"
+            
+            # mehrdad: trip-leg matching logic *:
+
+            tripleg_updated = 0
+            start_location_str='{1},{0}'.format(start_location[0],start_location[1])
+            end_location_str='{1},{0}'.format(end_location[0],end_location[1])
+            
+            # if we already got the linename and linetype hsl live, that's more accurate --> we skip the following trip-leg-matching code
+            # less than 200 meter, not a big impact! --> ignore            
+            if (line_type==None or (line_name=='' or line_name==None)) and distance > 200:
+                # try to match this trip-leg with a public transport ride (using hsl query)
+                # print "we're sending this to match function:", start_location_str, end_location_str, start_time, end_time
+                res, matchcount, res_linetype, res_linename = match_tripleg_with_publictransport(start_location_str, end_location_str, start_time, end_time)
+                
+                if res == HSL_ERROR_CODE_DATE_TOO_FAR: # second try (adjust the old weekday to current week)
+                    print ""
+                    print "failed because: HSL_ERROR_CODE_DATE_TOO_FAR !, trying second time with current week..."
+                    starttime_thisweek = find_same_journey_time_this_week(start_time)
+                    endtime_thisweek = find_same_journey_time_this_week(end_time)
+                    res, matchcount, res_linetype, res_linename = match_tripleg_with_publictransport(start_location_str, end_location_str, starttime_thisweek, endtime_thisweek)
+                                
+                if res == 1 and matchcount > 0: # if managed to match the trip-leg with one public transport ride using HSL query
+                    # update the previously 'misdetected' trip
+                    if res_linetype=="RAIL": # our database knows "TRAIN" (defined in 
+                        res_linetype="TRAIN"
+                    line_type = res_linetype
+                    line_name = res_linename
+                    self.user_invehicle_triplegs_updated += 1
+                    tripleg_updated = 1
+                    if line_name: line_name_str = line_name.encode('utf-8')                    
+                    print "> TRIP-LEG UPDATED (from second filter detection): ", user_id, activity, line_type, line_name_str
+        
+            # save the trip-leg records in file *:
+            # file columns: 
+            #   userid, triplegno, startcoo, endcoo, starttime, endtime, mode, linetype, linename, distance, duration, avgspeed, updated        
+            triplegfileline = "{0};{1};{2};{3};{4};{5};{6};{7};{8};{9};{10};{11};{12}".format(\
+                                user_id, self.user_invehicle_triplegs, start_location_str, end_location_str, start_time, end_time,\
+                                activity, line_type, line_name_str, distance, duration, avgspeed, tripleg_updated)
+            self.file_triplegs.write(triplegfileline+"\n")
+
+            # other filters: 
+
+            # the average human walking speed is about 5.0 kilometres per hour (km/h) >> let's consider a bit higher: 7.5 km/h --> ~2.08 m/s
+            if (line_type==None or (line_name=='' or line_name==None)) and avgspeed < 2.08:
+                print "trip's avg. speed:", avgspeed, "m/s", ": too slow! probably NOT IN_VEHICLE!"
+
+        # if activity != "IN_VEHICLE":  # also filter non-motorized detections? maybe some are wrong?!!!            
+
+        # append all points of this trip-leg ***
         for device_data_row in device_data_queue:
             current_location = json.loads(device_data_row["geojson"])["coordinates"]
+            # append this point of the trip-leg:
             filtered_device_data.append({"activity" : activity,
                                          "user_id" : user_id,
                                          'coordinate': 'POINT(%f %f)' % (float(current_location[0]), float(current_location[1])),
@@ -33,7 +119,13 @@ class DeviceDataFilterer:
                                          "line_type": line_type,
                                          "line_name": line_name})
 
+        # save it all! (includes all detected trip-legs)
         device_data_filtered_table_insert(filtered_device_data)
+
+        if len(device_data_queue) != len(filtered_device_data):
+            print "WHYYYYYYYYYYYY!?"
+
+     
 
     def _match_mass_transit_line(self, activity, device_data_queue):
         if activity != "IN_VEHICLE":
@@ -160,7 +252,16 @@ class DeviceDataFilterer:
         return False
 
 
+	# entry point for filtering device_data records for a specific userid: 
     def analyse_unfiltered_data(self, device_data_rows, user_id):
+        
+         # mehrdad ... :
+        self.user_invehicle_triplegs = 0
+        self.user_invehicle_triplegs_updated = 0
+        filename = "user_{0}_triplegs_invehicle.csv".format(user_id)
+        self.file_triplegs = open(filename, 'a')
+        self.file_triplegs.write("userid;triplegno;startCoo;endCoo;starttime;endtime;mode;linetype;linename;distance;duration;avgspeed;updated"+"\n")
+        
         rows = device_data_rows.fetchall()
         if len(rows) == 0:
             return
@@ -232,3 +333,22 @@ class DeviceDataFilterer:
 
         if chosen_activity != "NOT_SET":
             self._flush_device_data_queue(device_data_queue, chosen_activity, user_id)
+
+        # mehrdad: files ...........
+        self.file_triplegs.close()    
+        
+        updated_fraction = int(round( (float(self.user_invehicle_triplegs_updated)/self.user_invehicle_triplegs) * 100))
+        
+        filename = "user_{0}_stats_invehicle.csv".format(user_id)        
+        self.file_finalstats = open(filename, 'a')
+        self.file_finalstats.write("user_id;triplegs;triplegs_updated;updated_fraction" + "\n")
+        fileline = "{0};{1};{2};{3}".format(user_id, self.user_invehicle_triplegs, self.user_invehicle_triplegs_updated, updated_fraction)
+        self.file_finalstats.write(fileline + "\n")
+        self.file_finalstats.close()
+        print ""
+        print "--------- STATS FOR user", user_id, "---------"         
+        print "total trip-legs (in_vehicle) for this user:", self.user_invehicle_triplegs
+        print "updated trip-legs (in_vehicle) to public transport:", self.user_invehicle_triplegs_updated
+        print "ratio:", updated_fraction, "%"
+        print ""
+        
