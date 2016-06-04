@@ -27,18 +27,24 @@ class DeviceDataFilterer:
     def _flush_device_data_queue(self, device_data_queue, activity, user_id):
         if len(device_data_queue) == 0:
             return
-        filtered_device_data = []
 
-		# mehrdad: note: trip-leg matching code shoud go somewhere here: 
-		# check 1:
-        line_type, line_name = self._match_mass_transit_line(activity, device_data_queue)
+        line_type, line_name = self._match_mass_transit_live(
+            activity, device_data_queue)
 
-           
-	    # mehrdad: temp and more: 	    
-        # check 2: recheck detected , for this trip-leg
+        line_type, line_name = self._match_mass_transit_planner(
+            activity, device_data_queue, user_id, line_type, line_name)
+
+        self._write_filtered_data(
+            device_data_queue, activity, user_id, line_type, line_name)
+
+
+    def _match_mass_transit_planner(
+            self, activity, device_data_queue, user_id, line_type, line_name):
+
         HSL_ERROR_CODE_DATE_TOO_FAR = 406
             
         if activity == "IN_VEHICLE":    # TODO : only for IN_VEHICLE activity? ... but maybe a bus or tram ride is sometimnes misdetected as CYCLING or WALK?
+
             self.user_invehicle_triplegs += 1
             trip_leg_points = len(device_data_queue)                                  
             print ""
@@ -108,12 +114,16 @@ class DeviceDataFilterer:
             if (line_type==None or (line_name=='' or line_name==None)) and avgspeed < 2.08:
                 print "trip's avg. speed:", avgspeed, "m/s", ": too slow! probably NOT IN_VEHICLE!"
 
-        # if activity != "IN_VEHICLE":  # also filter non-motorized detections? maybe some are wrong?!!!            
+        return line_type, line_name
 
-        # append all points of this trip-leg ***
+
+    def _write_filtered_data(
+            self, device_data_queue, activity, user_id, line_type, line_name):
+
+        filtered_device_data = []
+
         for device_data_row in device_data_queue:
             current_location = json.loads(device_data_row["geojson"])["coordinates"]
-            # append this point of the trip-leg:
             filtered_device_data.append({"activity" : activity,
                                          "user_id" : user_id,
                                          'coordinate': 'POINT(%f %f)' % (float(current_location[0]), float(current_location[1])),
@@ -122,15 +132,10 @@ class DeviceDataFilterer:
                                          "line_type": line_type,
                                          "line_name": line_name})
 
-        # save it all! (includes all detected trip-legs)
         device_data_filtered_table_insert(filtered_device_data)
 
-        if len(device_data_queue) != len(filtered_device_data):
-            print "WHYYYYYYYYYYYY!?"
 
-     
-
-    def _match_mass_transit_line(self, activity, device_data_queue):
+    def _match_mass_transit_live(self, activity, device_data_queue):
         if activity != "IN_VEHICLE":
             return None, None
 
