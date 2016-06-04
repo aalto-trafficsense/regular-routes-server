@@ -7,6 +7,8 @@ from database_interface import get_mass_transit_points
 from pyfiles.database_interface import init_db, device_data_filtered_table_insert
 from pyfiles.mass_transit_match_planner import *
 
+DUMP_CSV_FILES = False
+
 class DeviceDataFilterer:
 
     def __init__(self):
@@ -97,7 +99,8 @@ class DeviceDataFilterer:
             triplegfileline = "{0};{1};{2};{3};{4};{5};{6};{7};{8};{9};{10};{11};{12}".format(\
                                 user_id, self.user_invehicle_triplegs, start_location_str, end_location_str, start_time, end_time,\
                                 activity, line_type, line_name_str, distance, duration, avgspeed, tripleg_updated)
-            self.file_triplegs.write(triplegfileline+"\n")
+            if DUMP_CSV_FILES:
+                self.file_triplegs.write(triplegfileline+"\n")
 
             # other filters: 
 
@@ -252,16 +255,18 @@ class DeviceDataFilterer:
         return False
 
 
-	# entry point for filtering device_data records for a specific userid: 
-    def analyse_unfiltered_data(self, device_data_rows, user_id):
-        
-         # mehrdad ... :
+    def _dump_csv_file_open(self, user_id):
         self.user_invehicle_triplegs = 0
         self.user_invehicle_triplegs_updated = 0
         filename = "user_{0}_triplegs_invehicle.csv".format(user_id)
         self.file_triplegs = open(filename, 'a')
         self.file_triplegs.write("userid;triplegno;startCoo;endCoo;starttime;endtime;mode;linetype;linename;distance;duration;avgspeed;updated"+"\n")
-        
+
+
+    def analyse_unfiltered_data(self, device_data_rows, user_id):
+        if DUMP_CSV_FILES:
+            self._dump_csv_file_open(user_id)
+
         rows = device_data_rows.fetchall()
         if len(rows) == 0:
             return
@@ -334,7 +339,11 @@ class DeviceDataFilterer:
         if chosen_activity != "NOT_SET":
             self._flush_device_data_queue(device_data_queue, chosen_activity, user_id)
 
-        # mehrdad: files ...........
+        if DUMP_CSV_FILES:
+            self._dump_csv_file_close(user_id)
+
+
+    def _dump_csv_file_close(self, user_id):
         self.file_triplegs.close()    
         
         updated_fraction = self.user_invehicle_triplegs and int(round( (float(self.user_invehicle_triplegs_updated)/self.user_invehicle_triplegs) * 100))
