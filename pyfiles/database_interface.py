@@ -354,7 +354,8 @@ def data_points_filtered(user_id, datetime_start, datetime_end):
             ST_AsGeoJSON(coordinate) AS geojson,
             time,
             activity,
-            line_type
+            line_type,
+            line_name
         FROM device_data_filtered
         WHERE user_id = :user_id
         AND time >= :time_start
