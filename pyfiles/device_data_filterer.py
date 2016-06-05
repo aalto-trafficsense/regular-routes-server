@@ -1,11 +1,16 @@
 import json
-import unicodedata
 
-from pyfiles.constants import *
-from pyfiles.common_helpers import *
-from database_interface import get_mass_transit_points
-from pyfiles.database_interface import init_db, device_data_filtered_table_insert
-from pyfiles.mass_transit_match_planner import *
+from pyfiles.common_helpers import get_distance_between_coordinates
+from pyfiles.constants import (
+    CONSECUTIVE_DIFFERENCE_LIMIT,
+    MAXIMUM_MASS_TRANSIT_MISSES,
+    MAX_DIFFERENT_DEVICE_TIME_DIFFERENCE,
+    MAX_POINT_TIME_DIFFERENCE,
+    NUMBER_OF_MASS_TRANSIT_MATCH_SAMPLES)
+from pyfiles.database_interface import (
+    device_data_filtered_table_insert, get_mass_transit_points)
+from pyfiles.mass_transit_match_planner import (
+    find_same_journey_time_this_week, match_tripleg_with_publictransport)
 
 DUMP_CSV_FILES = False
 
