@@ -65,10 +65,27 @@ def find_same_journey_time_this_week(starttime):
     print "same_journey_time_this_week :: ", time_thisweek
     return time_thisweek
 
+class TripMatchedWithPlanner:
+    matchcount = 0
+    linetype = None
+    linename = None       
+    start = None
+    end = None
+    legstart = None
+    legend = None 
+    deltaT = None
+    deltaTsign = None
+ 
+
+minSpeeds = {"walk":1.34112, "bus": 3.0, "tram":2.5, "train":5.0, "ferry":5.0} # walk speed default: 3 MPH (1.34112 m/s) (~ 5.0 km/h)
+
+
 def match_tripleg_with_publictransport(fromPlace, toPlace, trip_starttime, trip_endtime):
     print "Input Trip ...:"
     print "trip_starttime:", trip_starttime
     print "trip_endtime:", trip_endtime
+
+    tripmatchres = TripMatchedWithPlanner()
 
     trip_starttime = trip_starttime.replace(microsecond = 0)
     trip_endtime = trip_endtime.replace(microsecond = 0)
@@ -84,9 +101,11 @@ def match_tripleg_with_publictransport(fromPlace, toPlace, trip_starttime, trip_
     maxTransfers = 2  # seems like this param didn't have any effect!
     # TODO: is there a param 'max waiting time' too?
 
-    minSpeeds = {"walk":1.34112, "bus": 3.0, "tram":2.5, "train":5.0, "ferry":5.0} # walk sped default: 3 MPH (1.34112 ms/)
     maxIntervals = {"bus":60, "tram":30, "train":60, "ferry":60} # max arrival interval of each public transport mode during working hours (minutes)
-    maxDError = MAX_MODE_DETECTION_DELAY * 2    # e.g: one deltaD at each end of the trip
+    maxSlowness = {"bus":3, "tram":3, "train":3, "ferry":5} # maximum slowness (a bit different concept than 'being late') of public transport (minutes)
+                                                            # we should note that being "slower"/"faster" is different than bus arrival being "late"/"early"
+                                                            # TODO! depends also on the city! in Helsinki it's sharp! :) ... in Rome, maybe not
+    maxDError = MAX_MODE_DETECTION_DELAY * 2 # maximum Distance error (e.g: one deltaD at each end of the trip)
 
     legstart_shift = 0  # default: 4 (*) or CALC: e.g: MAX_MODE_DETECTION_DELAY/minSpeeds['bus']
     trip_starttime_earlier = trip_starttime - timedelta(minutes = legstart_shift)
@@ -110,24 +129,28 @@ def match_tripleg_with_publictransport(fromPlace, toPlace, trip_starttime, trip_
         # print "json_data error section:\n", json_data['error']
         
         if 'error' in json_data:
-            return json_data['error']['id'], 0, None, None
+            return json_data['error']['id'], tripmatchres
         else:
-            return 0, 0, None, None
+            return 0, tripmatchres
 
     print "\nWorking on the routes suggested by HSL ...:"
-    i = 0
+    itin_index = 0
     matchcount = 0
-    linetype = None
-    linename = None
     linetypes = []
     linenames = []
+    planned_start = []
+    planned_end = []
+    planned_legstart = []
+    planned_legend = []
+    planned_deltaT = []
+    planned_deltaTsign = []
     
     # go through all routes suggested ------ : 
     for itin in json_data['plan']['itineraries']: 
         duration = HSLDurationToNormalDuration(itin['duration'])        # duration of planned trip
         srtarttime = HSLTimeStampToNormalDateTime(itin['startTime'])    # start time of planned trip
         endtime = HSLTimeStampToNormalDateTime(itin['endTime'])         # ...
-        print "\n#", i+1, ": This journey planner trip's duration, start & ends time: ", \
+        print "\n#", itin_index+1, ": This journey planner trip's duration, start & ends time: ", \
                 duration,"(",srtarttime , "-->", endtime,")\t"#, itin['duration'], " seconds", "(",itin['startTime'], itin['endTime'],")" 
 
         # prepare the adjuster params TODO (instead of 'bus', it could be 'train', 'tram' ... depending on planned results) *
@@ -135,10 +158,17 @@ def match_tripleg_with_publictransport(fromPlace, toPlace, trip_starttime, trip_
         maxdeltaB = timedelta(seconds = round(maxDError/minSpeeds['bus']))    # max acceptable diff, result of bus traveling 1 stop less or more
         maxdeltaT = maxdeltaW + maxdeltaB
         maxI = timedelta(minutes = maxIntervals['bus']) # in minutes
+        maxdeltaSlowness = timedelta(minutes = maxSlowness['bus'])    
+        # maxdeltaSlowness = timedelta(minutes = 0) # TODO !!!! temp. , remove this 
         print "maxdeltaW, maxdeltaB, maxdeltaT, maxI: ", maxdeltaW, maxdeltaB, maxdeltaT, maxI
 
-        deltaT = abs(duration - trip_duration)        
+        deltaT = abs(duration - trip_duration)
+        deltaTsign = ""
+        if duration < trip_duration:
+            deltaTsign = "shorter"
 
+        legmatched = False        
+        legsreviewed = False # TODO: mostly for debugging
         # COND: pattern of planned trip-legs, 
         #   for example usually the idea is: 'WALK', <ride>, 'WALK'
         #   there should not be more than 1 'ride' (mass_transit invehicle) trip-leg
@@ -149,13 +179,14 @@ def match_tripleg_with_publictransport(fromPlace, toPlace, trip_starttime, trip_
         if transitlegs_count != 1:
             print "number of planned transit legs:", transitlegs_count, " (should be 1) => ignoring this journey planner trip (!)"                         
         # COND: compare original trip's total duration WITH planned trip total duration
-        elif duration < trip_duration:        
-            print "original trip_duration:",trip_duration, "planned trip duration:", duration, "duration < trip_duration", \
-                    "=> how come planned trip is shorter than original trip ??!! => ignoring this journey planner trip (!)"
+        elif duration < trip_duration and deltaT > maxdeltaSlowness: #TODO: ideally, maxdeltaSlowness should depend on current mode of transport        
+            print "original trip_duration:",trip_duration, "planned trip duration:", duration, "duration < trip_duration", " (deltaT:- ", deltaT,")", \
+                    "=> how come planned trip is shorter than original trip ??!! => ignoring this journey planner trip (!)" # one reason could be: maybe the bus or tram ran faster this time!
         elif deltaT > maxdeltaT:
             print "original trip_duration:",trip_duration, "planned trip duration:", duration, "(deltaT:",deltaT,"maxdeltaT:",maxdeltaT,")", \
                     "=> too much difference! ignoring this journey planner trip (!)"
-        else:
+        else: # now look at legs of this itin to maybe find a match *
+            legsreviewed = True
             print "Legs: "
             for leg in itin['legs']:
                 mode = leg['mode']
@@ -170,7 +201,7 @@ def match_tripleg_with_publictransport(fromPlace, toPlace, trip_starttime, trip_
                 if istransit: 
                     istransitstr = " ***"
 
-                # matching logic * (TODO >> also refer to paper notes) :
+                # matching logic * (TODO >> also refer to paper notes, math equations, kinematics, assumptions, etc.) :
                 #   unavoidable delay in detections: our recorded point might be in between two bus stops (after the original origin bus stop and before 2nd or 3rd bus stop)
                 #   --> assume: person started the trip 1-2 minutes earlier
                 #               person started the trip ~500 meters before               
@@ -192,30 +223,65 @@ def match_tripleg_with_publictransport(fromPlace, toPlace, trip_starttime, trip_
                             # TODO: but here saving all matches in a list
                             linetypes.append(mode)
                             linenames.append(line)
-                            
-                            matchcount += 1
+                            planned_legstart.append(legsrtarttime)
+                            planned_legend.append(legendtime)
+                            planned_deltaT.append(deltaT)
+                            planned_deltaTsign.append(deltaTsign)
+                                                                                    
+                            legmatched = True
                             ridematched_str = ":::::: this leg might be a match!!"
 
                 #line name encoding, now considered utf-8 #TODO
                 line_name_str = "None"
                 if line: line_name_str = line.encode('utf-8')                
-                print mode, line_name_str, ", is transit: ", istransit, ", Duration: ", \
+                print mode, line_name_str, ", is transit:", istransit, "| Duration: ", \
                         legdurationnormal, "(",legsrtarttime,"-->",legendtime,")", istransitstr, ridematched_str
-                        
-        i = i + 1
+        
+        if legmatched: # we've found a transit leg as a match in this itin (ideally should be only 1 matched leg (the transit leg)
+            matchcount += 1                
+            planned_start.append(srtarttime)
+            planned_end.append(endtime)
+        
+        if not legsreviewed: # TODO ***
+            print "Legs: "
+            for leg in itin['legs']:
+                mode = leg['mode']
+                line = leg['route']
+                istransit = leg['transitLeg']
+                legduration = leg['duration']
+                legdurationnormal = HSLDurationToNormalDuration(int(legduration)) # TODO why int() ?
+                legsrtarttime = HSLTimeStampToNormalDateTime(leg['startTime'])
+                legendtime = HSLTimeStampToNormalDateTime(leg['endTime'])
+
+                #line name encoding, now considered utf-8 #TODO
+                line_name_str = "None"
+                if line: line_name_str = line.encode('utf-8')                
+                print mode, line_name_str, ", is transit:", istransit, "| Duration: ", \
+                        legdurationnormal, "(",legsrtarttime,"-->",legendtime,")"
+        
+        itin_index += 1
 
     print "matchcount:", matchcount    
     
-    # TODO: for now returns the first found match (probably that's the best match IF HSL journey planner returns the best first!) :: 
+    # TODO: for now returns the first found match i.e. first leg-match from the first itin containing that leg (probably that's the best match IF HSL journey planner returns the best first!) :: 
     if len(linetypes)>0:
-        return 1, matchcount, linetypes[0], linenames[0]
+        tripmatchres.matchcount = matchcount
+        tripmatchres.linetype = linetypes[0]
+        tripmatchres.linename = linenames[0]        
+        tripmatchres.start = planned_start[0]
+        tripmatchres.end = planned_end[0]
+        tripmatchres.legstart = planned_legstart[0]
+        tripmatchres.legend = planned_legend[0]
+        tripmatchres.deltaT = planned_deltaT[0]        
+        tripmatchres.deltaTsign = planned_deltaTsign[0]                
+        return 1, tripmatchres
     else:
-        return 1, matchcount, None, None
+        return 1, tripmatchres
 
 # ---------------------------------------------------------
 
 
-def main_function(): # note: function to be called if want to run this file independently (e.g: only test querying HSL journey planner)
+#def main_function(): # note: function to be called if want to run this file independently (e.g: only test querying HSL journey planner)
     # ------ inputs ----------------------------------
 
     # Examples, trips, legs, etc.
@@ -242,14 +308,4 @@ def main_function(): # note: function to be called if want to run this file inde
     #i_starttime = datetime.strptime('2016/05/01 15:16:50', '%Y/%m/%d %H:%M:%S')
     #i_endtime = datetime.strptime('2016/05/01 15:23:21', '%Y/%m/%d %H:%M:%S')
 
-    fromPlace="60.170718,24.930221"
-    toPlace="60.250214,25.009566"
-    i_starttime = datetime.strptime('2016/05/26 17:20:03', '%Y/%m/%d %H:%M:%S')
-    i_endtime = datetime.strptime('2016/05/26 17:54:01', '%Y/%m/%d %H:%M:%S')
 
-
-    match_tripleg_with_publictransport(fromPlace, toPlace, i_starttime, i_endtime)
-
-
-if __name__ == "__main__":
-    main_function()
