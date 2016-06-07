@@ -229,28 +229,23 @@ def energymap_device_geojson():
 
     features = []
     for point in points:
-        point_geo = json.loads(point['geojson'])
         if point["line_type"] is None:
-            features.append({
-                'type': 'Feature',
-                'geometry': point_geo,
-                'properties': {
-                    'type': 'raw-point',
-                    'activity': str(point['activity']),
-                    'title': 'activity: %s' % point["activity"]
-                }
-            })
-        # Public transport recognized, use line-type instead
+            activity = point['activity']
+            title = 'activity: %s' % activity
         else:
-            features.append({
-                'type': 'Feature',
-                'geometry': point_geo,
-                'properties': {
-                    'type': 'raw-point',
-                    'activity': str(point['line_type']),
-                    'title': 'public_transport: %s' % point["line_type"]
-                }
-            })
+            # Public transport recognized, use line-type instead
+            activity = point['line_type']
+            title = 'public_transport: %s %s' % (activity, point['line_name'])
+        title += "\n%s" % point["time"].strftime('%Y-%m-%d %H:%M:%S')
+        features.append({
+            'type': 'Feature',
+            'geometry': json.loads(point['geojson']),
+            'properties': {
+                'type': 'raw-point',
+                'activity': activity,
+                'title': title
+            }
+        })
     geojson = {
         'type': 'FeatureCollection',
         'features': features
