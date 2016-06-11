@@ -374,7 +374,7 @@ def get_mass_transit_points(device_data_sample):
     return mass_transit_points
 
 
-def match_mass_transit_live(device, tstart, tend, tradius, dradius):
+def match_mass_transit_live(device, tstart, tend, tradius, dradius, nsamples):
     """Find mass transit vehicles near user during a trip leg.
 
     Arguments:
@@ -383,6 +383,7 @@ def match_mass_transit_live(device, tstart, tend, tradius, dradius):
     tend -- end timestamp of leg
     tradius -- slack allowed in seconds between device and vehicle data point
     dradius -- slack allowed in metres between device and vehicle data point
+    nsamples -- match using given number of points at most
 
     Result columns:
     revsum -- each metre inside dradius counts toward the summed distance score
@@ -394,10 +395,18 @@ def match_mass_transit_live(device, tstart, tend, tradius, dradius):
         text("""
 
 -- find the relevant device data points
-WITH trace AS (
+WITH fulltrace AS (
     SELECT coordinate, id, time, row_number() OVER (ORDER BY time) rn
     FROM device_data
     WHERE device_id = :device AND time >= :tstart AND time <= :tend),
+
+-- sample from full trace to limit quadratic matching; uses integer sampling
+-- interval so will end up with between [n/2, n] samples
+trace AS (
+    SELECT *
+    FROM fulltrace
+    WHERE rn % (
+        SELECT ceil((1 + max(rn)) / (1.0 + :nsamples)) FROM fulltrace) = 0),
 
 -- rough bbox margin meters to degrees of lon at lat, so overshoots on latitude
 m2lon AS (
@@ -448,7 +457,8 @@ nearest AS (
         tstart=tstart,
         tend=tend,
         tradius=tradius,
-        dradius=dradius)
+        dradius=dradius,
+        nsamples=nsamples)
 
 
 def verify_user_id(user_id):

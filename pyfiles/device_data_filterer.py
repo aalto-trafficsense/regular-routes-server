@@ -173,7 +173,8 @@ class DeviceDataFilterer:
         matches = match_mass_transit_live(
             device, tstart, tend,
             MAX_MASS_TRANSIT_TIME_DIFFERENCE,
-            MAX_MASS_TRANSIT_DISTANCE_DIFFERENCE).fetchall()
+            MAX_MASS_TRANSIT_DISTANCE_DIFFERENCE,
+            NUMBER_OF_MASS_TRANSIT_MATCH_SAMPLES).fetchall()
 
         print tstart, tend, device, len(device_data_queue)
         for x in matches:
