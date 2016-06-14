@@ -65,16 +65,24 @@ def find_same_journey_time_this_week(starttime):
     print "same_journey_time_this_week :: ", time_thisweek
     return time_thisweek
 
-class TripMatchedWithPlanner:
-    matchcount = 0
+class PlannedTrip:
+    start = None    # for whole trip (not specific leg)
+    end = None      # for whole trip (not specific leg)
+    # for the chosen leg (the transit leg):
     linetype = None
     linename = None       
-    start = None
-    end = None
     legstart = None
     legend = None 
     deltaT = None
     deltaTsign = None
+    deltaStarttime = None
+    deltaStarttimeStr = None
+    deltaStartPassed = None
+
+class TripMatchedWithPlannerResult:
+    trip = None
+    matchcount = 0
+    bestmatchindex = 0
  
 
 minSpeeds = {"walk":1.34112, "bus": 3.0, "tram":2.5, "train":5.0, "ferry":5.0} # walk speed default: 3 MPH (1.34112 m/s) (~ 5.0 km/h)
@@ -85,7 +93,7 @@ def match_tripleg_with_publictransport(fromPlace, toPlace, trip_starttime, trip_
     print "trip_starttime:", trip_starttime
     print "trip_endtime:", trip_endtime
 
-    tripmatchres = TripMatchedWithPlanner()
+    tripmatchres = TripMatchedWithPlannerResult()
 
     trip_starttime = trip_starttime.replace(microsecond = 0)
     trip_endtime = trip_endtime.replace(microsecond = 0)
@@ -106,14 +114,19 @@ def match_tripleg_with_publictransport(fromPlace, toPlace, trip_starttime, trip_
                                                             # we should note that being "slower"/"faster" is different than bus arrival being "late"/"early"
                                                             # TODO! depends also on the city! in Helsinki it's sharp! :) ... in Rome, maybe not
     maxDError = MAX_MODE_DETECTION_DELAY * 2 # maximum Distance error (e.g: one deltaD at each end of the trip)
-
-    legstart_shift = 0  # default: 4 (*) or CALC: e.g: MAX_MODE_DETECTION_DELAY/minSpeeds['bus']
-    trip_starttime_earlier = trip_starttime - timedelta(minutes = legstart_shift)
-    print "trip_starttime_earlier = trip_starttime - timedelta(minutes =", legstart_shift,"):", trip_starttime_earlier , " (note: WE'LL GIVE THIS TO JOURNEY PLANNER QUERY *)"
+    
+    legstartshift = timedelta(seconds = round(MAX_MODE_DETECTION_DELAY/minSpeeds['walk']))  # default: 4 minutes (*) or CALC: e.g: MAX_MODE_DETECTION_DELAY/minSpeeds['walk']        
+    trip_starttime_earlier = trip_starttime - legstartshift
+    print "legstartshift:",legstartshift
+    print "trip_starttime_earlier:", trip_starttime_earlier , " (note: WE'LL GIVE THIS TO JOURNEY PLANNER QUERY *)"
     print ""
     
     # query journey planner ----------:
     print "Query to journey planner:"
+    # TODO: use Interface / Abstract class *:
+    #   later planner match for the whole finland*: https://api.digitransit.fi/routing/v1/routers/finland/
+    #   later plannermatch for all possible countries: ??? OTP API interfance	
+    # ex: apiurl = IOTPServer.GetOTPAPIUrl() # shuld give the suitable instance, based on city/coutnry or user settings ...
     apiurl = 'http://api.digitransit.fi/routing/v1/routers/hsl/plan'
     querystr = "fromPlace={0}&toPlace={1}&date={2}&time={3}&numItineraries={4}&maxWalkDistance={5}"\
 			    .format(fromPlace, toPlace, datetime.date(trip_starttime_earlier), datetime.time(trip_starttime_earlier), numItineraries, maxWalkDistance, maxTransfers);
@@ -136,22 +149,23 @@ def match_tripleg_with_publictransport(fromPlace, toPlace, trip_starttime, trip_
     print "\nWorking on the routes suggested by HSL ...:"
     itin_index = 0
     matchcount = 0
-    linetypes = []
-    linenames = []
-    planned_start = []
-    planned_end = []
-    planned_legstart = []
-    planned_legend = []
-    planned_deltaT = []
-    planned_deltaTsign = []
+    plannedmatches = []
+#    linetypes = []
+#    linenames = []
+#    planned_start = []
+#    planned_end = []
+#    planned_legstart = []
+#    planned_legend = []
+#    planned_deltaT = []
+#    planned_deltaTsign = []
     
     # go through all routes suggested ------ : 
     for itin in json_data['plan']['itineraries']: 
         duration = HSLDurationToNormalDuration(itin['duration'])        # duration of planned trip
-        srtarttime = HSLTimeStampToNormalDateTime(itin['startTime'])    # start time of planned trip
+        starttime = HSLTimeStampToNormalDateTime(itin['startTime'])    # start time of planned trip
         endtime = HSLTimeStampToNormalDateTime(itin['endTime'])         # ...
         print "\n#", itin_index+1, ": This journey planner trip's duration, start & ends time: ", \
-                duration,"(",srtarttime , "-->", endtime,")\t"#, itin['duration'], " seconds", "(",itin['startTime'], itin['endTime'],")" 
+                duration,"(",starttime , "-->", endtime,")\t"#, itin['duration'], " seconds", "(",itin['startTime'], itin['endTime'],")" 
 
         # prepare the adjuster params TODO (instead of 'bus', it could be 'train', 'tram' ... depending on planned results) *
         maxdeltaW = timedelta(seconds = round(maxDError/minSpeeds['walk']))   # max acceptable diff, result of walking to the stop        
@@ -160,14 +174,14 @@ def match_tripleg_with_publictransport(fromPlace, toPlace, trip_starttime, trip_
         maxI = timedelta(minutes = maxIntervals['bus']) # in minutes
         maxdeltaSlowness = timedelta(minutes = maxSlowness['bus'])    
         # maxdeltaSlowness = timedelta(minutes = 0) # TODO !!!! temp. , remove this 
-        print "maxdeltaW, maxdeltaB, maxdeltaT, maxI: ", maxdeltaW, maxdeltaB, maxdeltaT, maxI
+        print "maxdeltaW, maxdeltaB, maxdeltaT, maxI: ", maxdeltaW, maxdeltaB, maxdeltaT, maxI, "maxdeltaB/2 + maxdeltaSlowness:",maxdeltaB/2 + maxdeltaSlowness
 
         deltaT = abs(duration - trip_duration)
         deltaTsign = ""
         if duration < trip_duration:
             deltaTsign = "shorter"
 
-        legmatched = False        
+        legsmatched = 0        
         legsreviewed = False # TODO: mostly for debugging
         # COND: pattern of planned trip-legs, 
         #   for example usually the idea is: 'WALK', <ride>, 'WALK'
@@ -176,25 +190,29 @@ def match_tripleg_with_publictransport(fromPlace, toPlace, trip_starttime, trip_
         for leg in itin['legs']:
             if leg['transitLeg']:
                 transitlegs_count += 1                
-        if transitlegs_count != 1:
+        if transitlegs_count != 1: #TODO: support multi-leg match later asap! *
             print "number of planned transit legs:", transitlegs_count, " (should be 1) => ignoring this journey planner trip (!)"                         
         # COND: compare original trip's total duration WITH planned trip total duration
         elif duration < trip_duration and deltaT > maxdeltaSlowness: #TODO: ideally, maxdeltaSlowness should depend on current mode of transport        
             print "original trip_duration:",trip_duration, "planned trip duration:", duration, "duration < trip_duration", " (deltaT:- ", deltaT,")", \
-                    "=> how come planned trip is shorter than original trip ??!! => ignoring this journey planner trip (!)" # one reason could be: maybe the bus or tram ran faster this time!
+                    "=> how come planned trip is this much shorter than original trip ??!! => ignoring this journey planner trip (!)" # one reason could be: maybe the bus or tram ran faster this time!
         elif deltaT > maxdeltaT:
             print "original trip_duration:",trip_duration, "planned trip duration:", duration, "(deltaT:",deltaT,"maxdeltaT:",maxdeltaT,")", \
                     "=> too much difference! ignoring this journey planner trip (!)"
-        else: # now look at legs of this itin to maybe find a match *
+        else: 
+        # now look at legs of this itin to maybe find a match *
             legsreviewed = True
             print "Legs: "
             for leg in itin['legs']:
+                matchedbytime = False
+                matchedbyroute = False
+                    
                 mode = leg['mode']
                 line = leg['route']
                 istransit = leg['transitLeg']
                 legduration = leg['duration']
                 legdurationnormal = HSLDurationToNormalDuration(int(legduration)) # TODO why int() ?
-                legsrtarttime = HSLTimeStampToNormalDateTime(leg['startTime'])
+                legstarttime = HSLTimeStampToNormalDateTime(leg['startTime'])
                 legendtime = HSLTimeStampToNormalDateTime(leg['endTime'])
 
                 istransitstr = ""
@@ -212,35 +230,87 @@ def match_tripleg_with_publictransport(fromPlace, toPlace, trip_starttime, trip_
 
                     if deltaTransitLeg <= maxdeltaB:                
                         # COND: planned start time not too far, e.g.: not more than bus interval
-                        if legsrtarttime - trip_starttime > maxI:
-                            print "planned trip starts too late => ignoring this leg !!!"
+                        deltaStarttime = abs(legstarttime - trip_starttime)
+                        deltaStartPassed = True
+                        if deltaStarttime > (maxdeltaB/2 + maxdeltaSlowness):
+                            deltaStartPassed = False
+                            
+                        if deltaStarttime > maxI:
+                            deltaStartPassed = False
                         else:
                             # matched with witch line_type? TRAM, SUBWAY, BUS, ...?
-                            # //TODO: for now saves the last match found as linename and linetype
-                            #linetype = mode
-                            #linename = line
-                            
-                            # TODO: but here saving all matches in a list
-                            linetypes.append(mode)
-                            linenames.append(line)
-                            planned_legstart.append(legsrtarttime)
-                            planned_legend.append(legendtime)
-                            planned_deltaT.append(deltaT)
-                            planned_deltaTsign.append(deltaTsign)
-                                                                                    
-                            legmatched = True
-                            ridematched_str = ":::::: this leg might be a match!!"
+                            matchedbytime = True    # this leg is a match time-based *                                             
+                            legsmatched += 1
+                                                   
+                        if not deltaStartPassed:
+                            print "planned trip-leg starts too late => ignoring this leg !!!"                                                             
+                #END if is_transit
+                
+                if matchedbytime: # if this leg is matched (time-based), then
+                    #now check location-based
+                    print ""
+                    print "trying to match location-based as well ..."
+                    # TODO
+                    #   get geometry points from planned leg
+                    #   match with some intermediate points of the filtered trip-leg we have here
+                    #   ? how many point matches are enough?
+                    matchedbyroute = True   # this itin has a match also geoloc&route-based *
+                    ridematched_str = ":::::: this leg might be a match!!"                                        
+                    
+                if matchedbytime and matchedbyroute: # save this leg as a match *
+                    matchcount += 1 # number of total matches found so far (among all planned itins)
+                    # //TODO: for now saves the last match found as linename and linetype
+                    #linetype = mode
+                    #linename = line                            
+                    # TODO: but here saving all matches in a list
 
+                    # TODO increase indent one step later!!! 
+                    plannedmatch = PlannedTrip() # a new matched planned trip
+                    
+                    #these value comes from the itin itself, not from this leg::                    
+                    plannedmatch.start = starttime
+                    plannedmatch.end = endtime
+                    plannedmatch.deltaT = deltaT
+                    plannedmatch.deltaTsign = deltaTsign
+                    #these value comes from this matched leg::
+                    plannedmatch.linetype = mode
+                    plannedmatch.linename = line
+                    plannedmatch.legstart = legstarttime
+                    plannedmatch.legend = legendtime
+                    # TODO: also save ??? will be useful??:
+                    #   legloc start, end
+                    #   leg geo points                                                                                                                   
+                    #linetypes.append(mode)
+                    #linenames.append(line)
+                    #planned_legstart.append(legstarttime)
+                    #planned_legend.append(legendtime)
+                    #planned_deltaT.append(deltaT)
+                    #planned_deltaTsign.append(deltaTsign)                            
+                    plannedmatch.deltaStarttime = deltaStarttime
+                    if legstarttime < trip_starttime:
+                        plannedmatch.deltaStarttimeStr = ("-{0}").format(deltaStarttime) # planned transitleg starts earlier than recorded starttime
+                    else:
+                        plannedmatch.deltaStarttimeStr = ("+{0}").format(deltaStarttime) # planned transitleg starts later or same time                                   
+                    plannedmatch.deltaStartPassed = deltaStartPassed
+
+                    plannedmatches.append(plannedmatch)
+                #END IF ---   
+                    
                 #line name encoding, now considered utf-8 #TODO
                 line_name_str = "None"
                 if line: line_name_str = line.encode('utf-8')                
                 print mode, line_name_str, ", is transit:", istransit, "| Duration: ", \
-                        legdurationnormal, "(",legsrtarttime,"-->",legendtime,")", istransitstr, ridematched_str
+                        legdurationnormal, "(",legstarttime,"-->",legendtime,")", istransitstr, ridematched_str
+            #LOOP END -- traverse next leg of current itin            
+        #else END
         
-        if legmatched: # we've found a transit leg as a match in this itin (ideally should be only 1 matched leg (the transit leg)
-            matchcount += 1                
-            planned_start.append(srtarttime)
-            planned_end.append(endtime)
+        # --- alll legs of current itin has been traveresed up to this point 
+        # assumption for now: only 1 trip-leg (transit leg) from each planned itin can be a match
+        # TODO: support multi-leg matches later asap *!!
+        if legsmatched > 0: # we've found transit-leg(s) as a match in this itin (ideally should be only 1 matched leg (the only transit leg))
+            #planned_start.append(starttime)
+            #planned_end.append(endtime)
+            donothing = None # TODO
         
         if not legsreviewed: # TODO ***
             print "Legs: "
@@ -250,30 +320,52 @@ def match_tripleg_with_publictransport(fromPlace, toPlace, trip_starttime, trip_
                 istransit = leg['transitLeg']
                 legduration = leg['duration']
                 legdurationnormal = HSLDurationToNormalDuration(int(legduration)) # TODO why int() ?
-                legsrtarttime = HSLTimeStampToNormalDateTime(leg['startTime'])
+                legstarttime = HSLTimeStampToNormalDateTime(leg['startTime'])
                 legendtime = HSLTimeStampToNormalDateTime(leg['endTime'])
 
                 #line name encoding, now considered utf-8 #TODO
                 line_name_str = "None"
                 if line: line_name_str = line.encode('utf-8')                
                 print mode, line_name_str, ", is transit:", istransit, "| Duration: ", \
-                        legdurationnormal, "(",legsrtarttime,"-->",legendtime,")"
+                        legdurationnormal, "(",legstarttime,"-->",legendtime,")"
         
         itin_index += 1
-
-    print "matchcount:", matchcount    
+    # LOOP END --- traverse next planned itin
     
-    # TODO: for now returns the first found match i.e. first leg-match from the first itin containing that leg (probably that's the best match IF HSL journey planner returns the best first!) :: 
-    if len(linetypes)>0:
+    print ""
+    print "from all planned itins ==>"
+    print "matchcount:", matchcount    
+    bestmatchindex = 0
+    # refining the matched legs from all planned itins, choosing the best match: 
+    # assumption: HSL journey planner returns the best match first!
+    if len(plannedmatches)>0:
+        print "refining the matched planned trips ..."
+        min_deltaStarttime = plannedmatches[0].deltaStarttime
+        matchindex = 0
+        for match in plannedmatches:
+            print "[",matchindex,"]> match.deltaStarttime:", match.deltaStarttime    
+            if match.deltaStarttime < min_deltaStarttime:
+                min_deltaStarttime = plannedmatches[matchindex].deltaStarttime
+                bestmatchindex = matchindex
+            matchindex += 1    
+        print "bestmatchindex:", bestmatchindex
+
+    if len(plannedmatches)>0:
+        tripmatchres.trip = plannedmatches[bestmatchindex]        
+        tripmatchres.bestmatchindex = bestmatchindex        
         tripmatchres.matchcount = matchcount
-        tripmatchres.linetype = linetypes[0]
-        tripmatchres.linename = linenames[0]        
-        tripmatchres.start = planned_start[0]
-        tripmatchres.end = planned_end[0]
-        tripmatchres.legstart = planned_legstart[0]
-        tripmatchres.legend = planned_legend[0]
-        tripmatchres.deltaT = planned_deltaT[0]        
-        tripmatchres.deltaTsign = planned_deltaTsign[0]                
+        
+        #tripmatchres.linetype = linetypes[bestmatchindex]
+        #tripmatchres.linename = linenames[bestmatchindex]        
+        #tripmatchres.start = planned_start[bestmatchindex]
+        #tripmatchres.end = planned_end[bestmatchindex]
+        #tripmatchres.legstart = planned_legstart[bestmatchindex]
+        #tripmatchres.legend = planned_legend[bestmatchindex]
+        #tripmatchres.deltaT = planned_deltaT[bestmatchindex]        
+        #tripmatchres.deltaTsign = planned_deltaTsign[bestmatchindex]
+        
+        #tripmatchres.deltaStarttimeStr = plannedmatches[bestmatchindex].deltaStarttimeStr                
+        #tripmatchres.deltaStartPassed = plannedmatches[bestmatchindex].deltaStartPassed
         return 1, tripmatchres
     else:
         return 1, tripmatchres
