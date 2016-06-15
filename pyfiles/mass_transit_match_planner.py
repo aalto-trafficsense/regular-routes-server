@@ -12,6 +12,7 @@ import time
 #import urllib
 import requests
 import urllib2
+import polyline
 
 DETAILEDLOG = True
 
@@ -80,7 +81,7 @@ class PlannedTrip:
     deltaStartPassed = None
 
 class TripMatchedWithPlannerResult:
-    trip = None
+    trip = None # its type should be PlannedTrip 
     matchcount = 0
     bestmatchindex = 0
  
@@ -88,13 +89,26 @@ class TripMatchedWithPlannerResult:
 minSpeeds = {"walk":1.34112, "bus": 3.0, "tram":2.5, "train":5.0, "ferry":5.0} # walk speed default: 3 MPH (1.34112 m/s) (~ 5.0 km/h)
 
 
-def match_tripleg_with_publictransport(fromPlace, toPlace, trip_starttime, trip_endtime):
+def match_tripleg_with_publictransport(fromPlace, toPlace, trip_starttime, trip_endtime, all_recorded_trip_points):
     print "Input Trip ...:"
     print "trip_starttime:", trip_starttime
     print "trip_endtime:", trip_endtime
 
     tripmatchres = TripMatchedWithPlannerResult()
 
+    # TODO TODO, who about these paratms returned by journey planner? 
+    # <walkTime>394</walkTime>
+    # <transitTime>1020</transitTime>
+    # <waitingTime>442</waitingTime>
+    # <walkDistance>489.6903846194335</walkDistance>
+    # <walkLimitExceeded>false</walkLimitExceeded>
+    # <elevationLost>0.0</elevationLost>
+    # <elevationGained>0.0</elevationGained>
+    # <transfers>1</transfers>
+    # returned by planner: 
+    #   <tooSloped>false</tooSloped>
+    
+    recordedpoints = all_recorded_trip_points
     trip_starttime = trip_starttime.replace(microsecond = 0)
     trip_endtime = trip_endtime.replace(microsecond = 0)
     trip_duration = trip_endtime - trip_starttime
@@ -146,18 +160,11 @@ def match_tripleg_with_publictransport(fromPlace, toPlace, trip_starttime, trip_
         else:
             return 0, tripmatchres
 
-    print "\nWorking on the routes suggested by HSL ...:"
+    print ""
+    print "Working on the routes suggested by journey planner ...:"
     itin_index = 0
     matchcount = 0
     plannedmatches = []
-#    linetypes = []
-#    linenames = []
-#    planned_start = []
-#    planned_end = []
-#    planned_legstart = []
-#    planned_legend = []
-#    planned_deltaT = []
-#    planned_deltaTsign = []
     
     # go through all routes suggested ------ : 
     for itin in json_data['plan']['itineraries']: 
@@ -253,18 +260,47 @@ def match_tripleg_with_publictransport(fromPlace, toPlace, trip_starttime, trip_
                     # TODO
                     #   get geometry points from planned leg
                     #   match with some intermediate points of the filtered trip-leg we have here
-                    #   ? how many point matches are enough?
+                    #   ? how many point matches are enough?                    
+
+                    # recordedpoint_startindex = ... where deltastarttime ... => no. of skiprecordedpoints
+                    # recordedpoint_endindex = ... ignore the last ? N ?  recorde points
+                    # step = (166)/(8,610/200)
+                    # step = (len(recordedpoints)) / (triplength_in_meters / 200)
+                    # 
+                    # go to indexes according to step (plus always incluide the last point) (OR exclude the last point!!!)
+                    # exlude the points in the 'last minute'?
+                    #
+                    # do the matching loop
+                    #   if N% of points do not have a match in plan ==> matching FAILED             ?
+                    #   if M consecutive points do not have a match in plan ==> matching FAILED     ?              
+                    #   or mayve check both conditions ,, with OR
+                    
+                    print "@@@ printing points of recorded trip (n=",len(recordedpoints),"): " 
+                    for point in recordedpoints:
+                        point_location = json.loads(point["geojson"])["coordinates"]
+                        point_location_str='{1},{0}'.format(point_location[0],point_location[1])
+                        point_time  = point['time']                        
+                        #print point_location_str
+                    print "@@@ printing times of recorded trip points: " 
+                    for point in recordedpoints:
+                        point_location = json.loads(point["geojson"])["coordinates"]
+                        point_location_str='{1},{0}'.format(point_location[0],point_location[1])
+                        point_time  = point['time']                        
+                        #print point_time
+
+                    plannedpoints = polyline.decode(leg['legGeometry']['points'])                    
+                    print ""
+                    print "@@@ printing poitns of planned trip (n=",len(plannedpoints),"):"
+                    for point in plannedpoints: 
+                        #print "{0},{1}".format(point[0],point[1])
+                        donothing = True
+                    
                     matchedbyroute = True   # this itin has a match also geoloc&route-based *
                     ridematched_str = ":::::: this leg might be a match!!"                                        
                     
                 if matchedbytime and matchedbyroute: # save this leg as a match *
                     matchcount += 1 # number of total matches found so far (among all planned itins)
-                    # //TODO: for now saves the last match found as linename and linetype
-                    #linetype = mode
-                    #linename = line                            
-                    # TODO: but here saving all matches in a list
 
-                    # TODO increase indent one step later!!! 
                     plannedmatch = PlannedTrip() # a new matched planned trip
                     
                     #these value comes from the itin itself, not from this leg::                    
@@ -277,21 +313,15 @@ def match_tripleg_with_publictransport(fromPlace, toPlace, trip_starttime, trip_
                     plannedmatch.linename = line
                     plannedmatch.legstart = legstarttime
                     plannedmatch.legend = legendtime
-                    # TODO: also save ??? will be useful??:
-                    #   legloc start, end
-                    #   leg geo points                                                                                                                   
-                    #linetypes.append(mode)
-                    #linenames.append(line)
-                    #planned_legstart.append(legstarttime)
-                    #planned_legend.append(legendtime)
-                    #planned_deltaT.append(deltaT)
-                    #planned_deltaTsign.append(deltaTsign)                            
                     plannedmatch.deltaStarttime = deltaStarttime
                     if legstarttime < trip_starttime:
                         plannedmatch.deltaStarttimeStr = ("-{0}").format(deltaStarttime) # planned transitleg starts earlier than recorded starttime
                     else:
                         plannedmatch.deltaStarttimeStr = ("+{0}").format(deltaStarttime) # planned transitleg starts later or same time                                   
                     plannedmatch.deltaStartPassed = deltaStartPassed
+                    # TODO: also save ??? will be useful??:
+                    #   legloc start, end
+                    #   leg geo points                                                                                                                   
 
                     plannedmatches.append(plannedmatch)
                 #END IF ---   
@@ -353,19 +383,7 @@ def match_tripleg_with_publictransport(fromPlace, toPlace, trip_starttime, trip_
     if len(plannedmatches)>0:
         tripmatchres.trip = plannedmatches[bestmatchindex]        
         tripmatchres.bestmatchindex = bestmatchindex        
-        tripmatchres.matchcount = matchcount
-        
-        #tripmatchres.linetype = linetypes[bestmatchindex]
-        #tripmatchres.linename = linenames[bestmatchindex]        
-        #tripmatchres.start = planned_start[bestmatchindex]
-        #tripmatchres.end = planned_end[bestmatchindex]
-        #tripmatchres.legstart = planned_legstart[bestmatchindex]
-        #tripmatchres.legend = planned_legend[bestmatchindex]
-        #tripmatchres.deltaT = planned_deltaT[bestmatchindex]        
-        #tripmatchres.deltaTsign = planned_deltaTsign[bestmatchindex]
-        
-        #tripmatchres.deltaStarttimeStr = plannedmatches[bestmatchindex].deltaStarttimeStr                
-        #tripmatchres.deltaStartPassed = plannedmatches[bestmatchindex].deltaStartPassed
+        tripmatchres.matchcount = matchcount                
         return 1, tripmatchres
     else:
         return 1, tripmatchres

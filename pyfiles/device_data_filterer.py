@@ -86,14 +86,14 @@ class DeviceDataFilterer:
             if (line_type==None or (line_name=='' or line_name==None)) and distance > 200:
                 # try to match this trip-leg with a public transport ride (using hsl query)
                 # print "we're sending this to match function:", start_location_str, end_location_str, start_time, end_time
-                res, matchres = match_tripleg_with_publictransport(start_location_str, end_location_str, start_time, end_time)
+                res, matchres = match_tripleg_with_publictransport(start_location_str, end_location_str, start_time, end_time, device_data_queue)
                 
                 if res == HSL_ERROR_CODE_DATE_TOO_FAR: # second try (adjust the old weekday to current week)
                     print ""
                     print "failed because: HSL_ERROR_CODE_DATE_TOO_FAR !, trying second time with current week..."
                     starttime_thisweek = find_same_journey_time_this_week(start_time)
                     endtime_thisweek = find_same_journey_time_this_week(end_time)
-                    res, matchres = match_tripleg_with_publictransport(start_location_str, end_location_str, starttime_thisweek, endtime_thisweek)
+                    res, matchres = match_tripleg_with_publictransport(start_location_str, end_location_str, starttime_thisweek, endtime_thisweek, device_data_queue)
                                                 
                 # if managed to match the trip-leg with one public transport ride using HSL query                                                
                 if res == 1 and matchres.matchcount > 0: 
