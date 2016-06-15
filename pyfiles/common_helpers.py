@@ -350,8 +350,8 @@ def trace_regular_destinations(
     d0 = d1 = merged = None
     while len(heap) > 1:
         for item in heap:
-            # rescan nearest where deleted (or not yet set, on first pass)
-            if item[1] in [d0, d1]:
+            # rescan nearest where nearest was merged away, or not yet set
+            if item[1] in (None, d0, d1):
                 item[:] = heapitem(item[2], (x[2] for x in heap))
                 continue
 
@@ -376,7 +376,7 @@ def trace_regular_destinations(
             "visits": d0["visits"] + d1["visits"]}
         for i in range(len(heap)):
             if heap[i][2] is d1:
-                heap[i] = heapitem(merged, (x[2] for x in heap))
+                heap[i] = [None, None, merged]
                 break
 
     groups = [x[2] for x in heap]
