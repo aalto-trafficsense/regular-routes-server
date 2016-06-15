@@ -353,26 +353,38 @@ def trace_regular_destinations(
     heapify(heap)
 
     while heap:
+        # pop out one end of shortest edge
         item = heappop(heap)
         distance, d1, d0 = item
+
+        # if shortest edge is long enough, unpop and stop
         if distance is None or distance >= threshold_distance * 2:
             heappush(heap, item) # unspill the milk
             break
-        for i in range(len(heap)):
-            if heap[i][2] is d1:
-                del heap[i] # heapify later
-                break
+
+        # replace other end with merged destination, stop if no others left
         merged = {
             "coordinates": dest_weighted_center(d0, d1),
             "visits": d0["visits"] + d1["visits"]}
+        for i in range(len(heap)):
+            if heap[i][2] is d1:
+                heap[i] = heapitem(merged, (x[2] for x in heap))
+                break
+        if len(heap) == 1:
+            break
+
         for item in heap:
+            # rescan nearest where deleted
             if item[1] in [d0, d1]:
                 item[:] = heapitem(item[2], (x[2] for x in heap))
                 continue
-            distance = dest_dist(item[2], merged)
-            if item[0] > distance:
-                item[0:2] = distance, merged
-        heappush(heap, heapitem(merged, (x[2] for x in heap)))
+
+            # update others where merged now nearest
+            if item[2] is not merged:
+                distance = dest_dist(item[2], merged)
+                if item[0] > distance:
+                    item[0:2] = distance, merged
+
         heapify(heap)
 
     groups = [x[2] for x in heap]
@@ -401,12 +413,12 @@ def trace_regular_destinations(
 #        bbsz = "%3s\xc3\x97%s" % tuple(int(x) for x in bounds_size(g["bounds"]))
 #        print "%s %s %s %.3f/%.3f %8s %s" % (
         r += 1
-        print "{} {} {} {:.3f}/{:.3f}".format(
-            timedelta_str(g["total_stay"]),
-            enhm,
-            exhm,
-            g["coordinates"][1],
-            g["coordinates"][0])
+#        print "{} {} {} {:.3f}/{:.3f}".format(
+#            timedelta_str(g["total_stay"]),
+#            enhm,
+#            exhm,
+#            g["coordinates"][1],
+#            g["coordinates"][0])
 
     for r, g in enumerate(sorted(groups, key=lambda x: x["total_stay"], reverse=True)):
         g["duration_rank"] = r + 1

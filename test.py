@@ -12,7 +12,7 @@ start = datetime.datetime(2016, 4, 1)
 end = datetime.datetime(2016, 6, 1)
 
 
-def user_regular_destinations(user):
+def user_regular_destinations(user, start=start, end=end, noisy=False):
 
 # filtered_data = db.metadata.tables["device_data_filtered"]
 # query = select(
@@ -55,9 +55,32 @@ def user_regular_destinations(user):
 
     dests = trace_regular_destinations(
         points, DEST_RADIUS_MAX, DEST_DURATION_MIN, 0)
+    if not noisy:
+        return dests
+
     print type(dests), len(dests)
     print type(dests[0]), len(dests[0]), dests[0].keys()
 
+    return dests
+
+
+def dests_accum(user, days):
+    # doing whole range once and looking at first visits might be faster :D
+    end = datetime.datetime.now().replace(
+        hour=0, minute=0, second=0, microsecond=0)
+    for d in range(1, days+1):
+        yield len(user_regular_destinations(
+            user, end - datetime.timedelta(days=d), end))
+
 
 if __name__ == "__main__":
-    user_regular_destinations(int(sys.argv[1]))
+    if len(sys.argv) > 1:
+        user_regular_destinations(int(sys.argv[1]), noisy=True)
+        sys.exit(0)
+
+    maxuser = 21
+    days = 60
+    print "user," + ",".join(str(x) for x in range(1, days+1))
+    for user in range(maxuser+1):
+        print str(user) + "," + ",".join(
+            str(c) for c in dests_accum(user, days))
