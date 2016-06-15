@@ -12,7 +12,8 @@ from pyfiles.database_interface import (
 from pyfiles.mass_transit_match_planner import (
     find_same_journey_time_this_week, match_tripleg_with_publictransport, TripMatchedWithPlannerResult, PlannedTrip, minSpeeds)
 
-DUMP_CSV_FILES = True # for now only for debugging (if enabled, records matching results of each user in a separate csv file)
+# if enabled, records matching results of each user in a separate csv file
+DUMP_CSV_FILES = False
 
 class DeviceDataFilterer:
 
