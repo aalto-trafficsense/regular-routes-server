@@ -346,35 +346,11 @@ def trace_regular_destinations(
                      d1] for d1 in dests if d1 is not d0)
                   + [d0])
 
-    if len(dests) == 1:
-        heap = [[None, None, dests[0]]]
-    else:
-        heap = [heapitem(d0, dests) for d0 in dests]
-    heapify(heap)
-
-    while heap:
-        # pop out one end of shortest edge
-        item = heappop(heap)
-        distance, d1, d0 = item
-
-        # if shortest edge is long enough, unpop and stop
-        if distance is None or distance >= threshold_distance * 2:
-            heappush(heap, item) # unspill the milk
-            break
-
-        # replace other end with merged destination, stop if no others left
-        merged = {
-            "coordinates": dest_weighted_center(d0, d1),
-            "visits": d0["visits"] + d1["visits"]}
-        for i in range(len(heap)):
-            if heap[i][2] is d1:
-                heap[i] = heapitem(merged, (x[2] for x in heap))
-                break
-        if len(heap) == 1:
-            break
-
+    heap = [[None, None, d] for d in dests]
+    d0 = d1 = merged = None
+    while len(heap) > 1:
         for item in heap:
-            # rescan nearest where deleted
+            # rescan nearest where deleted (or not yet set, on first pass)
             if item[1] in [d0, d1]:
                 item[:] = heapitem(item[2], (x[2] for x in heap))
                 continue
@@ -385,7 +361,23 @@ def trace_regular_destinations(
                 if item[0] > distance:
                     item[0:2] = distance, merged
 
+        # arrange heap, pop out one end of shortest edge
         heapify(heap)
+        distance, d1, d0 = item = heappop(heap)
+
+        # if shortest edge is long enough, unpop and stop
+        if distance is None or distance >= threshold_distance * 2:
+            heappush(heap, item) # unspill the milk
+            break
+
+        # replace other end with merged destination
+        merged = {
+            "coordinates": dest_weighted_center(d0, d1),
+            "visits": d0["visits"] + d1["visits"]}
+        for i in range(len(heap)):
+            if heap[i][2] is d1:
+                heap[i] = heapitem(merged, (x[2] for x in heap))
+                break
 
     groups = [x[2] for x in heap]
     for g in groups:
