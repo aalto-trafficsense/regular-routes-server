@@ -101,7 +101,7 @@ class DeviceDataFilterer:
                     if matchres.trip.linetype=="RAIL": # our database knows "TRAIN" (defined in 
                         matchres.trip.linetype="TRAIN"
                     # now update the previously 'misdetected' trip                        
-                    if matchres.trip.deltaStartPassed: # only if all conditions apply #TODO refactor later
+                    if matchres.trip.deltaStartPassed and matchres.trip.matchedbyroute: # only if all conditions apply #TODO refactor later
                         line_type = matchres.trip.linetype
                         line_name = matchres.trip.linename
                         self.user_invehicle_triplegs_updated += 1
@@ -124,12 +124,13 @@ class DeviceDataFilterer:
                                 activity, line_type, line_name_str, round(distance), duration, round(avgspeed,1), tripleg_updated)                                
             row_plandetails_str = ""
             if matchres.matchcount > 0:
-                row_plandetails_str = "{0};{1};{2};{3};{4};{5};{6};{7};;{8};{9}".format(\
+                row_plandetails_str = "{0};{1};{2};{3};{4};{5};{6};{7};;{8};{9};{10};{11};{12}".format(\
                                             matchres.trip.start, matchres.trip.end, 
                                             matchres.trip.legstart, matchres.trip.legend, 
                                             matchres.trip.deltaT, matchres.trip.deltaTsign, 
                                             matchres.trip.deltaStarttimeStr, matchres.trip.deltaStartPassed,
-                                            matchres.trip.linetype, matchres.trip.linename)
+                                            matchres.trip.linetype, matchres.trip.linename, 
+                                            matchres.trip.matchedbyroute, matchres.trip.matched_fraction, matchres.trip.longest_serialunmatch)
             triplegfileline = row_basics_str + ";;" + row_plandetails_str
                                                         
             if DUMP_CSV_FILES:
@@ -287,7 +288,8 @@ class DeviceDataFilterer:
         filename = "user_{0}_triplegs_invehicle.csv".format(user_id)
         self.file_triplegs = open(filename, 'a')
         maincols = "userid;triplegno;startCoo;endCoo;starttime;endtime;mode;linetype;linename;distance;duration;avgspeed;updated"        
-        plandetails = "planned_start;planned_end;transit_start;transit_end;delta_trip_duration;planned_trip_is_shorter;delta_transit_starttime;delta_passed?"        
+        plandetails = "planned_start;planned_end;transit_start;transit_end;delta_trip_duration;planned_trip_is_shorter;delta_transit_starttime;delta_passed?\
+                        ;;;;route_matched?;point_match_fraction;longest_serialunmatch"        
         self.file_triplegs.write(maincols + ";<<<>>>;" + plandetails+"\n")
 
 
