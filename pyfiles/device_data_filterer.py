@@ -236,9 +236,9 @@ class DeviceDataFilterer:
 
         def activities(point):
             return {
-                point["activity_1"]: point["activity_1_conf"],
-                point["activity_2"]: point["activity_2_conf"],
-                point["activity_3"]: point["activity_3_conf"]}
+                point["activity_1"]: point["activity_1_conf"] or 0,
+                point["activity_2"]: point["activity_2_conf"] or 0,
+                point["activity_3"]: point["activity_3_conf"] or 0}
 
         def dseconds(p0, p1):
             return (p1["time"] - p0["time"]).total_seconds()
