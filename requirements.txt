@@ -19,3 +19,4 @@ itsdangerous==0.17
 python-gflags==2.0
 wsgiref==0.1.2
 requests
+polyline

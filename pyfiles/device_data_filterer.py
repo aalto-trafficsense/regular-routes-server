@@ -11,7 +11,7 @@ from pyfiles.constants import (
 from pyfiles.database_interface import (
     device_data_filtered_table_insert, get_mass_transit_points)
 from pyfiles.mass_transit_match_planner import (
-    find_same_journey_time_this_week, match_tripleg_with_publictransport, TripMatchedWithPlanner, minSpeeds)
+    find_same_journey_time_this_week, match_tripleg_with_publictransport, TripMatchedWithPlannerResult, PlannedTrip, minSpeeds)
 
 # if enabled, records matching results of each user in a separate csv file
 DUMP_CSV_FILES = False
@@ -70,7 +70,7 @@ class DeviceDataFilterer:
             end_location = json.loads(end_row["geojson"])["coordinates"]
             start_time  = start_row['time']
             end_time  = end_row['time']
-            distance = get_distance_between_coordinates(start_location, end_location) # TODO: should get the 'distance' value from calculated more realistic traveled distances
+            distance = get_distance_between_coordinates(start_location, end_location) # TODO: should get 'distance' value from the calculated more realistic traveled distances
             duration = end_time - start_time
             avgspeed = distance/duration.total_seconds()
             print "duration:", duration, ",   ", "point-to-point straight-line distance:", distance, "(meters)  =>  ", "straigh-line avgspeed:",avgspeed, "(m/s)"
@@ -81,32 +81,34 @@ class DeviceDataFilterer:
             start_location_str='{1},{0}'.format(start_location[0],start_location[1])
             end_location_str='{1},{0}'.format(end_location[0],end_location[1])
             
-            matchres = TripMatchedWithPlanner()
+            matchres = TripMatchedWithPlannerResult()
             
             # if we already got the linename and linetype hsl live, that's more accurate --> we skip the following trip-leg-matching code
             # less than 200 meter, not a big impact! --> ignore            
             if (line_type==None or (line_name=='' or line_name==None)) and distance > 200:
                 # try to match this trip-leg with a public transport ride (using hsl query)
                 # print "we're sending this to match function:", start_location_str, end_location_str, start_time, end_time
-                res, matchres = match_tripleg_with_publictransport(start_location_str, end_location_str, start_time, end_time)
+                res, matchres = match_tripleg_with_publictransport(start_location_str, end_location_str, start_time, end_time, device_data_queue)
                 
                 if res == HSL_ERROR_CODE_DATE_TOO_FAR: # second try (adjust the old weekday to current week)
                     print ""
                     print "failed because: HSL_ERROR_CODE_DATE_TOO_FAR !, trying second time with current week..."
                     starttime_thisweek = find_same_journey_time_this_week(start_time)
                     endtime_thisweek = find_same_journey_time_this_week(end_time)
-                    res, matchres = match_tripleg_with_publictransport(start_location_str, end_location_str, starttime_thisweek, endtime_thisweek)
+                    res, matchres = match_tripleg_with_publictransport(start_location_str, end_location_str, starttime_thisweek, endtime_thisweek, device_data_queue)
                                                 
-                if res == 1 and matchres.matchcount > 0: # if managed to match the trip-leg with one public transport ride using HSL query
-                    # update the previously 'misdetected' trip
-                    if matchres.linetype=="RAIL": # our database knows "TRAIN" (defined in 
-                        matchres.linetype="TRAIN"
-                    line_type = matchres.linetype
-                    line_name = matchres.linename
-                    self.user_invehicle_triplegs_updated += 1
-                    tripleg_updated = 1
-                    if line_name: line_name_str = line_name.encode('utf-8')                    
-                    print "> TRIP-LEG UPDATED (from second filter detection): ", user_id, activity, line_type, line_name_str
+                # if managed to match the trip-leg with one public transport ride using HSL query                                                
+                if res == 1 and matchres.matchcount > 0: 
+                    if matchres.trip.linetype=="RAIL": # our database knows "TRAIN" (defined in 
+                        matchres.trip.linetype="TRAIN"
+                    # now update the previously 'misdetected' trip                        
+                    if matchres.trip.deltaStartPassed and matchres.trip.matchedbyroute: # only if all conditions apply #TODO refactor later
+                        line_type = matchres.trip.linetype
+                        line_name = matchres.trip.linename
+                        self.user_invehicle_triplegs_updated += 1
+                        tripleg_updated = 1
+                        if line_name: line_name_str = line_name.encode('utf-8')                    
+                        print "> TRIP-LEG UPDATED (from second filter detection): ", user_id, activity, line_type, line_name_str
 
             # other filters: 
             
@@ -120,11 +122,16 @@ class DeviceDataFilterer:
             #   userid, triplegno, startcoo, endcoo, starttime, endtime, mode, linetype, linename, distance, duration, avgspeed, updated        
             row_basics_str = "{0};{1};{2};{3};{4};{5};{6};{7};{8};{9};{10};{11};{12}".format(\
                                 user_id, self.user_invehicle_triplegs, start_location_str, end_location_str, start_time, end_time,\
-                                activity, line_type, line_name_str, distance, duration, avgspeed, tripleg_updated)                                
-            row_plandetails_str = "{0};{1};{2};{3};{4};{5}".format(\
-                                            matchres.start, matchres.end, 
-                                            matchres.legstart, matchres.legend, 
-                                            matchres.deltaT, matchres.deltaTsign)
+                                activity, line_type, line_name_str, round(distance), duration, round(avgspeed,1), tripleg_updated)                                
+            row_plandetails_str = ""
+            if matchres.matchcount > 0:
+                row_plandetails_str = "{0};{1};{2};{3};{4};{5};{6};{7};;{8};{9};{10};{11};{12}".format(\
+                                            matchres.trip.start, matchres.trip.end, 
+                                            matchres.trip.legstart, matchres.trip.legend, 
+                                            matchres.trip.deltaT, matchres.trip.deltaTsign, 
+                                            matchres.trip.deltaStarttimeStr, matchres.trip.deltaStartPassed,
+                                            matchres.trip.linetype, matchres.trip.linename, 
+                                            matchres.trip.matchedbyroute, matchres.trip.matched_fraction, matchres.trip.longest_serialunmatch)
             triplegfileline = row_basics_str + ";;" + row_plandetails_str
                                                         
             if DUMP_CSV_FILES:
@@ -279,7 +286,11 @@ class DeviceDataFilterer:
         self.user_invehicle_triplegs_updated = 0
         filename = "user_{0}_triplegs_invehicle.csv".format(user_id)
         self.file_triplegs = open(filename, 'a')
-        self.file_triplegs.write("userid;triplegno;startCoo;endCoo;starttime;endtime;mode;linetype;linename;distance;duration;avgspeed;updated"+"\n")
+        maincols = "userid;triplegno;startCoo;endCoo;starttime;endtime;mode;linetype;linename;distance;duration;avgspeed;updated"        
+        plandetails = "planned_start;planned_end;transit_start;transit_end;delta_trip_duration;planned_trip_is_shorter;delta_transit_starttime;delta_passed?\
+                        ;;;;route_matched?;point_match_fraction;longest_serialunmatch"        
+        self.file_triplegs.write(maincols + ";<<<>>>;" + plandetails+"\n")
+
 
 
     def analyse_unfiltered_data(self, device_data_rows, user_id):
