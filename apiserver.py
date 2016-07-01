@@ -286,8 +286,14 @@ def path(session_token):
     devices = db.metadata.tables["devices"]
     users = db.metadata.tables["users"]
 
+    # find end of filtered data
+    filterend = select(
+        [func.max(filtered_data.c.time)],
+        devices.c.token == session_token,
+        filtered_data.join(users).join(devices))
+
     # use filtered data if available
-    query = select(
+    filtered = select(
         [   func.ST_AsGeoJSON(filtered_data.c.coordinate).label("geojson"),
             filtered_data.c.activity,
             filtered_data.c.line_type,
@@ -296,28 +302,25 @@ def path(session_token):
         and_(
             devices.c.token == session_token,
             filtered_data.c.time >= start,
-            filtered_data.c.time <= end),
-        filtered_data.join(users).join(devices),
-        order_by=filtered_data.c.time)
-    points = db.engine.execute(query).fetchall()
-    if points:
-        start = points[-1]["time"]
+            filtered_data.c.time < end),
+        filtered_data.join(users).join(devices))
 
-    # fall back on unfiltered for the missing part, don't mix if specific date
-    if not points or not date:
-        query = select(
-            [   func.ST_AsGeoJSON(device_data.c.coordinate).label("geojson"),
-                device_data.c.activity_1.label("activity"),
-                literal(None).label("line_type"),
-                literal(None).label("line_name"),
-                device_data.c.time],
-            and_(
-                devices.c.token == session_token,
-                device_data.c.time > start,
-                device_data.c.time <= end),
-            device_data.join(devices),
-            order_by=device_data.c.time)
-        points += db.engine.execute(query)
+    # fall back on unfiltered beyond end of filtered data
+    unfiltered = select(
+        [   func.ST_AsGeoJSON(device_data.c.coordinate).label("geojson"),
+            device_data.c.activity_1.label("activity"),
+            literal(None).label("line_type"),
+            literal(None).label("line_name"),
+            device_data.c.time],
+        and_(
+            devices.c.token == session_token,
+            device_data.c.time >= start,
+            device_data.c.time < end,
+            device_data.c.time > filterend),
+        device_data.join(devices))
+
+    query = filtered.union_all(unfiltered).order_by("time")
+    points = db.engine.execute(query)
 
     # don't draw lines over too long intervals, separate trip on either side
     segments = trace_split_sparse(points, MAX_POINT_TIME_DIFFERENCE)
