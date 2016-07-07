@@ -120,21 +120,21 @@ class DeviceDataFilterer:
             # save the trip-leg records in file *:
             # file columns: 
             #   userid, triplegno, startcoo, endcoo, starttime, endtime, mode, linetype, linename, distance, duration, avgspeed, updated        
-            row_basics_str = "{0};{1};{2};{3};{4};{5};{6};{7};{8};{9};{10};{11};{12}".format(\
+            if DUMP_CSV_FILES:
+                row_basics_str = "{0};{1};{2};{3};{4};{5};{6};{7};{8};{9};{10};{11};{12}".format(\
                                 user_id, self.user_invehicle_triplegs, start_location_str, end_location_str, start_time, end_time,\
                                 activity, line_type, line_name_str, round(distance), duration, round(avgspeed,1), tripleg_updated)                                
-            row_plandetails_str = ""
-            if matchres.matchcount > 0:
-                row_plandetails_str = "{0};{1};{2};{3};{4};{5};{6};{7};;{8};{9};{10};{11};{12}".format(\
+                row_plandetails_str = ""
+                if matchres.matchcount > 0:
+                    row_plandetails_str = "{0};{1};{2};{3};{4};{5};{6};{7};;{8};{9};{10};{11};{12}".format(\
                                             matchres.trip.start, matchres.trip.end, 
                                             matchres.trip.legstart, matchres.trip.legend, 
                                             matchres.trip.deltaT, matchres.trip.deltaTsign, 
                                             matchres.trip.deltaStarttimeStr, matchres.trip.deltaStartPassed,
                                             matchres.trip.linetype, matchres.trip.linename, 
                                             matchres.trip.matchedbyroute, matchres.trip.matched_fraction, matchres.trip.longest_serialunmatch)
-            triplegfileline = row_basics_str + ";;" + row_plandetails_str
+                triplegfileline = row_basics_str + ";;" + row_plandetails_str
                                                         
-            if DUMP_CSV_FILES:
                 self.file_triplegs.write(triplegfileline+"\n")
 
         return line_type, line_name
