@@ -244,13 +244,9 @@ def destinations(session_token):
         order_by=device_data.c.time)
     points = db.engine.execute(query)
 
-    dests = trace_regular_destinations(
-        points, DEST_RADIUS_MAX, DEST_DURATION_MIN)
-
-    for d in dests:
-        d["visits"] = len(d["visits"])
-
-    dests.sort(key=lambda x: x["visits_rank"])
+    dests = sorted(
+        trace_regular_destinations(points, DEST_RADIUS_MAX, DEST_DURATION_MIN),
+        key=lambda x: x["visits_rank"])
 
     geojson = {
         "type": "FeatureCollection",
@@ -261,6 +257,10 @@ def destinations(session_token):
                     "coordinates": d["coordinates"]},
                 "properties": d}
             for d in dests]}
+
+    for f in geojson["features"]:
+        del f["properties"]["coordinates"] # included in geometry
+        f["properties"]["visits"] = len(f["properties"]["visits"])
 
     return jsonify(geojson)
 
