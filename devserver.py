@@ -7,7 +7,7 @@ from oauth2client.client import *
 from sqlalchemy.sql import and_, func, select, text
 
 from pyfiles.common_helpers import (
-    simplify,
+    simplify_geometry,
     timedelta_str,
     trace_destinations,
     trace_linestrings,
@@ -296,8 +296,8 @@ def visualize_device_geojson(device_id):
                 'type': 'dest-line',
                 'title': '%s\n%s' % (dest[0]['time'], dest[-1]['time'])}})
 
-    simplified = [
-        dict(x) for x in simplify(points, maxpts=maxpts, mindist=mindist)]
+    simplified = simplify_geometry(
+            points, maxpts=maxpts, mindist=mindist, keep_activity=True)
     features += trace_linestrings(
         simplified, ('activity',), {'type': 'trace-line'})
 

@@ -7,8 +7,9 @@ from oauth2client.client import *
 from sqlalchemy.sql import and_, func, literal, select, text
 import json
 
-from pyfiles.common_helpers import simplify, trace_linestrings
-
+from pyfiles.common_helpers import (
+    simplify_geometry, trace_linestrings, trace_split_sparse)
+from pyfiles.constants import MAX_POINT_TIME_DIFFERENCE
 from pyfiles.database_interface import init_db, db_engine_execute, users_table_insert, users_table_update, devices_table_insert, device_data_table_insert
 from pyfiles.database_interface import verify_user_id, update_last_activity, get_users_table_id_for_device, get_device_table_id
 from pyfiles.database_interface import get_device_table_id_for_session, get_users_table_id, get_session_token_for_device, get_user_id_from_device_id
@@ -269,7 +270,7 @@ def path(session_token):
     # get data for specified date, or last 12h if unspecified
     date = request.args.get("date")
 
-    # passed on to simplify
+    # passed on to simplify_geometry
     maxpts = int(request.args.get("maxpts") or 0)
     mindist = int(request.args.get("mindist") or 0)
 
@@ -285,8 +286,14 @@ def path(session_token):
     devices = db.metadata.tables["devices"]
     users = db.metadata.tables["users"]
 
+    # find end of filtered data
+    filterend = select(
+        [func.max(filtered_data.c.time)],
+        devices.c.token == session_token,
+        filtered_data.join(users).join(devices))
+
     # use filtered data if available
-    query = select(
+    filtered = select(
         [   func.ST_AsGeoJSON(filtered_data.c.coordinate).label("geojson"),
             filtered_data.c.activity,
             filtered_data.c.line_type,
@@ -295,43 +302,45 @@ def path(session_token):
         and_(
             devices.c.token == session_token,
             filtered_data.c.time >= start,
-            filtered_data.c.time <= end),
-        filtered_data.join(users).join(devices),
-        order_by=filtered_data.c.time)
-    points = db.engine.execute(query).fetchall()
-    if points:
-        start = points[-1]["time"]
+            filtered_data.c.time < end),
+        filtered_data.join(users).join(devices))
 
-    # fall back on unfiltered for the missing part
-    query = select(
+    # fall back on unfiltered beyond end of filtered data
+    unfiltered = select(
         [   func.ST_AsGeoJSON(device_data.c.coordinate).label("geojson"),
             device_data.c.activity_1.label("activity"),
             literal(None).label("line_type"),
-            literal(None).label("line_name")],
+            literal(None).label("line_name"),
+            device_data.c.time],
         and_(
             devices.c.token == session_token,
-            device_data.c.time > start,
-            device_data.c.time <= end),
-        device_data.join(devices),
-        order_by=device_data.c.time)
-    points += db.engine.execute(query)
+            device_data.c.time >= start,
+            device_data.c.time < end,
+            device_data.c.time > filterend),
+        device_data.join(devices))
 
-    # simplify the path geometry by dropping redundant points
-    points = simplify(points, maxpts=maxpts, mindist=mindist)
+    query = filtered.union_all(unfiltered).order_by("time")
+    points = db.engine.execute(query)
 
-    # merge line_type into activity
-    points = [dict(p) for p in points] # rowproxies are not so mutable
-    for p in points:
-        if p.get("line_type"):
-            p["activity"] = p["line_type"]
-        del p["line_type"]
+    # don't draw lines over too long intervals, separate trip on either side
+    segments = trace_split_sparse(points, MAX_POINT_TIME_DIFFERENCE)
 
-    geojson = {
-        'type': 'FeatureCollection',
-        'features': list(trace_linestrings(points, ('activity', 'line_name')))
-    }
+    features = []
+    for points in segments:
+        # simplify the path geometry by dropping redundant points
+        points = simplify_geometry(
+            points, maxpts=maxpts, mindist=mindist, keep_activity=True)
 
-    return jsonify(geojson)
+        # merge line_type into activity
+        points = [dict(p) for p in points] # rowproxies are not so mutable
+        for p in points:
+            if p.get("line_type"):
+                p["activity"] = p["line_type"]
+                del p["line_type"]
+
+        features += trace_linestrings(points, ('activity', 'line_name'))
+
+    return jsonify({'type': 'FeatureCollection', 'features': features})
 
 
 @app.route('/svg/<session_token>')

@@ -53,7 +53,12 @@ def point_interval(p0, p1):
     return (p1["time"] - p0["time"]).total_seconds()
 
 
-def simplify(points, maxpts=None, mindist=None, interpolate=False):
+def simplify_geometry(
+        points,
+        maxpts=None,
+        mindist=None,
+        interpolate=False,
+        keep_activity=False):
     """Simplify location trace by removing geometrically redundant points.
 
     points -- [{
@@ -62,6 +67,7 @@ def simplify(points, maxpts=None, mindist=None, interpolate=False):
     maxpts -- simplify until given number of points remain
     mindist -- omit points contributing no greater than given offset
     interpolate -- use distance from interpolated point, else from line
+    keep_activity -- keep last moved>mindist point of each continuous activity
     """
 
     # avoid building heap if input already conformant
@@ -94,9 +100,6 @@ def simplify(points, maxpts=None, mindist=None, interpolate=False):
         p_ref = [p[i] - ref[i] for i in dim]
         return sum(p_ref[i]**2 for i in dim)**.5
 
-    def dseconds(p0, p1):
-        return (p1["time"] - p0["time"]).total_seconds()
-
     def linedist(p0, p1, p2):
         """Distance of p1 from line segment between p0 and p2."""
         m0, m1, m2 = (
@@ -109,8 +112,27 @@ def simplify(points, maxpts=None, mindist=None, interpolate=False):
         m0, m1, m2 = (
             projector.d2m(*json.loads(x['geojson'])['coordinates'])
             for x in (p0, p1, p2))
-        fraction = dseconds(p0, p1) / dseconds(p0, p2)
+        fraction = point_interval(p0, p1) / point_interval(p0, p2)
         return distance_point_lineseg(m1, (m0, m2), fraction)
+
+    dist = interpolate and timedist or linedist
+
+    def keeping_activity(p0, p1, p2):
+        """Sortable (bool, dist) metric"""
+        changes = p1["activity"] != p2["activity"]
+        moved = point_distance(p0, p1) > mindist
+        return (changes and moved, dist(p0, p1, p2))
+
+    metric = keep_activity and keeping_activity or dist
+    minmetric = keep_activity and (False, mindist) or mindist
+
+    return simplify(points, metric, maxpts, minmetric)
+
+
+def simplify(points, metric, maxpts=None, minmetric=None):
+    """Remove points in order of lowest metric(predecessor, point, successor)
+    until it reaches minmetric, and number of points is no greater than
+    maxpts."""
 
     class Dll:
         def __init__(self, value, before=None, after=None):
@@ -123,17 +145,16 @@ def simplify(points, maxpts=None, mindist=None, interpolate=False):
             if self.after:
                 self.after.before = self.before
 
+    def node_metric(node):
+        return metric(node.before.value, node.value, node.after.value)
+
     linked = [Dll(x) for x in points]
     for i in range(1, len(linked)):
         linked[i].before = linked[i-1]
     for i in range(len(linked) - 1):
         linked[i].after = linked[i+1]
 
-    f = interpolate and timedist or linedist
-    def metric(node):
-        return f(node.before.value, node.value, node.after.value)
-
-    heap = [[metric(node), node] for node in linked[1:-1]]
+    heap = [[node_metric(node), node] for node in linked[1:-1]]
     for node, heap_entry in zip(linked[1:-1], heap):
         node.heap_entry = heap_entry
     heapify(heap)
@@ -142,12 +163,12 @@ def simplify(points, maxpts=None, mindist=None, interpolate=False):
         m, node = heappop(heap)
         # 3 == the endpoints not in heap, plus the one item popped above
         if ((not maxpts or len(heap) <= maxpts - 3)
-                and (not mindist or m > mindist)):
+                and (not minmetric or m > minmetric)):
             break
         node.unlink()
         for neighbor in node.before, node.after:
             if hasattr(neighbor, "heap_entry"):
-                neighbor.heap_entry[0] = metric(neighbor)
+                neighbor.heap_entry[0] = node_metric(neighbor)
         heapify(heap)
 
     node = linked[0]
@@ -260,40 +281,16 @@ def trace_linestrings(points, keys=(), feature_properties=()):
         streaks[i]["points"].insert(0, streaks[i-1]["points"][-1])
 
     for streak in streaks:
+        if len(streak["points"]) < 2:
+            continue # one point does not make a line
         streak["properties"].update(feature_properties)
         yield {
             "type": "Feature",
             "geometry": {
                 "type": "LineString",
                 "coordinates": [
-                    json.loads(x["geojson"])["coordinates"]
-                    for x in streak["points"]]},
+                    point_coordinates(x) for x in streak["points"]]},
             "properties": streak["properties"]}
-
-
-def bounds_overlap(bounds0, bounds1):
-    for a, b in (bounds0, bounds1), (bounds1, bounds0):
-        if (       a["west"] >= b["east"]
-                or a["east"] <= b["west"]
-                or a["south"] >= b["north"]
-                or a["north"] <= b["south"]):
-            return False
-    return True
-
-
-def bounds_size(bounds):
-    projector = Equirectangular(bounds["west"], bounds["south"])
-    p0 = projector.d2m(bounds["west"], bounds["south"])
-    p1 = projector.d2m(bounds["east"], bounds["north"])
-    return [c1 - c0 for c0, c1 in zip(p0, p1)]
-
-
-def bounds_union(bounds0, bounds1):
-    return {
-        "west": min(bounds0["west"], bounds1["west"]),
-        "east": max(bounds0["east"], bounds1["east"]),
-        "south": min(bounds0["south"], bounds1["south"]),
-        "north": max(bounds0["north"], bounds1["north"])}
 
 
 def timedelta_str(td):
@@ -421,79 +418,15 @@ def trace_regular_destinations(
     return groups
 
 
-def leftovers(points, distance, interval, maxpts):
-    groups = [
-        {   "bounds": {
-                "west": min(point_coordinates(p)[0] for p in visit),
-                "east": max(point_coordinates(p)[0] for p in visit),
-                "south": min(point_coordinates(p)[1] for p in visit),
-                "north": max(point_coordinates(p)[1] for p in visit)},
-            "visits": [visit]}
-        for visit in trace_destinations(points, distance, interval)]
+def trace_split_sparse(points, interval):
+    """"Split location trace where interval between points exceeds given
+    threshold interval."""
 
-    for g in groups:
-        print "dest {} {} {} {}\xc3\x97{}".format(
-            g["visits"][0][0]["time"], g["visits"][0][-1]["time"],
-            len(g["visits"][0]),
-            *(int(x) for x in bounds_size(g["bounds"])))
-
-        d = g["visits"][0]
-        if d[0]["time"] > d[-1]["time"]:
-            for p in d:
-                print p["time"]
-
-    print len(groups)
-
-    merged = True
-    while merged:
-        merged = False
-        for g0 in groups:
-            i1 = iter(groups)
-            for g1 in i1:
-                if g0 is g1:
-                    break
-            for g1 in i1: # items subsequent to g0
-                if bounds_overlap(g0["bounds"], g1["bounds"]):
-                    g0["bounds"] = bounds_union(g0["bounds"], g1["bounds"])
-                    g0["visits"] += g1["visits"]
-                    groups.remove(g1)
-                    merged = True
-                    break
-            if merged:
-                break
-
-    print len(groups)
-
-    for g in groups:
-        g["total_stay"] = sum(point_interval(v[0], v[-1]) for v in g["visits"])
-        coords = []
-        entries = []
-        exits = []
-        for v in g["visits"]:
-            coords += [point_coordinates(p) for p in v]
-            entries.append((v[0]["time"] - v[0]["time"].replace(
-                hour=0, minute=0, second=0, microsecond=0)).total_seconds())
-            exits.append((v[-1]["time"] - v[-1]["time"].replace(
-                hour=0, minute=0, second=0, microsecond=0)).total_seconds())
-        g["avg_coords"] = [
-            c / len(coords) for c in map(lambda *x: sum(x), *coords)]
-
-        # XXX these averages are bogus over midnight, natch
-        g["avg_entry"] = sum(entries) / len(entries)
-        g["avg_exit"] = sum(exits) / len(exits)
-
-    for g in sorted(groups, key=lambda x: x["total_stay"], reverse=True):
-        enhm = "%02i:%02i" % divmod(g["avg_entry"]/60, 60)
-        exhm = "%02i:%02i" % divmod(g["avg_exit"]/60, 60)
-        bbsz = "%3s\xc3\x97%s" % tuple(int(x) for x in bounds_size(g["bounds"]))
-#        print "%s %s %s %.3f/%.3f %8s %s" % (
-        print "{} {} {} {:.3f}/{:.3f} {:8s} {}".format(
-            timedelta_str(g["total_stay"]),
-            enhm,
-            exhm,
-            g["avg_coords"][1],
-            g["avg_coords"][0],
-            bbsz,
-            g["bounds"])
-
-    return groups
+    segment = []
+    for p in points:
+        if segment and point_interval(segment[-1], p) > interval:
+            yield segment
+            segment = []
+        segment.append(p)
+    if segment:
+        yield segment
