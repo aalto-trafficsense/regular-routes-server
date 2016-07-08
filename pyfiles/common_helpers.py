@@ -221,7 +221,7 @@ def trace_destinations(points, distance, interval):
                 break
             if point_interval(point, head) >= interval:
                 if dest is None:
-                    dest = []
+                    dest = [point]
                 dend = head
 
     if dest:
