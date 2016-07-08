@@ -223,18 +223,24 @@ def data_post():
 
 @app.route('/destinations/<session_token>')
 def destinations(session_token):
-    devices = db.metadata.tables["devices"]
-    device_data = db.metadata.tables["device_data"]
-
     start = datetime.datetime.now() - datetime.timedelta(days=30)
+
+    # get data from all user's devices, but do use unfiltered, filtering can
+    # drop pings useful for destination detection
+    devices0 = db.metadata.tables["devices"] # token -> user
+    devices1 = devices0.alias() # user -> devices
+    device_data = db.metadata.tables["device_data"] # devices -> points
+
     query = select(
         [   func.ST_AsGeoJSON(device_data.c.coordinate).label("geojson"),
             device_data.c.accuracy,
             device_data.c.time],
         and_(
-            devices.c.token == session_token,
-            device_data.c.time > start),
-        device_data.join(devices),
+            devices0.c.token == session_token,
+            device_data.c.time >= start),
+        devices0 \
+            .join(devices1, devices0.c.user_id == devices1.c.user_id) \
+            .join(device_data, device_data.c.device_id == devices1.c.id),
         order_by=device_data.c.time)
     points = db.engine.execute(query)
 
