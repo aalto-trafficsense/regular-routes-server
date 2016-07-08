@@ -235,19 +235,30 @@ def trace_discard_inaccurate(points, accuracy):
 
 def trace_discard_sidesteps(points, factor=2):
     """Discard points in trace that make the distance between their neighbors
-    suspiciously long compared to the straight line. This works more completely
-    if discard_unmoved is applied first to remove repeats bogus locations."""
+    suspiciously long compared to the straight line."""
 
-    buf = [] # buffer for point and its neighbors
+    d = point_distance
+    def badness(p0, p1, p2):
+        hyp = d(p0, p2)
+        return hyp and (d(p0, p1) + d(p1, p2)) / hyp or float("inf")
+
+    # sidestep can make prior point look bad so drop only if next is not worse
+    buf = []
     for p in points:
         buf.append(p)
-        if len(buf) < 3:
+        if len(buf) < 4:
             continue
-        if (point_distance(buf[0], buf[1]) + point_distance(buf[1], buf[2])
-                <= factor * point_distance(buf[0], buf[2])):
-            yield buf.pop(0)
+        badness1 = badness(*buf[0:3])
+        badness2 = badness(*buf[1:4])
+        if badness1 > factor and badness1 > badness2:
+            buf.pop(1)
             continue
+        yield buf.pop(0)
+
+    # last three points
+    if len(buf) == 3 and badness(*buf) > factor:
         buf.pop(1)
+
     for p in buf:
         yield p
 
