@@ -274,22 +274,6 @@ def visualize_device_geojson(device_id):
             points, distance=DEST_RADIUS_MAX, interval=DEST_DURATION_MIN):
         features.append({
             'type': 'Feature',
-            'geometry': json.loads(dest[0]['geojson']),
-            'properties': {
-                'type': 'dest-start',
-                'title': '%s\n%s' % (
-                    str(dest[0]['time']),
-                    timedelta_str(dest[-1]['time'] - dest[0]['time']))}})
-        features.append({
-            'type': 'Feature',
-            'geometry': json.loads(dest[-1]['geojson']),
-            'properties': {
-                'type': 'dest-end',
-                'title': '%s\n%s' % (
-                    timedelta_str(dest[-1]['time'] - dest[0]['time']),
-                    str(dest[-1]['time']))}})
-        features.append({
-            'type': 'Feature',
             'geometry': {
                 'type': 'LineString',
                 'coordinates': [

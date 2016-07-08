@@ -95,26 +95,6 @@ $(document).ready(function() {
 		// white is rather invisible at low opacity
 		strokeOpacity: (pointColor == 'white' && .8 || .2)
 	    };
-	} else if (type === 'dest-start') {
-	    return {
-		icon: {
-		    path: google.maps.SymbolPath.BACKWARD_OPEN_ARROW,
-		    scale: 5,
-		    strokeColor: 'cyan',
-		    strokeWeight: 3
-		},
-		title: title
-	    };
-	} else if (type === 'dest-end') {
-	    return {
-		icon: {
-		    path: google.maps.SymbolPath.BACKWARD_OPEN_ARROW,
-		    scale: 5,
-		    strokeColor: 'magenta',
-		    strokeWeight: 3
-		},
-		title: title
-	    };
 	} else if (type === 'dest-line') {
 	    return {
 		strokeColor: '#66F',
