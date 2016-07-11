@@ -51,6 +51,6 @@ jore_tram_replace_regex = re.compile("^.0*")
 jore_bus_replace_regex = re.compile("^.0*")
 
 
-# Maximum radius (m) and minimum duration (s) for detecting a trip endpoint.
+# Maximum distance (m) and minimum duration (s) for detecting a stopover.
 DEST_DURATION_MIN = 300
-DEST_RADIUS_MAX = 100
+DEST_RADIUS_MAX = 200
