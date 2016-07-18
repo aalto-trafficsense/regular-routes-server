@@ -45,6 +45,7 @@ users_table = None
 devices_table = None
 device_data_table = None
 device_data_filtered_table = None
+legs_table = None
 travelled_distances_table = None
 mass_transit_data_table = None
 global_statistics_table = None
@@ -119,6 +120,7 @@ def init_db(app):
     Index('idx_device_data_snapping_time_null', device_data_table.c.snapping_time, postgresql_where=device_data_table.c.snapping_time == None)
 
     # device_data_table after filtering activities.
+    # Deprecated by legs, below.
     global device_data_filtered_table
     device_data_filtered_table = Table('device_data_filtered', metadata,
                               Column('id', Integer, primary_key=True),
@@ -133,6 +135,24 @@ def init_db(app):
                               Index('idx_device_data_filtered_user_id_time', 'user_id', 'time'))
 
     device_data_filtered_table.create(checkfirst=True)
+
+    # decided activity and detected mass transit line in trace time ranges
+    global legs_table
+    legs_table = Table('legs', metadata,
+        Column('id', Integer, primary_key=True),
+        Column('device_id', Integer, ForeignKey('devices.id'), nullable=False),
+        Column('user_id', Integer, ForeignKey('users.id')),
+        Column('time_start', TIMESTAMP, nullable=False),
+        Column('time_end', TIMESTAMP, nullable=False),
+        Column('coordinate_start',
+            ga2.Geography('point', 4326, spatial_index=False), nullable=False),
+        Column('coordinate_end',
+            ga2.Geography('point', 4326, spatial_index=False), nullable=False),
+        Column('activity', activity_type_enum),
+        Column('line_type', mass_transit_type_enum),
+        Column('line_name', String),
+        Column('line_stage',
+            Enum("UNKNOWN", "LIVE", "PLANNER", name="line_source_enum")))
 
     # travelled distances per day per device
     global travelled_distances_table
