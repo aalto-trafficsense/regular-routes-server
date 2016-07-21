@@ -152,25 +152,17 @@ def get_ratings_from_rows(filtered_data_rows, user_id):
     return ratings
 
 
-
-
-
 def update_global_statistics():
-    query = '''
-        SELECT MAX(time) as time
-        FROM global_statistics
-    '''
-    time_row = db.engine.execute(text(query)).fetchone()
-    if time_row["time"] is None:
-        query = '''
-            SELECT MIN(time) as time
-            FROM travelled_distances
-        '''
-        time_row = db.engine.execute(text(query)).fetchone()
-        if time_row["time"] is None:
-            return
-    time_start = time_row["time"].replace(hour=0,minute=0,second=0,microsecond=0)
-    last_midnight = datetime.datetime.now().replace(hour=0,minute=0,second=0,microsecond=0)
+    query = """
+        SELECT COALESCE(
+            (SELECT max(time) + interval '1 day' FROM global_statistics),
+            (SELECT min(time) FROM travelled_distances))"""
+    time_start = db.engine.execute(text(query)).scalar()
+    if time_start is None:
+        return
+
+    last_midnight = datetime.datetime.now().replace(
+        hour=0, minute=0, second=0, microsecond=0)
     items = []
     while (time_start < last_midnight):
         time_end = time_start + timedelta(days=1)
@@ -183,8 +175,8 @@ def update_global_statistics():
         travelled_distances_rows = db.engine.execute(text(query), time_start=time_start, time_end=time_end)
         items.append(get_global_statistics_for_day(travelled_distances_rows, time_start))
         time_start += timedelta(days=1)
-    db.engine.execute(global_statistics_table.insert(items))
-
+    if items:
+        db.engine.execute(global_statistics_table.insert(items))
 
 
 def get_global_statistics_for_day(travelled_distances_rows, time):
