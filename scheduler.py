@@ -79,17 +79,25 @@ def filter_device_data():
         device_data_filterer.analyse_unfiltered_data(device_data_rows, id_row["id"])
 
 
-
 def generate_distance_data():
     user_ids =  db.engine.execute(text("SELECT id FROM users;"))
     ratings = []
+    last_midnight = datetime.datetime.now().replace(
+        hour=0, minute=0, second=0, microsecond=0)
     for id_row in user_ids:
         time = get_max_time_from_table("time", "travelled_distances", "user_id", id_row["id"]) + timedelta(days=1)
-        last_midnight = datetime.datetime.now().replace(hour = 0, minute = 0, second = 0, microsecond = 0)
         data_rows = get_filtered_device_data_points(id_row["id"], time, last_midnight)
         ratings += get_ratings_from_rows(data_rows, id_row["id"])
     if len(ratings) > 0:
         db.engine.execute(travelled_distances_table.insert(ratings))
+
+    # update rankings based on ratings
+    query = text("""
+        SELECT DISTINCT time FROM travelled_distances
+        WHERE ranking IS NULL AND total_distance IS NOT NULL""")
+    for row in db.engine.execute(query):
+        generate_rankings(row[0])
+
 
 def get_ratings_from_rows(filtered_data_rows, user_id):
     ratings = []
@@ -174,7 +182,6 @@ def update_global_statistics():
         '''
         travelled_distances_rows = db.engine.execute(text(query), time_start=time_start, time_end=time_end)
         items.append(get_global_statistics_for_day(travelled_distances_rows, time_start))
-        generate_rankings(time_start)
         time_start += timedelta(days=1)
     db.engine.execute(global_statistics_table.insert(items))
 
