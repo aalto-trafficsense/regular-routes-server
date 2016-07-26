@@ -57,7 +57,7 @@ global_statistics_table = db.metadata.tables['global_statistics']
 def initialize():
     print "initialising scheduler"
     scheduler = BackgroundScheduler()
-    scheduler.add_job(retrieve_hsl_data, "cron", second="*/28")
+    scheduler.add_job(retrieve_hsl_data, "cron", second="*/30")
     scheduler.add_job(run_daily_tasks, "cron", hour="3")
     run_daily_tasks()
     print "scheduler init done"
@@ -243,7 +243,7 @@ def generate_rankings(time):
 
 def retrieve_hsl_data():
     url = "http://dev.hsl.fi/siriaccess/vm/json"
-    response = urllib2.urlopen(url)
+    response = urllib2.urlopen(url, timeout=50)
     json_data = json.loads(response.read())
     vehicle_data = json_data["Siri"]["ServiceDelivery"]["VehicleMonitoringDelivery"][0]["VehicleActivity"]
 
