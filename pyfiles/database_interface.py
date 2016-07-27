@@ -287,7 +287,7 @@ def get_filtered_device_data_points(user_id, datetime_start, datetime_end):
     points =  db.engine.execute(text(query), user_id=user_id, time_start=datetime_start, time_end=datetime_end)
     return points
 
-def data_points_by_user_id(user_id, datetime_start, datetime_end):
+def data_points_by_user_id_after(user_id, datetime_start, datetime_end):
     query = '''
         SELECT device_id,
             ST_AsGeoJSON(coordinate) AS geojson,
@@ -297,9 +297,8 @@ def data_points_by_user_id(user_id, datetime_start, datetime_end):
             waypoint_id,
             time
         FROM device_data
-        WHERE device_id IN (SELECT id FROM devices
-                                 WHERE user_id = :user_id)
-        AND time >= :time_start
+        WHERE device_id IN (SELECT id FROM devices WHERE user_id = :user_id)
+        AND time > :time_start
         AND time < :time_end
         ORDER BY time ASC
     '''

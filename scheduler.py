@@ -7,8 +7,8 @@ import sys
 import time
 import re
 import urllib2
-from pyfiles.database_interface import(
-    init_db, get_filtered_device_data_points, data_points_by_user_id)
+from pyfiles.database_interface import (
+    init_db, data_points_by_user_id_after, get_filtered_device_data_points)
 from pyfiles.device_data_filterer import DeviceDataFilterer
 from pyfiles.energy_rating import EnergyRating
 from pyfiles.constants import *
@@ -74,7 +74,8 @@ def filter_device_data():
     user_ids =  db.engine.execute(text("SELECT id FROM users;"))
     for id_row in user_ids:
         time = get_max_time_from_table("time", "device_data_filtered", "user_id", id_row["id"])
-        device_data_rows = data_points_by_user_id(id_row["id"], time, datetime.datetime.now())
+        device_data_rows = data_points_by_user_id_after(
+            id_row["id"], time, datetime.datetime.now())
         device_data_filterer = DeviceDataFilterer()
         device_data_filterer.analyse_unfiltered_data(device_data_rows, id_row["id"])
 
