@@ -19,9 +19,7 @@ from sqlalchemy.sql import text
 
 import logging
 logging.basicConfig()
-
-
-
+log = logging.getLogger(__name__)
 
 
 SETTINGS_FILE_ENV_VAR = 'REGULARROUTES_SETTINGS'
@@ -250,7 +248,7 @@ def retrieve_hsl_data():
 
     all_vehicles = []
 
-    for vehicle in vehicle_data:
+    def vehicle_row(vehicle):
         timestamp = datetime.datetime.fromtimestamp(vehicle["RecordedAtTime"] / 1000) #datetime doesn't like millisecond accuracy
         line_name, line_type = interpret_jore(vehicle["MonitoredVehicleJourney"]["LineRef"]["value"])
         longitude = vehicle["MonitoredVehicleJourney"]["VehicleLocation"]["Longitude"]
@@ -258,16 +256,25 @@ def retrieve_hsl_data():
         coordinate = 'POINT(%f %f)' % (longitude, latitude)
         vehicle_ref = vehicle["MonitoredVehicleJourney"]["VehicleRef"]["value"]
 
-        vehicle_item = {
+        return {
             'coordinate': coordinate,
             'line_name': line_name,
             'line_type': line_type,
             'time': timestamp,
             'vehicle_ref': vehicle_ref
         }
-        all_vehicles.append(vehicle_item)
 
-    db.engine.execute(mass_transit_data_table.insert(all_vehicles))
+    for vehicle in vehicle_data:
+        try:
+            all_vehicles.append(vehicle_row(vehicle))
+        except Exception as e:
+            log.exception("Failed to handle vehicle record: %s" % vehicle)
+
+    if all_vehicles:
+        db.engine.execute(mass_transit_data_table.insert(all_vehicles))
+    else:
+        log.warning(
+            "No mass transit data received at %s" % datetime.datetime.now())
 
 
 def interpret_jore(jore_code):
