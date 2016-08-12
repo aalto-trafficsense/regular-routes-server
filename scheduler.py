@@ -20,7 +20,7 @@ from sqlalchemy.sql import text
 import logging
 logging.basicConfig()
 log = logging.getLogger(__name__)
-
+log.setLevel(logging.INFO)
 
 SETTINGS_FILE_ENV_VAR = 'REGULARROUTES_SETTINGS'
 CLIENT_SECRET_FILE_NAME = 'client_secrets.json'
@@ -55,17 +55,20 @@ global_statistics_table = db.metadata.tables['global_statistics']
 def initialize():
     print "initialising scheduler"
     scheduler = BackgroundScheduler()
-    scheduler.add_job(retrieve_hsl_data, "cron", second="*/30")
-    scheduler.add_job(run_daily_tasks, "cron", hour="3")
-    run_daily_tasks()
-    print "scheduler init done"
     scheduler.start()
+    scheduler.add_job(retrieve_hsl_data, "cron", second="*/30")
+    run_daily_tasks()
+    scheduler.add_job(run_daily_tasks, "cron", hour="3")
+    print "scheduler init done"
+
 
 def run_daily_tasks():
     # The order is important.
     filter_device_data()
     generate_distance_data()
     update_global_statistics()
+    mass_transit_cleanup()
+
 
 def filter_device_data():
     #TODO: Don't check for users that have been inactive for a long time.
@@ -238,6 +241,39 @@ def generate_rankings(time):
         for i in range(len(totals_sorted))]
     if batch:
         db.engine.execute(travelled_distances_table.insert(batch))
+
+
+def mass_transit_cleanup():
+    """Delete and vacuum mass transit live location data older than configured
+    interval, for example
+        MASS_TRANSIT_LIVE_KEEP_DAYS = 7"""
+
+    # keep all data if nothing configured
+    days = app.config.get("MASS_TRANSIT_LIVE_KEEP_DAYS")
+    if not days:
+        return
+
+    # snap deletion to daystart; be noisy as these can take quite a long time
+    log.info("Deleting mass_transit_data older than %d days...", days)
+    query = text("""
+        DELETE FROM mass_transit_data
+        WHERE time < date_trunc('day', now() - interval ':days days')""")
+    delrows = db.engine.execute(query, days=days).rowcount
+    log.info("Deleted %d rows of mass_transit_data.", delrows)
+    if not delrows:
+        return
+
+    # vacuum to reuse space; cannot be wrapped in transaction, so another conn
+    log.info("Vacuuming and analyzing mass_transit_data...")
+    query = text("VACUUM ANALYZE mass_transit_data")
+    conn = db.engine.connect().execution_options(isolation_level="AUTOCOMMIT")
+    conn.execute(query)
+    conn.close()
+    log.info("Vacuuming and analyzing mass_transit_data complete.")
+
+    # Note, to free space rather than mark for reuse, e.g. after configuring a
+    # lower retention limit, use VACUUM FULL. Not done automatically due to
+    # locking, additional temporary space usage, and potential OOM on reindex.
 
 
 def retrieve_hsl_data():
