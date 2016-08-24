@@ -176,10 +176,10 @@ class DeviceDataFilterer:
             MAX_MASS_TRANSIT_DISTANCE_DIFFERENCE,
             NUMBER_OF_MASS_TRANSIT_MATCH_SAMPLES).fetchall()
 
-        print tstart, tend, device, len(device_data_queue)
-        for x in matches:
-            print "%4i %.2f %s" % (x[0], x[1], x[2:])
-        print
+        print "d"+str(device), str(tstart)[:16], str(tend)[11:16], \
+            str(len(device_data_queue))+"p:", ", ".join("%.2f %i %s" % (
+                x[1], x[0], " ".join(x[2:])) for x in matches) \
+            or "no nearby vehicles"
 
         hitreq = ((1.0*
                 NUMBER_OF_MASS_TRANSIT_MATCH_SAMPLES
@@ -187,90 +187,9 @@ class DeviceDataFilterer:
           / NUMBER_OF_MASS_TRANSIT_MATCH_SAMPLES)
 
         if matches and matches[0]["hitrate"] >= hitreq:
-            # could only fetch winner from db
             return matches[0]["line_type"], matches[0]["line_name"]
 
         return None, None
-
-
-    def _match_mass_transit_live_OLD(self, activity, device_data_queue):
-        if activity != "IN_VEHICLE":
-            return None, None
-
-        vehicle_data = {} # Contains the line name and line type of a vehicle id
-        match_counts = {} # Contains the number of matches per vehicle id
-        total_distances = {} # Contains the total distance from device_data samples to mass transit samples
-        collected_matches = [] # Contains lists of vehicle matches. One list per sampling point.
-        final_matches = []
-
-        # Get NUMBER_OF_MASS_TRANSIT_MATCH_SAMPLES samples from device_data_queue and try to match those samples
-        # with mass transit data.
-        sampling_factor = len(device_data_queue) / NUMBER_OF_MASS_TRANSIT_MATCH_SAMPLES
-        for i in range(NUMBER_OF_MASS_TRANSIT_MATCH_SAMPLES):
-            #print i # print to get some responses of the progress.
-            sample = device_data_queue[i * sampling_factor]
-            mass_transit_points = get_mass_transit_points(sample)
-            new_vehicles_and_distances = {} # Dictionary: vehicle_id, distance to device_data sample
-            matches_and_distances = []
-            sample_location = json.loads(sample["geojson"])["coordinates"]
-            for point in mass_transit_points:
-                vehicle_location = json.loads(point["geojson"])["coordinates"]
-                # Get all distinct nearby vehicle ids and their distances from the device data sample and store their data
-                distance = get_distance_between_coordinates(sample_location, vehicle_location)
-                
-                # Because there can be multiple matches for a single mass transport vehicle,
-                # we pick the closest one.
-                if point["vehicle_ref"] in new_vehicles_and_distances:
-                    if new_vehicles_and_distances[point["vehicle_ref"]] > distance:
-                        new_vehicles_and_distances[point["vehicle_ref"]] = distance
-                else:
-                    new_vehicles_and_distances[point["vehicle_ref"]] = distance
-                vehicle_data[point["vehicle_ref"]] = (point["line_type"], point["line_name"])
-
-            for veh_id in new_vehicles_and_distances:
-                matches_and_distances.append((veh_id, new_vehicles_and_distances[veh_id]))
-            collected_matches.append(matches_and_distances)
-
-        # Count the total number of matches
-        for matches_and_distances in collected_matches:
-            for vehicle in matches_and_distances:
-                if vehicle[0] in match_counts:
-                    match_counts[vehicle[0]] += 1
-                    total_distances[vehicle[0]] += vehicle[1]
-                else:
-                    match_counts[vehicle[0]] = 1
-                    total_distances[vehicle[0]] = vehicle[1]
-
-        # Find the vehicle ids with most matches
-        for i in range(MAXIMUM_MASS_TRANSIT_MISSES + 1):
-            for match in match_counts:
-                if match_counts[match] == NUMBER_OF_MASS_TRANSIT_MATCH_SAMPLES - i:
-                    final_matches.append(match)
-            if len(final_matches) > 0:
-                break
-
-        if len(final_matches) == 0:
-            return None, None
-
-        #print device_data_queue[0]["time"]
-        #for transit in final_matches:
-        #    print vehicle_data[transit]
-
-        # Find the vehicle whose total distance from device data samples was the smallest.
-        min_distance = -1
-        final_vehicle = ""
-        for veh_id in final_matches:
-            if min_distance < 0:
-                min_distance = total_distances[veh_id]
-                final_vehicle = veh_id
-            else:
-                if total_distances[veh_id] < min_distance:
-                    min_distance = total_distances[veh_id]
-                    final_vehicle = veh_id
-
-        line_data = vehicle_data[final_vehicle]
-        #print line_data
-        return line_data[0], line_data[1] # line_type, line_name
 
 
     def _analyse_activities(self, points):

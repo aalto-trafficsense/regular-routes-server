@@ -351,28 +351,6 @@ def data_points_filtered(user_id, datetime_start, datetime_end):
     points =  db.engine.execute(text(qstring), user_id=user_id, time_start=datetime_start, time_end=datetime_end)
     return points
 
-def get_mass_transit_points(device_data_sample):
-    # Get all mass transit points near a device data sample with timestamps close to each other.
-    min_time = device_data_sample["time"] - datetime.timedelta(seconds=MAX_MASS_TRANSIT_TIME_DIFFERENCE)
-    max_time = device_data_sample["time"] + datetime.timedelta(seconds=MAX_MASS_TRANSIT_TIME_DIFFERENCE)
-    current_location = json.loads(device_data_sample["geojson"])["coordinates"]
-    query = """SELECT line_type,
-                      line_name,
-                      vehicle_ref,
-                      ST_AsGeoJSON(coordinate) AS geojson
-               FROM mass_transit_data
-               WHERE time >= :min_time
-               AND time < :max_time
-               AND ST_DWithin(coordinate, ST_Point(:longitude,:latitude), :MAX_MATCH_DISTANCE)"""
-
-    mass_transit_points = db.engine.execute(text(query),
-                                     min_time=min_time,
-                                     max_time=max_time,
-                                     longitude=current_location[0],
-                                     latitude=current_location[1],
-                                     MAX_MATCH_DISTANCE=MAX_MASS_TRANSIT_DISTANCE_DIFFERENCE)
-    return mass_transit_points
-
 
 def match_mass_transit_live(device, tstart, tend, tradius, dradius, nsamples):
     """Find mass transit vehicles near user during a trip leg.
