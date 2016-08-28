@@ -406,19 +406,31 @@ boxed AS (
         AND time < timestamp :tend + interval ':tradius seconds'
         AND coordinate::geometry @ (SELECT x FROM bbox)),
 
--- only nearest sample of each vehicle so no inflation from reporting more
--- often, or from randomly switching to a different line_name all the time
-nearest AS (
+-- Join device points with linestrings of the trace of each vehicle around that
+-- time. The line_name changes randomly on some vehicles, pick most frequent.
+linetraces AS (
     SELECT
-        max(:dradius - ST_Distance(m.coordinate, d.coordinate)) revdist,
         d.id,
+        d.coordinate,
         m.vehicle_ref,
+        ST_MakeLine(m.coordinate::geometry ORDER BY m.time) line_trace,
         mode() WITHIN GROUP (ORDER BY m.line_type) line_type,
         mode() WITHIN GROUP (ORDER BY m.line_name) line_name
     FROM boxed m JOIN trace d
     ON abs(extract(epoch from (m.time - d.time))) <= :tradius
-        AND ST_Distance(m.coordinate, d.coordinate) <= :dradius
-    GROUP BY d.id, m.vehicle_ref)
+    GROUP BY d.id, d.coordinate, m.vehicle_ref),
+
+-- Score matches by the distance inward of the match radius.
+nearest AS (
+    SELECT
+        id,
+        vehicle_ref,
+        line_type,
+        line_name,
+        max(:dradius - ST_Distance(line_trace, coordinate)) revdist
+    FROM linetraces
+    WHERE ST_Distance(line_trace, coordinate) <= :dradius
+    GROUP BY id, vehicle_ref, line_type, line_name)
 
 -- sum and count over user location trace. some vehicles' line_name and other
 -- fields flip randomly, pick most frequent
