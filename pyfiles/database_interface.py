@@ -427,13 +427,12 @@ nearest AS (
         vehicle_ref,
         line_type,
         line_name,
-        max(:dradius - ST_Distance(line_trace, coordinate)) revdist
+        :dradius - ST_Distance(line_trace, coordinate) revdist
     FROM linetraces
-    WHERE ST_Distance(line_trace, coordinate) <= :dradius
-    GROUP BY id, vehicle_ref, line_type, line_name)
+    WHERE ST_Distance(line_trace, coordinate) <= :dradius)
 
--- sum and count over user location trace. some vehicles' line_name and other
--- fields flip randomly, pick most frequent
+-- Sum scores and count matches over user location trace. Some vehicles'
+-- line_name and other fields flip randomly, pick most frequent.
     SELECT
         sum(revdist) revsum,
         1.0 * count(*) / (SELECT count(*) FROM trace) hitrate,
