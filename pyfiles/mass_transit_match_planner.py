@@ -134,6 +134,7 @@ def match_tripleg_with_publictransport(fromPlace, toPlace, trip_starttime, trip_
     showIntermediateStops = "True"
     # TODO: is there a param 'max waiting time' too?
 
+
     maxIntervals = {"bus":60, "tram":30, "train":60, "ferry":60} # max arrival interval of each public transport mode during working hours (minutes)
     maxSlowness = {"bus":3, "tram":3, "train":3, "ferry":5} # maximum slowness (a bit different concept than 'being late') of public transport (minutes)
                                                             # we should note that being "slower"/"faster" is different than bus arrival being "late"/"early"
@@ -432,16 +433,20 @@ def match_tripleg_with_publictransport(fromPlace, toPlace, trip_starttime, trip_
                             else:
                                 unmatchedpoints.append(point)
                                 serialunmatchcount += 1
-                        #END for, traverse goodpoints -----------
+                        #END for. traverse goodpoints -----------
                         print "serialunmatches:", serialunmatches
                                             
                         matched_fraction = round( 100 * ( len(matchedpointpairs)/float(len(goodpoints)) ) )
                         longest_serialunmatch = max(serialunmatches)                 
+                        # if N% of goodpoints do not have a match in plan ==> matching FAILED             ?
+                        # if M consecutive goodpoints do not have a match in plan ==> matching FAILED     ?              
+                        ridematched_str = ""                        
                         if matched_fraction >= MIN_MATCH_RATIO and longest_serialunmatch <= MAX_SERIAL_UNMATCH:
                             matchedbyroute = True   # this itin has a match also geoloc&route-based *
-                            ridematched_str = ":::::: this leg might be a match (time-based & route-based) !!"                                        
+                            ridematched_str = ":::::: above leg might be a match (time-based & route-based) !!"                                        
                         print "matched_fraction", matched_fraction, "%,  MIN_MATCH_RATIO:", MIN_MATCH_RATIO,"%"
                         print "longest_serialunmatch:",longest_serialunmatch, "points,  MAX_SERIAL_UNMATCH:", MAX_SERIAL_UNMATCH
+                        print ridematched_str
 
 
                     # TODO: just print for debug ---------------------------------------          

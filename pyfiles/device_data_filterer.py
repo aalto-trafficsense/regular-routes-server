@@ -48,19 +48,24 @@ class DeviceDataFilterer:
             self, activity, device_data_queue, user_id, line_type, line_name):
 
         HSL_ERROR_CODE_DATE_TOO_FAR = 406
-            
-        if activity == "IN_VEHICLE":    # TODO : only for IN_VEHICLE activity? ... but maybe a bus or tram ride is sometimnes misdetected as CYCLING or WALK?
+        
+        # TODO : implement matching for "BIKE" legs too: 
+            #   ...
+            #   ...
 
+        # TODO : only for IN_VEHICLE activity? ... but maybe a bus or tram ride is sometimnes misdetected as CYCLING or WALK?            
+        if activity == "IN_VEHICLE":    
             self.user_invehicle_triplegs += 1
             trip_leg_points = len(device_data_queue)                                  
             print ""
             line_name_str = "None"
-            if line_name: line_name_str = line_name.encode('utf-8')
+            if line_name: 
+                line_name_str = line_name.encode('utf-8')
             print "----- TRIP-LEG (in_vehicle) #", self.user_invehicle_triplegs ,"(from first filter detection): ", user_id, activity, line_type, line_name_str
             print "trip-leg starts. ends: ", device_data_queue[0]['time'], " --> ", device_data_queue[trip_leg_points-1]['time'] \
                     , "(poitns in this trip leg:", trip_leg_points, ")"
             
-            # detect starting point and end point of the trip-leg":
+            # detect starting point and end point of the trip-leg:
             start_row = device_data_queue[0]
             end_row = device_data_queue[trip_leg_points-1]
 
@@ -74,8 +79,7 @@ class DeviceDataFilterer:
             avgspeed = distance/duration.total_seconds()
             print "duration:", duration, ",   ", "point-to-point straight-line distance:", distance, "(meters)  =>  ", "straigh-line avgspeed:",avgspeed, "(m/s)"
             
-            # mehrdad: trip-leg matching logic *:
-
+            # mehrdad: trip-leg matching logic * -----------------------------------------:
             tripleg_updated = 0
             start_location_str='{1},{0}'.format(start_location[0],start_location[1])
             end_location_str='{1},{0}'.format(end_location[0],end_location[1])
@@ -106,7 +110,8 @@ class DeviceDataFilterer:
                         line_name = matchres.trip.linename
                         self.user_invehicle_triplegs_updated += 1
                         tripleg_updated = 1
-                        if line_name: line_name_str = line_name.encode('utf-8')                    
+                        if line_name: 
+                            line_name_str = line_name.encode('utf-8')                    
                         print "> TRIP-LEG UPDATED (from second filter detection): ", user_id, activity, line_type, line_name_str
 
             # other filters: 
@@ -116,24 +121,28 @@ class DeviceDataFilterer:
             if (line_type==None or (line_name=='' or line_name==None)) and avgspeed < minSpeeds['walk']:
                 print "trip's avg. speed:", avgspeed, "m/s", ": too slow! probably NOT IN_VEHICLE!"
         
-            # save the trip-leg records in file *:
+            # save the trip-leg records in file -------------------------------------:
             # file columns: 
             #   userid, triplegno, startcoo, endcoo, starttime, endtime, mode, linetype, linename, distance, duration, avgspeed, updated        
-            row_basics_str = "{0};{1};{2};{3};{4};{5};{6};{7};{8};{9};{10};{11};{12}".format(\
-                                user_id, self.user_invehicle_triplegs, start_location_str, end_location_str, start_time, end_time,\
-                                activity, line_type, line_name_str, round(distance), duration, round(avgspeed,1), tripleg_updated)                                
-            row_plandetails_str = ""
-            if matchres.matchcount > 0:
-                row_plandetails_str = "{0};{1};{2};{3};{4};{5};{6};{7};;{8};{9};{10};{11};{12}".format(\
-                                            matchres.trip.start, matchres.trip.end, 
-                                            matchres.trip.legstart, matchres.trip.legend, 
-                                            matchres.trip.deltaT, matchres.trip.deltaTsign, 
-                                            matchres.trip.deltaStarttimeStr, matchres.trip.deltaStartPassed,
-                                            matchres.trip.linetype, matchres.trip.linename, 
-                                            matchres.trip.matchedbyroute, matchres.trip.matched_fraction, matchres.trip.longest_serialunmatch)
-            triplegfileline = row_basics_str + ";;" + row_plandetails_str
-                                                        
             if DUMP_CSV_FILES:
+                row_basics_str = "{0};{1};{2};{3};{4};{5};{6};{7};{8};{9};{10};{11};{12}".format(\
+                                    user_id, self.user_invehicle_triplegs, start_location_str, end_location_str, start_time, end_time,\
+                                    activity, line_type, line_name_str, round(distance), duration, round(avgspeed,1), tripleg_updated)                                
+                row_plandetails_str = ""
+                if matchres.matchcount > 0:                
+                    # TODO fix this better!
+                    line_name = matchres.trip.linename
+                    if line_name: line_name_str = line_name.encode('utf-8')                    
+                
+                    row_plandetails_str = "{0};{1};{2};{3};{4};{5};{6};{7};;{8};{9};{10};{11};{12}".format(\
+                                                matchres.trip.start, matchres.trip.end, 
+                                                matchres.trip.legstart, matchres.trip.legend, 
+                                                matchres.trip.deltaT, matchres.trip.deltaTsign, 
+                                                matchres.trip.deltaStarttimeStr, matchres.trip.deltaStartPassed,
+                                                matchres.trip.linetype, line_name_str, 
+                                                matchres.trip.matchedbyroute, matchres.trip.matched_fraction, matchres.trip.longest_serialunmatch)
+                triplegfileline = row_basics_str + ";;" + row_plandetails_str
+                                                        
                 self.file_triplegs.write(triplegfileline+"\n")
 
         return line_type, line_name
