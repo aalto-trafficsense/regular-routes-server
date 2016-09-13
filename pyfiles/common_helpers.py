@@ -198,7 +198,21 @@ def dict_groups(dicts, keys):
 def trace_partition_movement(points, distance, interval):
     """Partition location trace into moving and stationary segments as a
     sequence of (bool moving, list points). A stationary segment is where the
-    trace moves less than the given distance in the given time interval."""
+    trace moves less than the given distance in the given time interval.
+
+    Destination entry and exit are refined to the points maximizing the
+    difference between the distances traveled in the prior and subsequent
+    intervals, clamped to the distance to avoid faraway window edge effects.
+
+    The former uses interval measure on distance window edges; the other way
+    around, looping over a longer distance and back in the given interval would
+    be misidentifed as stationary.
+
+    The latter uses distance measure on interval window edges; the other way
+    around, points on the exit path would interfere with entry detection and
+    vice versa, resulting in more or less random knee points.
+
+    Low accuracy or otherwise suspicious points are discarded."""
 
     # worst-case inaccurate point pair can break up a destination, but only if
     # helped by epsilon of real movement
@@ -207,30 +221,86 @@ def trace_partition_movement(points, distance, interval):
     # prevent false faraway location points breaking up visits
     points = trace_discard_sidesteps(points, 2)
 
-    points, heads = tee(points, 2)
-    head = next(heads, None)
-    stopend = None
-    segment = []
+    inf = float("inf")
+    entryend = exitend = None
+    entrymax = exitmax = -inf
+    moveseg, stopseg, nextseg = [], [], []
+
+    points, heads, itails, iheads = tee(points, 4)
+    head = next(heads, None) # distance lookahead window for stop condition
+    itail = next(itails, None) # interval back window for entry/exit refinement
+    ihead = None # point inside interval lookahead window
+    next_ihead = next(iheads, None) # point outside interval lookahead window
 
     for point in points:
-        segment.append(point)
+        nextseg.append(point)
 
-        if point is stopend:
-            yield False, segment
-            segment = []
-            stopend = None
+        # Adjust two-pane time window used for entry/exit refinement.
+        while point_interval(itail, point) > interval:
+            itail = next(itails, None)
+        while next_ihead and point_interval(point, next_ihead) <= interval:
+            ihead = next_ihead
+            next_ihead = next(iheads, None) # the overextended point
 
+        # Track knees i.e. sharpest speed change at entry and exit. Clamp to
+        # neighborhood of interest to avoid faraway window edge effects.
+        stretch = (min(distance, point_distance(point, ihead))
+                 - min(distance, point_distance(itail, point)))
+
+        # Find valid windows while advancing head until out of range.
         while head and point_distance(point, head) <= distance:
+
+            # When stop condition is valid, do stuff.
             if point_interval(point, head) >= interval:
-                if stopend is None:
-                    if len(segment) > 1:
-                        yield True, segment[:-1]
-                    segment = [point]
-                stopend = head
+
+                # On first validity on a stop, set up entry refinement window.
+                if exitend is None:
+                    entrymax = -inf
+                    entryend = head
+
+                # Reset exit refinement window.
+                exitmax = -inf
+                exitend = head
+
             head = next(heads, None)
 
-    if segment:
-        yield stopend is None, segment
+        # Refine entry point when in entry window.
+        if entryend is not None and -stretch > entrymax: # > lone/clamp early
+            entrymax = -stretch
+            moveseg += stopseg + nextseg
+            stopseg = [moveseg.pop()] # current point belongs in stop
+            nextseg = []
+            exitmax = -inf # reset exit refinement
+
+        # Refine exit when in a stop.
+        if exitend is not None and stretch >= exitmax: # >= lone/clamp late
+            exitmax = stretch
+            stopseg += nextseg
+            nextseg = []
+
+        # At the end of the entry window, emit the prior move segment.
+        if point is entryend:
+            entryend = None
+            if moveseg:
+                yield True, moveseg
+            moveseg = []
+
+        # At end of stop condition validity, emit the stop segment.
+        if point is exitend:
+            exitend = None
+            if stopseg:
+                yield False, stopseg
+            stopseg = []
+
+    if exitend:
+        stopseg += nextseg
+    else:
+        moveseg += nextseg
+
+    if moveseg:
+        yield True, moveseg
+    if stopseg:
+        yield False, stopseg
 
 
 def trace_destinations(points, distance, interval):
@@ -372,10 +442,14 @@ def timedelta_str(td):
     return "%6s" % ''.join(rv[:2])
 
 
-def trace_regular_destinations(
-        points, threshold_distance, threshold_interval):
+def trace_regular_destinations(points, threshold_distance, threshold_interval):
     """Find regular destinations in location
     trace. Distance and interval thresholds passed on to trace_destinations."""
+
+    # With refined entry/exit, the visit centres should not be too biased by
+    # the entry/exit traces, so using double cluster distance should not too
+    # often lead to two sdjacent stops clustering into one destination.
+    cluster_distance = threshold_distance * 2
 
     dests = [
         {   "coordinates": tuple(
@@ -422,7 +496,7 @@ def trace_regular_destinations(
         distance, d1, d0 = item = heappop(heap)
 
         # if shortest edge is long enough, unpop and stop
-        if distance is None or distance >= threshold_distance:
+        if distance is None or distance >= cluster_distance:
             heappush(heap, item) # unspill the milk
             break
 

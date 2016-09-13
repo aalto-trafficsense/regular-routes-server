@@ -53,4 +53,4 @@ jore_bus_replace_regex = re.compile("^.0*")
 
 # Maximum distance (m) and minimum duration (s) for detecting a stopover.
 DEST_DURATION_MIN = 300
-DEST_RADIUS_MAX = 200
+DEST_RADIUS_MAX = 100
