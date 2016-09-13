@@ -195,7 +195,10 @@ def dict_groups(dicts, keys):
         yield gkey, group
 
 
-def trace_destinations(points, distance, interval):
+def trace_partition_movement(points, distance, interval):
+    """Partition location trace into moving and stationary segments as a
+    sequence of (bool moving, list points). A stationary segment is where the
+    trace moves less than the given distance in the given time interval."""
 
     # worst-case inaccurate point pair can break up a destination, but only if
     # helped by epsilon of real movement
@@ -205,14 +208,16 @@ def trace_destinations(points, distance, interval):
     points = trace_discard_sidesteps(points, 2)
 
     points, heads = tee(points, 2)
-    dest = head = dend = None
+    head = stopend = None
+    segment = []
 
     for point in points:
-        if dest is not None:
-            dest.append(point)
-        if point is dend:
-            yield dest
-            dest = None
+        segment.append(point)
+
+        if point is stopend:
+            yield False, segment
+            segment = []
+            stopend = None
         if head and point_distance(point, head) > distance:
             continue
 
@@ -220,12 +225,21 @@ def trace_destinations(points, distance, interval):
             if point_distance(point, head) > distance:
                 break
             if point_interval(point, head) >= interval:
-                if dest is None:
-                    dest = [point]
-                dend = head
+                if stopend is None:
+                    if len(segment) > 1:
+                        yield True, segment[:-1]
+                    segment = [point]
+                stopend = head
 
-    if dest:
-        yield dest
+    if segment:
+        yield stopend is None, segment
+
+
+def trace_destinations(points, distance, interval):
+    """Find stationary subsequences in location trace"""
+    for mov, seg in trace_partition_movement(points, distance, interval):
+        if not mov:
+            yield seg
 
 
 def trace_discard_inaccurate(points, accuracy):
