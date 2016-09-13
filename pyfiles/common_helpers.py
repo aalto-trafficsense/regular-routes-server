@@ -208,7 +208,8 @@ def trace_partition_movement(points, distance, interval):
     points = trace_discard_sidesteps(points, 2)
 
     points, heads = tee(points, 2)
-    head = stopend = None
+    head = next(heads, None)
+    stopend = None
     segment = []
 
     for point in points:
@@ -218,18 +219,15 @@ def trace_partition_movement(points, distance, interval):
             yield False, segment
             segment = []
             stopend = None
-        if head and point_distance(point, head) > distance:
-            continue
 
-        for head in heads:
-            if point_distance(point, head) > distance:
-                break
+        while head and point_distance(point, head) <= distance:
             if point_interval(point, head) >= interval:
                 if stopend is None:
                     if len(segment) > 1:
                         yield True, segment[:-1]
                     segment = [point]
                 stopend = head
+            head = next(heads, None)
 
     if segment:
         yield stopend is None, segment
