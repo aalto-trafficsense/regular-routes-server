@@ -91,7 +91,9 @@ class TripMatchedWithPlannerResult:
     trip = None # its type should be PlannedTrip 
     matchcount = 0
     bestmatchindex = 0
- 
+    error_code = 0
+    error_msg = ''
+    error_message = ''
 
 minSpeeds = {"walk":1.34112, "bus": 3.0, "tram":2.5, "train":5.0, "ferry":5.0} # walk speed default: 3 MPH (1.34112 m/s) (~ 5.0 km/h)
 
@@ -168,7 +170,10 @@ def match_tripleg_with_publictransport(fromPlace, toPlace, trip_starttime, trip_
         # print "json_data error section:\n", json_data['error']
         
         if 'error' in json_data:
-            return json_data['error']['id'], tripmatchres
+            tripmatchres.error_code = json_data['error']['id']
+            tripmatchres.error_msg = json_data['error']['msg']
+            tripmatchres.error_message =  json_data['error']['message']
+            return 0, tripmatchres
         else:
             return 0, tripmatchres
 

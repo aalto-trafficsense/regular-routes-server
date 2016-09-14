@@ -93,15 +93,18 @@ class DeviceDataFilterer:
                 # print "we're sending this to match function:", start_location_str, end_location_str, start_time, end_time
                 res, matchres = match_tripleg_with_publictransport(start_location_str, end_location_str, start_time, end_time, device_data_queue)
                 
-                if res == HSL_ERROR_CODE_DATE_TOO_FAR: # second try (adjust the old weekday to current week)
+                if res == 0 and matchres.error_code == HSL_ERROR_CODE_DATE_TOO_FAR: # second try (adjust the old weekday to current week)
                     print ""
-                    print "failed because: HSL_ERROR_CODE_DATE_TOO_FAR !, trying second time with current week..."
+                    print "FAILED because: HSL_ERROR_CODE_DATE_TOO_FAR !, trying second time with current week..."
                     starttime_thisweek = find_same_journey_time_this_week(start_time)
                     endtime_thisweek = find_same_journey_time_this_week(end_time)
                     res, matchres = match_tripleg_with_publictransport(start_location_str, end_location_str, starttime_thisweek, endtime_thisweek, device_data_queue)
-                                                
+
+                if res == 1 and matchres.matchcount == 0:
+                    print ""
+                    print "> NO matching transit detected. Nothing updated."
                 # if managed to match the trip-leg with one public transport ride using HSL query                                                
-                if res == 1 and matchres.matchcount > 0: 
+                elif res == 1 and matchres.matchcount > 0: 
                     if matchres.trip.linetype=="RAIL": # our database knows "TRAIN" (defined in 
                         matchres.trip.linetype="TRAIN"
                     # now update the previously 'misdetected' trip                        
@@ -113,6 +116,10 @@ class DeviceDataFilterer:
                         if line_name: 
                             line_name_str = line_name.encode('utf-8')                    
                         print "> TRIP-LEG UPDATED (from second filter detection): ", user_id, activity, line_type, line_name_str
+                else:
+                    print ""
+                    print "> FAILED because: error_code:", matchres.error_code, "error_text1:",matchres.error_msg, "error_text2:",matchres.error_message
+                    
 
             # other filters: 
             
