@@ -15,7 +15,7 @@ from pyfiles.constants import *
 from pyfiles.common_helpers import get_distance_between_coordinates
 from apscheduler.schedulers.background import BackgroundScheduler
 from flask import Flask
-from sqlalchemy.sql import text
+from sqlalchemy.sql import func, or_, select, text
 
 import logging
 logging.basicConfig()
@@ -64,19 +64,58 @@ def initialize():
 
 def run_daily_tasks():
     # The order is important.
+    generate_legs()
     filter_device_data()
     generate_distance_data()
     update_global_statistics()
     mass_transit_cleanup()
 
 
-def filter_device_data():
+def generate_legs():
+    """Record legs from stops and mobile activity found in device telemetry."""
+
+    dd = db.metadata.tables["device_data"]
+    legs = db.metadata.tables["legs"]
+
+    # Find last point sent from each device.
+    devmax = select(
+        [dd.c.device_id, func.max(dd.c.time).label("lastpoint")],
+        group_by=dd.c.device_id).alias("devmax")
+
+    # Find time range of last leg preocessed for each device.
+    legmax = select(
+        [   legs.c.device_id,
+            func.max(legs.c.time_start).label("laststart"),
+            func.max(legs.c.time_end).label("lastend")],
+        group_by=legs.c.device_id).alias("legmax")
+
+    # Find start of last leg for devices that have points recorded after it.
+    afters = select(
+        [devmax.c.device_id, legmax.c.laststart],
+        or_(legmax.c.lastend == None, devmax.c.lastpoint > legmax.c.lastend),
+        devmax.outerjoin(legmax, devmax.c.device_id == legmax.c.device_id))
+    # get no row if nothing to process for that device, good.
+    # XXX get null if no legs for that device, awkward.
+
+    q = afters
+    len(list(db.engine.execute(q)))
+    print "\n".join(repr(x) for x in db.engine.execute(q))
+
+    # process device legs
+
+    # attach device legs to users.
+
+
+def filter_device_data(maxtime=None):
+    if not maxtime:
+        maxtime = datetime.datetime.now()
+
     #TODO: Don't check for users that have been inactive for a long time.
     user_ids =  db.engine.execute(text("SELECT id FROM users;"))
     for id_row in user_ids:
         time = get_max_time_from_table("time", "device_data_filtered", "user_id", id_row["id"])
         device_data_rows = data_points_by_user_id_after(
-            id_row["id"], time, datetime.datetime.now())
+            id_row["id"], time, maxtime)
         device_data_filterer = DeviceDataFilterer()
         device_data_filterer.analyse_unfiltered_data(device_data_rows, id_row["id"])
 
