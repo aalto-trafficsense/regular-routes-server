@@ -12,10 +12,11 @@ from pyfiles.database_interface import (
 from pyfiles.device_data_filterer import DeviceDataFilterer
 from pyfiles.energy_rating import EnergyRating
 from pyfiles.constants import *
-from pyfiles.common_helpers import get_distance_between_coordinates
+from pyfiles.common_helpers import (
+    get_distance_between_coordinates, trace_partition_movement)
 from apscheduler.schedulers.background import BackgroundScheduler
 from flask import Flask
-from sqlalchemy.sql import func, or_, select, text
+from sqlalchemy.sql import and_, func, or_, select, text
 
 import logging
 logging.basicConfig()
@@ -77,9 +78,11 @@ def generate_legs():
     dd = db.metadata.tables["device_data"]
     legs = db.metadata.tables["legs"]
 
-    # Find last point sent from each device.
+    # Find first and last point sent from each device.
     devmax = select(
-        [dd.c.device_id, func.max(dd.c.time).label("lastpoint")],
+        [   dd.c.device_id,
+            func.min(dd.c.time).label("firstpoint"),
+            func.max(dd.c.time).label("lastpoint")],
         group_by=dd.c.device_id).alias("devmax")
 
     # Find time range of last leg preocessed for each device.
@@ -89,21 +92,50 @@ def generate_legs():
             func.max(legs.c.time_end).label("lastend")],
         group_by=legs.c.device_id).alias("legmax")
 
-    # Find start of last leg for devices that have points recorded after it.
-    afters = select(
-        [devmax.c.device_id, legmax.c.laststart],
+    # Find resume points: start of last leg, or first point if no legs.
+    starts = select(
+        [   devmax.c.device_id,
+            func.coalesce(legmax.c.laststart, devmax.c.firstpoint)],
         or_(legmax.c.lastend == None, devmax.c.lastpoint > legmax.c.lastend),
         devmax.outerjoin(legmax, devmax.c.device_id == legmax.c.device_id))
-    # get no row if nothing to process for that device, good.
-    # XXX get null if no legs for that device, awkward.
 
-    q = afters
-    len(list(db.engine.execute(q)))
-    print "\n".join(repr(x) for x in db.engine.execute(q))
+    for device, start in db.engine.execute(starts):
+        query = select(
+            [   func.ST_AsGeoJSON(dd.c.coordinate).label("geojson"),
+                dd.c.accuracy,
+                dd.c.time,
+                dd.c.device_id,
+                dd.c.activity_1, dd.c.activity_1_conf,
+                dd.c.activity_2, dd.c.activity_2_conf,
+                dd.c.activity_3, dd.c.activity_3_conf],
+            and_(dd.c.device_id == device, dd.c.time >= start))
 
-    # process device legs
+        points = db.engine.execute(query).fetchall()
+        print device, start, len(list(points))
+        for mov, seg in trace_partition_movement(
+                points, DEST_RADIUS_MAX, DEST_DURATION_MIN):
+            print mov, len(seg)
+            filterer = DeviceDataFilterer() # not very objecty rly
+            for leg in filterer.analyse_unfiltered_data(seg):
+                print leg
 
-    # attach device legs to users.
+
+        # XXX create device legs here.
+        # XXX rm (or update) the last leg first, but pref after finding new?
+        # Partition stationary and moving spans.
+        # Feed moving spans to activity filter and mass transit detection.
+
+        # XXX need different fn in filtererer to source detections from old
+        # filter data first to cover legacy, then fall back to live and
+        # planner? tbh live should be preferred where available, and planner
+        # where current...
+
+
+    # XXX attach device legs to users. Resume point is similar... Find last leg
+    # recorded for user ...eh, that's likely to have been deleted above ;) So
+    # just process legs of devices belonging to user, beyond the last fixed
+    # user leg. Mixed devices in leg time_end order ascending, and discard
+    # overlaps, so more dense transitions win.
 
 
 def filter_device_data(maxtime=None):
@@ -117,7 +149,8 @@ def filter_device_data(maxtime=None):
         device_data_rows = data_points_by_user_id_after(
             id_row["id"], time, maxtime)
         device_data_filterer = DeviceDataFilterer()
-        device_data_filterer.analyse_unfiltered_data(device_data_rows, id_row["id"])
+        device_data_filterer.generate_filtered_data(
+            device_data_rows, id_row["id"])
 
 
 def generate_distance_data():

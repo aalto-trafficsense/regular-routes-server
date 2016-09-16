@@ -35,7 +35,7 @@ class DeviceDataFilterer:
         self.file_finalstats = None
 
 	# mehrdad: note: works on one trip-leg with specific activity of specific userid (trip-legs found by analyze_unfiltered_data())
-    def _flush_device_data_queue(self, device_data_queue, activity, user_id):
+    def _match_mass_transit(self, device_data_queue, activity, user_id):
         if len(device_data_queue) == 0:
             return
 
@@ -45,8 +45,15 @@ class DeviceDataFilterer:
         line_type, line_name = self._match_mass_transit_planner(
             activity, device_data_queue, user_id, line_type, line_name)
 
-        self._write_filtered_data(
-            device_data_queue, activity, user_id, line_type, line_name)
+        return device_data_queue, activity, user_id, line_type, line_name
+
+
+    # XXX make classmethods where no members used, so, uh, everywhere? :)
+    def generate_filtered_data(self, device_data_rows, user_id):
+        for device_data_queue, activity, user_id, line_type, line_name in \
+                self.analyse_unfiltered_data(device_data_rows, user_id):
+            self._write_filtered_data(
+                device_data_queue, activity, user_id, line_type, line_name)
 
 
     def _match_mass_transit_planner(
@@ -245,12 +252,14 @@ class DeviceDataFilterer:
         self.file_triplegs.write(maincols + ";<<<>>>;" + plandetails+"\n")
 
 
+    def analyse_unfiltered_data(self, device_data_rows, user_id=None):
+        """Generate stabilized contiguous activity spans from raw trace, with
+        mass transit detected in the vehicle spans."""
 
-    def analyse_unfiltered_data(self, device_data_rows, user_id):
         if DUMP_CSV_FILES:
             self._dump_csv_file_open(user_id)
 
-        rows = device_data_rows.fetchall()
+        rows = list(device_data_rows)
         if len(rows) == 0:
             return
         device_data_queue = []
@@ -265,7 +274,8 @@ class DeviceDataFilterer:
         for current_row, current_activity in self._analyse_activities(rows):
             if (current_row["time"] - previous_time).total_seconds() > MAX_POINT_TIME_DIFFERENCE:
                 if chosen_activity != "NOT_SET": #if false, no good activity was found
-                    self._flush_device_data_queue(device_data_queue, chosen_activity, user_id)
+                    yield self._match_mass_transit(
+                        device_data_queue, chosen_activity, user_id)
                 device_data_queue = []
                 previous_device_id = current_row["device_id"]
                 previous_time = current_row["time"]
@@ -306,7 +316,10 @@ class DeviceDataFilterer:
             if consecutive_differences == CONSECUTIVE_DIFFERENCE_LIMIT:
                 #split the transition points, first half is previous activity, latter half is new activity
                 splitting_point = CONSECUTIVE_DIFFERENCE_LIMIT + (different_activity_counter - CONSECUTIVE_DIFFERENCE_LIMIT) / 2
-                self._flush_device_data_queue(device_data_queue[:-splitting_point], chosen_activity, user_id)
+                yield self._match_mass_transit(
+                    device_data_queue[:-splitting_point],
+                    chosen_activity,
+                    user_id)
                 device_data_queue = device_data_queue[-splitting_point:]
                 consecutive_differences = 0
                 different_activity_counter = 0
@@ -317,7 +330,8 @@ class DeviceDataFilterer:
             previous_activity = current_activity
 
         if chosen_activity != "NOT_SET":
-            self._flush_device_data_queue(device_data_queue, chosen_activity, user_id)
+            yield self._match_mass_transit(
+                device_data_queue, chosen_activity, user_id)
 
         if DUMP_CSV_FILES:
             self._dump_csv_file_close(user_id)
@@ -341,4 +355,3 @@ class DeviceDataFilterer:
         print "updated trip-legs (in_vehicle) to public transport:", self.user_invehicle_triplegs_updated
         print "ratio:", updated_fraction, "%"
         print ""
-        
