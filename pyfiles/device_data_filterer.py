@@ -1,10 +1,13 @@
 import json
 
-from pyfiles.common_helpers import get_distance_between_coordinates
+from pyfiles.common_helpers import (
+    get_distance_between_coordinates, trace_partition_movement)
 
 from pyfiles.constants import (
     ACTIVITY_WIN,
     CONSECUTIVE_DIFFERENCE_LIMIT,
+    DEST_DURATION_MIN,
+    DEST_RADIUS_MAX,
     MAXIMUM_MASS_TRANSIT_MISSES,
     MAX_DIFFERENT_DEVICE_TIME_DIFFERENCE,
     MAX_MASS_TRANSIT_DISTANCE_DIFFERENCE,
@@ -48,10 +51,42 @@ class DeviceDataFilterer:
         return device_data_queue, activity, user_id, line_type, line_name
 
 
-    # XXX make classmethods where no members used, so, uh, everywhere? :)
+    def generate_device_legs(self, points):
+        """Generate sequence of stationary and moving segments of same
+        activity from the raw trace of one device."""
+
+        # Partition stationary and moving spans.
+        for mov, seg in trace_partition_movement(
+                points, DEST_RADIUS_MAX, DEST_DURATION_MIN):
+            print mov, len(seg), seg[0]["time"], seg[-1]["time"]
+
+            # Emit stationary span.
+            if not mov:
+                yield {
+                    "time_start": seg[0]["time"],
+                    "time_end": seg[-1]["time"],
+                    "geojson_start": seg[0]["geojson"],
+                    "geojson_end": seg[-1]["geojson"],
+                    "activity": "STILL"}
+                continue
+
+            # Feed moving span to activity stabilizer, mass transit detection.
+            for leg in self._analyse_unfiltered_data(seg):
+                legpts, legact, leguser, legtype, legname = leg
+                yield {
+                    "time_start": legpts[0]["time"],
+                    "time_end": legpts[-1]["time"],
+                    "geojson_start": legpts[0]["geojson"],
+                    "geojson_end": legpts[-1]["geojson"],
+                    "activity": legact,
+                    "line_type": legtype,
+                    "line_name": legname,
+                    "line_stage": None} # XXX oooooohhhhhhhh
+
+
     def generate_filtered_data(self, device_data_rows, user_id):
         for device_data_queue, activity, user_id, line_type, line_name in \
-                self.analyse_unfiltered_data(device_data_rows, user_id):
+                self._analyse_unfiltered_data(device_data_rows, user_id):
             self._write_filtered_data(
                 device_data_queue, activity, user_id, line_type, line_name)
 
@@ -252,9 +287,9 @@ class DeviceDataFilterer:
         self.file_triplegs.write(maincols + ";<<<>>>;" + plandetails+"\n")
 
 
-    def analyse_unfiltered_data(self, device_data_rows, user_id=None):
-        """Generate stabilized contiguous activity spans from raw trace, with
-        mass transit detected in the vehicle spans."""
+    def _analyse_unfiltered_data(self, device_data_rows, user_id=None):
+        """Generate stabilized contiguous activity spans from moving raw trace,
+        with mass transit detected in the vehicle spans."""
 
         if DUMP_CSV_FILES:
             self._dump_csv_file_open(user_id)
