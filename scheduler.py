@@ -111,25 +111,54 @@ def generate_legs():
             and_(dd.c.device_id == device, dd.c.time >= start))
 
         points = db.engine.execute(query).fetchall()
-        print device, start, len(list(points))
+        print device, start, len(points)
+
+        # Partition stationary and moving spans.
         for mov, seg in trace_partition_movement(
                 points, DEST_RADIUS_MAX, DEST_DURATION_MIN):
-            print mov, len(seg)
-            filterer = DeviceDataFilterer() # not very objecty rly
-            for leg in filterer.analyse_unfiltered_data(seg):
-                print leg
+            # XXX need to replace the last leg superseded
+            print mov, len(seg), seg[0]["time"], seg[-1]["time"]
 
+            # XXX mmmm duplicate insertion code, should generate in a separate
+            # thing, add to filtererer, maybe do insert here
+            if mov:
+                # Moving spans to activity filter and mass transit detection.
+                filterer = DeviceDataFilterer() # not very objecty rly
+                for leg in filterer.analyse_unfiltered_data(seg):
+                    legpts, legact, leguser, legtype, legname = leg
+                    print "mov:", len(legpts), legact, leguser, legtype, legname
+                    insert = legs.insert({
+                        "device_id": device,
+                        "time_start": legpts[0]["time"],
+                        "time_end": legpts[-1]["time"],
+                        "coordinate_start": func.ST_GeomFromGeoJSON(
+                            legpts[0]["geojson"]),
+                        "coordinate_end": func.ST_GeomFromGeoJSON(
+                            legpts[-1]["geojson"]),
+                        "activity": legact,
+                        "line_type": legtype,
+                        "line_name": legname,
+                        "line_stage": None}) # XXX oooooohhhhhhhh
+                    db.engine.execute(insert)
+            else:
+                print "not mov", seg[0]["geojson"]
+                insert = legs.insert({
+                    "device_id": device,
+                    "time_start": seg[0]["time"],
+                    "time_end": seg[-1]["time"],
+                        "coordinate_start": func.ST_GeomFromGeoJSON(
+                            seg[0]["geojson"]),
+                        "coordinate_end": func.ST_GeomFromGeoJSON(
+                            seg[-1]["geojson"]),
+                    "activity": "STILL"})
+                db.engine.execute(insert)
 
-        # XXX create device legs here.
         # XXX rm (or update) the last leg first, but pref after finding new?
-        # Partition stationary and moving spans.
-        # Feed moving spans to activity filter and mass transit detection.
 
         # XXX need different fn in filtererer to source detections from old
         # filter data first to cover legacy, then fall back to live and
         # planner? tbh live should be preferred where available, and planner
         # where current...
-
 
     # XXX attach device legs to users. Resume point is similar... Find last leg
     # recorded for user ...eh, that's likely to have been deleted above ;) So
