@@ -107,18 +107,17 @@ def generate_legs():
                 dd.c.activity_1, dd.c.activity_1_conf,
                 dd.c.activity_2, dd.c.activity_2_conf,
                 dd.c.activity_3, dd.c.activity_3_conf],
-            and_(dd.c.device_id == device, dd.c.time >= start))
+            and_(dd.c.device_id == device, dd.c.time >= start),
+            order_by=dd.c.time)
 
         points = db.engine.execute(query).fetchall()
-        print device, start, len(points)
+        print "resume:", "d"+str(device), start, len(points)
 
         filterer = DeviceDataFilterer() # not very objecty rly
-        updated = False
+        replaced = False
         for leg in filterer.generate_device_legs(points):
-            # XXX need to replace the last leg superseded
-#            if not updated:
-#                # Replace the first leg ...umm what if there isn't one?
-#                updated = True
+    
+            # Adjust leg for db entry
             leg.update({
                 "device_id": device,
                 "coordinate_start": func.ST_GeomFromGeoJSON(
@@ -127,6 +126,19 @@ def generate_legs():
                     leg["geojson_end"])})
             del leg["geojson_start"]
             del leg["geojson_end"]
+
+            # Update the resumed leg if there is one.
+            if not replaced:
+                replaced = True
+                update = legs.update(
+                    and_(
+                        legs.c.device_id == device,
+                        legs.c.time_start == leg["time_start"]),
+                    leg)
+                if db.engine.execute(update).rowcount > 0:
+                    print "resume leg updated"
+                    continue # don't insert if update matched
+
             db.engine.execute(legs.insert(leg))
 
         # XXX need to create the reject leg at least at the end? to avoid
