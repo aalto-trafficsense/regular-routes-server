@@ -84,7 +84,7 @@ def generate_legs():
             func.max(dd.c.time).label("lastpoint")],
         group_by=dd.c.device_id).alias("devmax")
 
-    # Find time range of last leg preocessed for each device.
+    # Find time range of last leg processed for each device.
     legmax = select(
         [   legs.c.device_id,
             func.max(legs.c.time_start).label("laststart"),
@@ -114,7 +114,7 @@ def generate_legs():
         print "resume:", "d"+str(device), start, len(points)
 
         filterer = DeviceDataFilterer() # not very objecty rly
-        replaced = False
+        first = True
         for leg in filterer.generate_device_legs(points):
     
             # Adjust leg for db entry
@@ -128,22 +128,36 @@ def generate_legs():
             del leg["geojson_end"]
 
             # Update the resumed leg if there is one.
-            if not replaced:
-                replaced = True
+            if first:
+                first = False
+
+                # Don't update the start of the resumed leg. On resume of a
+                # stop leg, the entry refinement will start on the previously
+                # refined point, rather than the appropriate entry window,
+                # causing the entry to shift forward inappropriately.
+                leg_nostart = leg.copy()
+                del leg_nostart["coordinate_start"]
+                del leg_nostart["time_start"]
                 update = legs.update(
                     and_(
                         legs.c.device_id == device,
-                        legs.c.time_start == leg["time_start"]),
-                    leg)
+                        legs.c.time_start == start),
+                    leg_nostart)
                 if db.engine.execute(update).rowcount > 0:
                     print "resume leg updated"
                     continue # don't insert if update matched
 
             db.engine.execute(legs.insert(leg))
 
+#        if not first:
+#            leg["time_end"] + epsilon to last point reject null activity leg?
+
         # XXX need to create the reject leg at least at the end? to avoid
         # re-resuming on last valid leg, possibly with worse results due to
         # expired auxiliary data/sources.
+
+        # maybe generate it from the filtererer since it has the points in hand
+        # ...or not, the resume logic is here after all
 
         # XXX need different fn in filtererer to source detections from old
         # filter data first to cover legacy, then fall back to live and
