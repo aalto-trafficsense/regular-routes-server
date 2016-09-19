@@ -55,7 +55,10 @@ class DeviceDataFilterer:
         """Generate sequence of stationary and moving segments of same
         activity from the raw trace of one device."""
 
-        # Partition stationary and moving spans.
+        lastend = None
+
+        # Partition stationary and moving spans. Note that this loses
+        # inaccurate and sharp points.
         for mov, seg in trace_partition_movement(
                 points, DEST_RADIUS_MAX, DEST_DURATION_MIN):
             print mov, len(seg), seg[0]["time"], seg[-1]["time"]
@@ -68,9 +71,11 @@ class DeviceDataFilterer:
                     "geojson_start": seg[0]["geojson"],
                     "geojson_end": seg[-1]["geojson"],
                     "activity": "STILL"}
+                lastend = seg[-1]["time"]
                 continue
 
             # Feed moving span to activity stabilizer, mass transit detection.
+            # This loses unstabilizable point spans.
             for leg in self._analyse_unfiltered_data(seg):
                 legpts, legact, leguser, legtype, legname = leg
                 yield {
@@ -82,6 +87,17 @@ class DeviceDataFilterer:
                     "line_type": legtype,
                     "line_name": legname,
                     "line_stage": None} # XXX oooooohhhhhhhh
+                lastend = legpts[-1]["time"]
+
+        # Emit trailing undecided points as a null activity terminator leg.
+        rejects = [x for x in points if not lastend or x["time"] > lastend]
+        if rejects:
+            yield {
+                "time_start": rejects[0]["time"],
+                "time_end": rejects[-1]["time"],
+                "geojson_start": rejects[0]["geojson"],
+                "geojson_end": rejects[-1]["geojson"],
+                "activity": None}
 
 
     def generate_filtered_data(self, device_data_rows, user_id):
