@@ -231,8 +231,12 @@ def trace_partition_movement(points, distance, interval):
     itail = next(itails, None) # interval back window for entry/exit refinement
     ihead = None # point inside interval lookahead window
     next_ihead = next(iheads, None) # point outside interval lookahead window
+    firstpoint = None
 
     for point in points:
+        if not firstpoint:
+            firstpoint = point
+
         nextseg.append(point)
 
         # Adjust two-pane time window used for entry/exit refinement.
@@ -264,16 +268,18 @@ def trace_partition_movement(points, distance, interval):
 
             head = next(heads, None)
 
-        # Refine entry point when in entry window.
-        if entryend is not None and -stretch > entrymax: # > lone/clamp early
+        # Refine entry point when in entry window, but keep if start of trace
+        if (entryend
+                and (not stopseg or stopseg[0] is not firstpoint)
+                and -stretch > entrymax): # > lone/clamp early
             entrymax = -stretch
             moveseg += stopseg + nextseg
             stopseg = [moveseg.pop()] # current point belongs in stop
             nextseg = []
             exitmax = -inf # reset exit refinement
 
-        # Refine exit when in a stop.
-        if exitend is not None and stretch >= exitmax: # >= lone/clamp late
+        # Refine exit when in a stop, always to end of trace (null head)
+        if exitend and (not head or stretch >= exitmax): # >= lone/clamp late
             exitmax = stretch
             stopseg += nextseg
             nextseg = []
