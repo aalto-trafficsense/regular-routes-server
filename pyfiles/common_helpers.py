@@ -251,6 +251,12 @@ def trace_partition_movement(points, distance, interval):
         stretch = (min(distance, point_distance(point, ihead))
                  - min(distance, point_distance(itail, point)))
 
+        # Refine exit when in a stop, always to end of trace (null head)
+        if exitend and (not head or stretch >= exitmax): # >= lone/clamp late
+            exitmax = stretch
+            stopseg += nextseg
+            nextseg = []
+
         # Find valid windows while advancing head until out of range.
         while head and point_distance(point, head) <= distance:
 
@@ -268,22 +274,6 @@ def trace_partition_movement(points, distance, interval):
 
             head = next(heads, None)
 
-        # Refine entry point when in entry window, but keep if start of trace
-        if (entryend
-                and (not stopseg or stopseg[0] is not firstpoint)
-                and -stretch > entrymax): # > lone/clamp early
-            entrymax = -stretch
-            moveseg += stopseg + nextseg
-            stopseg = [moveseg.pop()] # current point belongs in stop
-            nextseg = []
-            exitmax = -inf # reset exit refinement
-
-        # Refine exit when in a stop, always to end of trace (null head)
-        if exitend and (not head or stretch >= exitmax): # >= lone/clamp late
-            exitmax = stretch
-            stopseg += nextseg
-            nextseg = []
-
         # At the end of the entry window, emit the prior move segment.
         if point is entryend:
             entryend = None
@@ -297,6 +287,16 @@ def trace_partition_movement(points, distance, interval):
             if stopseg:
                 yield False, stopseg
             stopseg = []
+
+        # Refine entry point when in entry window, but keep if start of trace
+        if (entryend
+                and (not stopseg or stopseg[0] is not firstpoint)
+                and -stretch > entrymax): # > lone/clamp early
+            entrymax = -stretch
+            moveseg += stopseg + nextseg
+            stopseg = [moveseg.pop()] # current point belongs in stop
+            nextseg = []
+            exitmax = -inf # reset exit refinement
 
     if exitend:
         stopseg += nextseg
