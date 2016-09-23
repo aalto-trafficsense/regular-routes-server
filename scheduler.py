@@ -77,6 +77,8 @@ def generate_legs(maxtime=None):
     if not maxtime:
         maxtime = datetime.datetime.now()
 
+    print "generate_legs up to", maxtime
+
     dd = db.metadata.tables["device_data"]
     legs = db.metadata.tables["legs"]
 
@@ -177,6 +179,8 @@ def generate_legs(maxtime=None):
 def filter_device_data(maxtime=None):
     if not maxtime:
         maxtime = datetime.datetime.now()
+
+    print "filter_device_data up to", maxtime
 
     #TODO: Don't check for users that have been inactive for a long time.
     user_ids =  db.engine.execute(text("SELECT id FROM users;"))

@@ -41,39 +41,39 @@ class DeviceDataFilterer:
         self.file_finalstats = None
 
 	# mehrdad: note: works on one trip-leg with specific activity of specific userid (trip-legs found by analyze_unfiltered_data())
-    def _match_mass_transit(
-            self, device_data_queue, activity, user_id, fallback=False):
+    def _match_mass_transit(self, device_data_queue, activity, user_id):
 
-        """Find mass transit match for leg in device_data_queue, using live
-        vehicle locations, and trip planner. If fallback is True, planner is
-        only used in the range where live data is also available, while for
-        earlier legs the matches are taken from old filtered data."""
+        """Find mass transit match for leg in device_data_queue, using legacy
+        filtered data, live vehicle locations, and trip planner."""
 
         if len(device_data_queue) == 0 or activity != "IN_VEHICLE":
             return None, None, None
 
         line_source = None
 
+        # If legacy filtered data exists, just copy matches from there.
+        # Filtered data should be generated after legs so this copying won't
+        # happen for new data.
+        match = self._match_mass_transit_filtered(activity, device_data_queue)
+        if match is not None: # filtered data exists
+            line_type, line_name = match
+            if line_type:
+                line_source = "FILTERED"
+            return line_type, line_name, line_source
+
         line_type, line_name = self._match_mass_transit_live(
             activity, device_data_queue)
+        if line_type:
+            line_source = "LIVE"
 
-        if line_type is not False:
-            line_source = "LIVE" # data available, set source even if no match
-            fallback = False
-
-        if fallback:
-            line_type, line_name, fpcount = self._match_mass_transit_filtered(
-                activity, device_data_queue)
-            if fpcount > 0:
-                line_source = "FILTERED"
-        else:
-            # This looks a bit backwards, but reflects that this planner call
-            # is a printing and csv dumping no-op if these are not None
-            if not line_type:
-                line_source = "PLANNER"
-
-            line_type, line_name = self._match_mass_transit_planner(
-                activity, device_data_queue, user_id, line_type, line_name)
+        # This looks a bit backwards, but reflects that the planner call is a
+        # printing and csv dumping no-op if given type/name are not None.
+        if not line_type:
+            line_source = "PLANNER"
+        line_type, line_name = self._match_mass_transit_planner(
+            activity, device_data_queue, user_id, line_type, line_name)
+        if not line_type:
+            line_source = None
 
         return line_type, line_name, line_source
 
@@ -105,7 +105,7 @@ class DeviceDataFilterer:
             # This loses unstabilizable point spans.
             for legpts, legact in self._analyse_unfiltered_data(seg):
                 legtype, legname, legsource = \
-                    self._match_mass_transit(legpts, legact, None, True)
+                    self._match_mass_transit(legpts, legact, None)
                 yield {
                     "time_start": legpts[0]["time"],
                     "time_end": legpts[-1]["time"],
@@ -129,10 +129,10 @@ class DeviceDataFilterer:
 
 
     def generate_filtered_data(self, device_data_rows, user_id):
-        for device_data_queue, activity in \
+        for legpts, legact in \
                 self._analyse_unfiltered_data(device_data_rows, user_id):
             legtype, legname, legsource = \
-                self._match_mass_transit(device_data_queue, activity, user_id)
+                self._match_mass_transit(legpts, legact, user_id)
             self._write_filtered_data(
                 legpts, legact, user_id, legtype, legname)
 
@@ -270,7 +270,7 @@ class DeviceDataFilterer:
 
         if matches is None:
             print "no vehicle data available"
-            return False, False
+            return None, None
 
         matches = matches.fetchall()
 

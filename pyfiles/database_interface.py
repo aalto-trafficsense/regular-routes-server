@@ -8,7 +8,7 @@ from sqlalchemy import MetaData, Table, Column, ForeignKey, Enum, BigInteger, In
     Float
 from sqlalchemy.dialects.postgres import DOUBLE_PRECISION, TIMESTAMP, UUID
 from sqlalchemy.exc import DataError
-from sqlalchemy.sql import text, func, column, table, select
+from sqlalchemy.sql import and_, text, func, column, table, select
 import svg_generation
 from datetime import timedelta
 
@@ -380,7 +380,23 @@ def data_points_filtered(user_id, datetime_start, datetime_end):
 
 
 def match_mass_transit_filtered(device, tstart, tend):
-    """Find mass transit match from legacy filtered data, use as fallback."""
+    """Find mass transit match from legacy filtered data. Returns None if
+    no filtered data for this device beyond end of range; otherwise (line_type,
+    line_name) pair."""
+
+    # Find out if filtered data extends this far forward. Due to gaps, looking
+    # at just the given range would lead to firing actual detectors for very
+    # old data.
+    if None is db.engine.execute(select(
+            [1],
+            and_(
+                device_data_filtered_table.c.time >= tend,
+                devices_table.c.id == device),
+            device_data_filtered_table.join(
+                devices_table,
+                device_data_filtered_table.c.user_id==devices_table.c.user_id),
+            ).limit(1)).scalar():
+        return None
 
     # XXX Should rather ORDER BY (line_type, line_name), so the pair can't be
     # mismatched, but the result row record seems like a pain to unpack?
@@ -388,8 +404,7 @@ def match_mass_transit_filtered(device, tstart, tend):
         text("""
             SELECT
                 mode() WITHIN GROUP (ORDER BY line_type) line_type,
-                mode() WITHIN GROUP (ORDER BY line_name) line_name,
-                count(*)
+                mode() WITHIN GROUP (ORDER BY line_name) line_name
             FROM device_data_filtered f JOIN devices d USING (user_id)
             WHERE d.id = :device AND time BETWEEN :tstart AND :tend"""),
         device=device, tstart=tstart, tend=tend).first()
@@ -415,8 +430,9 @@ def match_mass_transit_live(device, tstart, tend, tradius, dradius, nsamples):
     case when older data has been deleted, return None.
     """
 
+    # Find out if mass_transit_data extends this far back.
     if None is db.engine.execute(select(
-            [1], mass_transit_data_table.c.time < tstart).limit(1)).scalar():
+            [1], mass_transit_data_table.c.time <= tstart).limit(1)).scalar():
         return None
 
     return db.engine.execute(
