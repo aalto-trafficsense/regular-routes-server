@@ -139,7 +139,7 @@ def generate_legs(maxtime=None):
                 "activity", "line_type", "line_name", "line_source"]]),
 
             # Ignore any legs in the rewind span.
-            if leg["time_end"] <= start:
+            if leg["time_end"] < start:
                 print "-> ignore"
                 continue
 
