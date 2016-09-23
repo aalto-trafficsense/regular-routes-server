@@ -88,7 +88,6 @@ class DeviceDataFilterer:
         # inaccurate and sharp points.
         for mov, seg in trace_partition_movement(
                 points, DEST_RADIUS_MAX, DEST_DURATION_MIN):
-            print mov, len(seg), seg[0]["time"], seg[-1]["time"]
 
             # Emit stationary span.
             if not mov:

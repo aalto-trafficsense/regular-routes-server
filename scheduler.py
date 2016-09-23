@@ -58,6 +58,7 @@ def initialize():
     scheduler.start()
     scheduler.add_job(retrieve_hsl_data, "cron", second="*/30")
     run_daily_tasks()
+    scheduler.add_job(generate_legs, "cron", minute=24)
     scheduler.add_job(run_daily_tasks, "cron", hour="3")
     print "scheduler init done"
 
@@ -126,15 +127,22 @@ def generate_legs(maxtime=None):
             order_by=dd.c.time)
 
         points = db.engine.execute(query).fetchall()
-        print "resume:", "d"+str(device), start, rewind, len(points)
+
+        print "d"+str(device), "resume", str(start)[:19], \
+            "rewind", str(rewind)[:19], str(len(points))+"p"
 
         filterer = DeviceDataFilterer() # not very objecty rly
         first = True
         for leg in filterer.generate_device_legs(points):
+            print " ".join(["d"+str(device), str(leg["time_start"])[:19],
+                str(leg["time_end"])[:19]] + [str(leg.get(x)) for x in [
+                "activity", "line_type", "line_name", "line_source"]]),
+
             # Ignore any legs in the rewind span.
             if leg["time_end"] <= start:
+                print "-> ignore"
                 continue
-    
+
             # Adjust leg for db entry
             leg.update({
                 "device_id": device,
@@ -159,10 +167,11 @@ def generate_legs(maxtime=None):
                         legs.c.time_start == start),
                     leg_nostart)
                 if db.engine.execute(update).rowcount > 0:
-                    print "resume leg updated"
+                    print "-> update"
                     continue # don't insert if update matched
 
             db.engine.execute(legs.insert(leg))
+            print "-> insert"
 
         # XXX need different fn in filtererer to source detections from old
         # filter data first to cover legacy, then fall back to live and
