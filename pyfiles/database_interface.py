@@ -151,8 +151,15 @@ def init_db(app):
         Column('activity', activity_type_enum),
         Column('line_type', mass_transit_type_enum),
         Column('line_name', String),
-        Column('line_stage',
-            Enum("UNKNOWN", "LIVE", "PLANNER", name="line_source_enum")))
+        Column('line_source',
+            Enum("FILTERED", "LIVE", "PLANNER", name="line_source_enum")))
+    # useful near beginning of time
+    Index('idx_legs_user_id_time_start_time_end',
+        'user_id', 'time_start', 'time_end')
+    # useful near end of time
+    Index('idx_legs_user_id_time_end_time_start',
+        'user_id', 'time_end', 'time_start')
+    # for something useful in the middle, query and gist index on tsrange
 
     # travelled distances per day per device
     global travelled_distances_table
@@ -372,6 +379,22 @@ def data_points_filtered(user_id, datetime_start, datetime_end):
     return points
 
 
+def match_mass_transit_filtered(device, tstart, tend):
+    """Find mass transit match from legacy filtered data, use as fallback."""
+
+    # XXX Should rather ORDER BY (line_type, line_name), so the pair can't be
+    # mismatched, but the result row record seems like a pain to unpack?
+    return db.engine.execute(
+        text("""
+            SELECT
+                mode() WITHIN GROUP (ORDER BY line_type) line_type,
+                mode() WITHIN GROUP (ORDER BY line_name) line_name,
+                count(*)
+            FROM device_data_filtered f JOIN devices d USING (user_id)
+            WHERE d.id = :device AND time BETWEEN :tstart AND :tend"""),
+        device=device, tstart=tstart, tend=tend).first()
+
+
 def match_mass_transit_live(device, tstart, tend, tradius, dradius, nsamples):
     """Find mass transit vehicles near user during a trip leg.
 
@@ -387,7 +410,14 @@ def match_mass_transit_live(device, tstart, tend, tradius, dradius, nsamples):
     revsum -- each metre inside dradius counts toward the summed distance score
     hitrate -- fraction of times device and vehicle within dradius and tradius
     vehicle_ref, line_type, line_name -- as in mass_transit_data
+
+    If no mass transit vehicle data exists prior to tstart, as would be the
+    case when older data has been deleted, return None.
     """
+
+    if None is db.engine.execute(select(
+            [1], mass_transit_data_table.c.time < tstart).limit(1)).scalar():
+        return None
 
     return db.engine.execute(
         text("""

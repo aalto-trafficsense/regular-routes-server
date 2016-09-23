@@ -71,8 +71,11 @@ def run_daily_tasks():
     mass_transit_cleanup()
 
 
-def generate_legs():
+def generate_legs(maxtime=None):
     """Record legs from stops and mobile activity found in device telemetry."""
+
+    if not maxtime:
+        maxtime = datetime.datetime.now()
 
     dd = db.metadata.tables["device_data"]
     legs = db.metadata.tables["legs"]
@@ -82,6 +85,7 @@ def generate_legs():
         [   dd.c.device_id,
             func.min(dd.c.time).label("firstpoint"),
             func.max(dd.c.time).label("lastpoint")],
+        dd.c.time < maxtime,
         group_by=dd.c.device_id).alias("devmax")
 
     # Find time range of last leg processed for each device.
@@ -113,7 +117,10 @@ def generate_legs():
                 dd.c.activity_1, dd.c.activity_1_conf,
                 dd.c.activity_2, dd.c.activity_2_conf,
                 dd.c.activity_3, dd.c.activity_3_conf],
-            and_(dd.c.device_id == device, dd.c.time >= rewind),
+            and_(
+                dd.c.device_id == device,
+                dd.c.time >= rewind,
+                dd.c.time < maxtime),
             order_by=dd.c.time)
 
         points = db.engine.execute(query).fetchall()

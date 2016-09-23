@@ -16,7 +16,10 @@ from pyfiles.constants import (
     NUMBER_OF_MASS_TRANSIT_MATCH_SAMPLES)
 
 from pyfiles.database_interface import (
-    device_data_filtered_table_insert, match_mass_transit_live)
+    device_data_filtered_table_insert,
+    match_mass_transit_filtered,
+    match_mass_transit_live)
+
 from pyfiles.mass_transit_match_planner import (
     find_same_journey_time_this_week, match_tripleg_with_publictransport, TripMatchedWithPlannerResult, PlannedTrip, minSpeeds)
 
@@ -38,17 +41,41 @@ class DeviceDataFilterer:
         self.file_finalstats = None
 
 	# mehrdad: note: works on one trip-leg with specific activity of specific userid (trip-legs found by analyze_unfiltered_data())
-    def _match_mass_transit(self, device_data_queue, activity, user_id):
-        if len(device_data_queue) == 0:
-            return
+    def _match_mass_transit(
+            self, device_data_queue, activity, user_id, fallback=False):
+
+        """Find mass transit match for leg in device_data_queue, using live
+        vehicle locations, and trip planner. If fallback is True, planner is
+        only used in the range where live data is also available, while for
+        earlier legs the matches are taken from old filtered data."""
+
+        if len(device_data_queue) == 0 or activity != "IN_VEHICLE":
+            return None, None, None
+
+        line_source = None
 
         line_type, line_name = self._match_mass_transit_live(
             activity, device_data_queue)
 
-        line_type, line_name = self._match_mass_transit_planner(
-            activity, device_data_queue, user_id, line_type, line_name)
+        if line_type is not False:
+            line_source = "LIVE" # data available, set source even if no match
+            fallback = False
 
-        return device_data_queue, activity, user_id, line_type, line_name
+        if fallback:
+            line_type, line_name, fpcount = self._match_mass_transit_filtered(
+                activity, device_data_queue)
+            if fpcount > 0:
+                line_source = "FILTERED"
+        else:
+            # This looks a bit backwards, but reflects that this planner call
+            # is a printing and csv dumping no-op if these are not None
+            if not line_type:
+                line_source = "PLANNER"
+
+            line_type, line_name = self._match_mass_transit_planner(
+                activity, device_data_queue, user_id, line_type, line_name)
+
+        return line_type, line_name, line_source
 
 
     def generate_device_legs(self, points):
@@ -76,9 +103,9 @@ class DeviceDataFilterer:
 
             # Feed moving span to activity stabilizer, mass transit detection.
             # This loses unstabilizable point spans.
-            for legpts, legact, leguser in self._analyse_unfiltered_data(seg):
-                legpts, legact, leguser, legtype, legname = \
-                    self._match_mass_transit(legpts, legact, leguser)
+            for legpts, legact in self._analyse_unfiltered_data(seg):
+                legtype, legname, legsource = \
+                    self._match_mass_transit(legpts, legact, None, True)
                 yield {
                     "time_start": legpts[0]["time"],
                     "time_end": legpts[-1]["time"],
@@ -87,7 +114,7 @@ class DeviceDataFilterer:
                     "activity": legact,
                     "line_type": legtype,
                     "line_name": legname,
-                    "line_stage": None} # XXX oooooohhhhhhhh
+                    "line_source": legsource}
                 lastend = legpts[-1]["time"]
 
         # Emit trailing undecided points as a null activity terminator leg.
@@ -102,10 +129,12 @@ class DeviceDataFilterer:
 
 
     def generate_filtered_data(self, device_data_rows, user_id):
-        for device_data_queue, activity, user_id in \
+        for device_data_queue, activity in \
                 self._analyse_unfiltered_data(device_data_rows, user_id):
-            self._write_filtered_data(*self._match_mass_transit(
-                device_data_queue, activity, user_id))
+            legtype, legname, legsource = \
+                self._match_mass_transit(device_data_queue, activity, user_id)
+            self._write_filtered_data(
+                legpts, legact, user_id, legtype, legname)
 
 
     def _match_mass_transit_planner(
@@ -221,10 +250,14 @@ class DeviceDataFilterer:
         device_data_filtered_table_insert(filtered_device_data)
 
 
-    def _match_mass_transit_live(self, activity, device_data_queue):
-        if activity != "IN_VEHICLE":
-            return None, None
+    def _match_mass_transit_filtered(self, activity, device_data_queue):
+        return match_mass_transit_filtered(
+            device_data_queue[0]["device_id"],
+            device_data_queue[0]["time"],
+            device_data_queue[-1]["time"])
 
+
+    def _match_mass_transit_live(self, activity, device_data_queue):
         device = device_data_queue[0]["device_id"]
         tstart = device_data_queue[0]["time"]
         tend = device_data_queue[-1]["time"]
@@ -233,7 +266,13 @@ class DeviceDataFilterer:
             device, tstart, tend,
             MAX_MASS_TRANSIT_TIME_DIFFERENCE,
             MAX_MASS_TRANSIT_DISTANCE_DIFFERENCE,
-            NUMBER_OF_MASS_TRANSIT_MATCH_SAMPLES).fetchall()
+            NUMBER_OF_MASS_TRANSIT_MATCH_SAMPLES)
+
+        if matches is None:
+            print "no vehicle data available"
+            return False, False
+
+        matches = matches.fetchall()
 
         print "d"+str(device), str(tstart)[:16], str(tend)[11:16], \
             str(len(device_data_queue))+"p:", ", ".join("%.2f %i %s" % (
@@ -325,7 +364,7 @@ class DeviceDataFilterer:
         for current_row, current_activity in self._analyse_activities(rows):
             if (current_row["time"] - previous_time).total_seconds() > MAX_POINT_TIME_DIFFERENCE:
                 if chosen_activity != "NOT_SET": #if false, no good activity was found
-                    yield device_data_queue, chosen_activity, user_id
+                    yield device_data_queue, chosen_activity
                 device_data_queue = []
                 previous_device_id = current_row["device_id"]
                 previous_time = current_row["time"]
@@ -366,10 +405,7 @@ class DeviceDataFilterer:
             if consecutive_differences == CONSECUTIVE_DIFFERENCE_LIMIT:
                 #split the transition points, first half is previous activity, latter half is new activity
                 splitting_point = CONSECUTIVE_DIFFERENCE_LIMIT + (different_activity_counter - CONSECUTIVE_DIFFERENCE_LIMIT) / 2
-                yield (
-                    device_data_queue[:-splitting_point],
-                    chosen_activity,
-                    user_id)
+                yield device_data_queue[:-splitting_point], chosen_activity
                 device_data_queue = device_data_queue[-splitting_point:]
                 consecutive_differences = 0
                 different_activity_counter = 0
@@ -380,7 +416,7 @@ class DeviceDataFilterer:
             previous_activity = current_activity
 
         if chosen_activity != "NOT_SET":
-            yield device_data_queue, chosen_activity, user_id
+            yield device_data_queue, chosen_activity
 
         if DUMP_CSV_FILES:
             self._dump_csv_file_close(user_id)
