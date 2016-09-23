@@ -76,8 +76,9 @@ class DeviceDataFilterer:
 
             # Feed moving span to activity stabilizer, mass transit detection.
             # This loses unstabilizable point spans.
-            for leg in self._analyse_unfiltered_data(seg):
-                legpts, legact, leguser, legtype, legname = leg
+            for legpts, legact, leguser in self._analyse_unfiltered_data(seg):
+                legpts, legact, leguser, legtype, legname = \
+                    self._match_mass_transit(legpts, legact, leguser)
                 yield {
                     "time_start": legpts[0]["time"],
                     "time_end": legpts[-1]["time"],
@@ -101,10 +102,10 @@ class DeviceDataFilterer:
 
 
     def generate_filtered_data(self, device_data_rows, user_id):
-        for device_data_queue, activity, user_id, line_type, line_name in \
+        for device_data_queue, activity, user_id in \
                 self._analyse_unfiltered_data(device_data_rows, user_id):
-            self._write_filtered_data(
-                device_data_queue, activity, user_id, line_type, line_name)
+            self._write_filtered_data(*self._match_mass_transit(
+                device_data_queue, activity, user_id))
 
 
     def _match_mass_transit_planner(
@@ -304,8 +305,7 @@ class DeviceDataFilterer:
 
 
     def _analyse_unfiltered_data(self, device_data_rows, user_id=None):
-        """Generate stabilized contiguous activity spans from moving raw trace,
-        with mass transit detected in the vehicle spans."""
+        """Generate stabilized contiguous activity spans from raw trace."""
 
         if DUMP_CSV_FILES:
             self._dump_csv_file_open(user_id)
@@ -325,8 +325,7 @@ class DeviceDataFilterer:
         for current_row, current_activity in self._analyse_activities(rows):
             if (current_row["time"] - previous_time).total_seconds() > MAX_POINT_TIME_DIFFERENCE:
                 if chosen_activity != "NOT_SET": #if false, no good activity was found
-                    yield self._match_mass_transit(
-                        device_data_queue, chosen_activity, user_id)
+                    yield device_data_queue, chosen_activity, user_id
                 device_data_queue = []
                 previous_device_id = current_row["device_id"]
                 previous_time = current_row["time"]
@@ -367,7 +366,7 @@ class DeviceDataFilterer:
             if consecutive_differences == CONSECUTIVE_DIFFERENCE_LIMIT:
                 #split the transition points, first half is previous activity, latter half is new activity
                 splitting_point = CONSECUTIVE_DIFFERENCE_LIMIT + (different_activity_counter - CONSECUTIVE_DIFFERENCE_LIMIT) / 2
-                yield self._match_mass_transit(
+                yield (
                     device_data_queue[:-splitting_point],
                     chosen_activity,
                     user_id)
@@ -381,8 +380,7 @@ class DeviceDataFilterer:
             previous_activity = current_activity
 
         if chosen_activity != "NOT_SET":
-            yield self._match_mass_transit(
-                device_data_queue, chosen_activity, user_id)
+            yield device_data_queue, chosen_activity, user_id
 
         if DUMP_CSV_FILES:
             self._dump_csv_file_close(user_id)
