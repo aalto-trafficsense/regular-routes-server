@@ -99,6 +99,12 @@ def generate_legs():
         devmax.outerjoin(legmax, devmax.c.device_id == legmax.c.device_id))
 
     for device, start in db.engine.execute(starts):
+        # When the resumed leg is a stop, the stop condition is not necessarily
+        # valid anymore from the refined entry point, making the stop
+        # unresumable. Rewind by the minimum stop duration to make sure a
+        # resumed stop is redetected.
+        rewind = start - datetime.timedelta(seconds=DEST_DURATION_MIN)
+
         query = select(
             [   func.ST_AsGeoJSON(dd.c.coordinate).label("geojson"),
                 dd.c.accuracy,
@@ -107,15 +113,18 @@ def generate_legs():
                 dd.c.activity_1, dd.c.activity_1_conf,
                 dd.c.activity_2, dd.c.activity_2_conf,
                 dd.c.activity_3, dd.c.activity_3_conf],
-            and_(dd.c.device_id == device, dd.c.time >= start),
+            and_(dd.c.device_id == device, dd.c.time >= rewind),
             order_by=dd.c.time)
 
         points = db.engine.execute(query).fetchall()
-        print "resume:", "d"+str(device), start, len(points)
+        print "resume:", "d"+str(device), start, rewind, len(points)
 
         filterer = DeviceDataFilterer() # not very objecty rly
         first = True
         for leg in filterer.generate_device_legs(points):
+            # Ignore any legs in the rewind span.
+            if leg["time_end"] <= start:
+                continue
     
             # Adjust leg for db entry
             leg.update({
@@ -131,10 +140,7 @@ def generate_legs():
             if first:
                 first = False
 
-                # Don't update the start of the resumed leg. On resume of a
-                # stop leg, the entry refinement will start on the previously
-                # refined point, rather than the appropriate entry window,
-                # causing the entry to shift forward inappropriately.
+                # Don't update the start of the resumed leg.
                 leg_nostart = leg.copy()
                 del leg_nostart["coordinate_start"]
                 del leg_nostart["time_start"]
@@ -148,16 +154,6 @@ def generate_legs():
                     continue # don't insert if update matched
 
             db.engine.execute(legs.insert(leg))
-
-#        if not first:
-#            leg["time_end"] + epsilon to last point reject null activity leg?
-
-        # XXX need to create the reject leg at least at the end? to avoid
-        # re-resuming on last valid leg, possibly with worse results due to
-        # expired auxiliary data/sources.
-
-        # maybe generate it from the filtererer since it has the points in hand
-        # ...or not, the resume logic is here after all
 
         # XXX need different fn in filtererer to source detections from old
         # filter data first to cover legacy, then fall back to live and
