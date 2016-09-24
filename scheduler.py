@@ -135,7 +135,7 @@ def generate_legs(maxtime=None):
         first = True
         for leg in filterer.generate_device_legs(points):
             print " ".join(["d"+str(device), str(leg["time_start"])[:19],
-                str(leg["time_end"])[:19]] + [str(leg.get(x)) for x in [
+                str(leg["time_end"])[:19]] + [repr(leg.get(x)) for x in [
                 "activity", "line_type", "line_name", "line_source"]]),
 
             # Ignore any legs in the rewind span.
