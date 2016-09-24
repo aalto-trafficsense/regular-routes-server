@@ -231,12 +231,17 @@ def trace_partition_movement(points, distance, interval):
     itail = next(itails, None) # interval back window for entry/exit refinement
     ihead = None # point inside interval lookahead window
     next_ihead = next(iheads, None) # point outside interval lookahead window
-    firstpoint = None
+
+    def refine_entry():
+        refine_exit()
+        moveseg.extend(stopseg)
+        stopseg[:] = [moveseg.pop()] # current point first in stop
+
+    def refine_exit():
+        stopseg.extend(nextseg)
+        nextseg[:] = []
 
     for point in points:
-        if not firstpoint:
-            firstpoint = point
-
         nextseg.append(point)
 
         # Adjust two-pane time window used for entry/exit refinement.
@@ -251,11 +256,10 @@ def trace_partition_movement(points, distance, interval):
         stretch = (min(distance, point_distance(point, ihead))
                  - min(distance, point_distance(itail, point)))
 
-        # Refine exit when in a stop, always to end of trace (null head)
-        if exitend and (not head or stretch >= exitmax): # >= lone/clamp late
+        # Refine exit when in a stop.
+        if exitend and stretch >= exitmax: # >= prefer later when equal
             exitmax = stretch
-            stopseg += nextseg
-            nextseg = []
+            refine_exit()
 
         # Find valid windows while advancing head until out of range.
         while head and point_distance(point, head) <= distance:
@@ -267,6 +271,11 @@ def trace_partition_movement(points, distance, interval):
                 if exitend is None:
                     entrymax = -inf
                     entryend = head
+
+                    # If at gap or start of trace, don't refine entry further.
+                    if point is itail:
+                        entrymax = inf
+                        refine_entry()
 
                 # Reset exit refinement window.
                 exitmax = -inf
@@ -283,19 +292,20 @@ def trace_partition_movement(points, distance, interval):
 
         # At end of stop condition validity, emit the stop segment.
         if point is exitend:
+
+            # If followed by gap or end of trace, set exit here.
+            if point is ihead:
+                refine_exit()
+
             exitend = None
             if stopseg:
                 yield False, stopseg
             stopseg = []
 
-        # Refine entry point when in entry window, but keep if start of trace
-        if (entryend
-                and (not stopseg or stopseg[0] is not firstpoint)
-                and -stretch > entrymax): # > lone/clamp early
+        # Refine entry point when in entry window.
+        if (entryend and -stretch > entrymax): # > prefer earlier when equal
             entrymax = -stretch
-            moveseg += stopseg + nextseg
-            stopseg = [moveseg.pop()] # current point belongs in stop
-            nextseg = []
+            refine_entry()
             exitmax = -inf # reset exit refinement
 
     if exitend:
