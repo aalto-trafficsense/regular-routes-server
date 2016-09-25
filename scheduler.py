@@ -72,8 +72,10 @@ def run_daily_tasks():
     mass_transit_cleanup()
 
 
-def generate_legs(maxtime=None):
-    """Record legs from stops and mobile activity found in device telemetry."""
+def generate_legs(maxtime=None, repair=False):
+    """Record legs from stops and mobile activity found in device telemetry, up
+    to now or given maxtime. In repair mode, re-evaluate and replace all
+    changed legs."""
 
     if not maxtime:
         maxtime = datetime.datetime.now()
@@ -104,6 +106,10 @@ def generate_legs(maxtime=None):
             func.coalesce(legmax.c.laststart, devmax.c.firstpoint)],
         or_(legmax.c.lastend == None, devmax.c.lastpoint > legmax.c.lastend),
         devmax.outerjoin(legmax, devmax.c.device_id == legmax.c.device_id))
+
+    # In repair mode, just start from the top.
+    if repair:
+        starts = select([devmax.c.device_id, devmax.c.firstpoint])
 
     for device, start in db.engine.execute(starts):
         # When the resumed leg is a stop, the stop condition is not necessarily
@@ -140,7 +146,7 @@ def generate_legs(maxtime=None):
 
             # Ignore any legs in the rewind span.
             if leg["time_end"] < start:
-                print "-> ignore"
+                print "-> early"
                 continue
 
             # Adjust leg for db entry
@@ -153,36 +159,33 @@ def generate_legs(maxtime=None):
             del leg["geojson_start"]
             del leg["geojson_end"]
 
-            # Update the resumed leg if there is one.
-            if first:
-                first = False
+            # Don't touch if same leg already recorded.
+            existing = db.engine.execute(legs.select(and_(
+                legs.c.device_id == leg["device_id"],
+                legs.c.time_start == leg["time_start"],
+                legs.c.time_end == leg["time_end"]))).first()
+            # oh don't want to compare id and stuff...
+            if existing and all(leg.get(x) == existing[x] for x in [
+                    "activity", "line_type", "line_name", "line_source"]):
+                print "-> unchanged"
+                continue
 
-                # Don't update the start of the resumed leg.
-                leg_nostart = leg.copy()
-                del leg_nostart["coordinate_start"]
-                del leg_nostart["time_start"]
-                update = legs.update(
-                    and_(
-                        legs.c.device_id == device,
-                        legs.c.time_start == start),
-                    leg_nostart)
-                if db.engine.execute(update).rowcount > 0:
-                    print "-> update"
-                    continue # don't insert if update matched
-
+            # Replace overlapping legs.
+            rowcount = db.engine.execute(legs.delete(and_(
+                legs.c.device_id == leg["device_id"],
+                legs.c.time_start <= leg["time_end"],
+                legs.c.time_end >= leg["time_start"]))).rowcount
+            if rowcount:
+                print "-> delete %d" % rowcount,
             db.engine.execute(legs.insert(leg))
             print "-> insert"
-
-        # XXX need different fn in filtererer to source detections from old
-        # filter data first to cover legacy, then fall back to live and
-        # planner? tbh live should be preferred where available, and planner
-        # where current...
 
     # XXX attach device legs to users. Resume point is similar... Find last leg
     # recorded for user ...eh, that's likely to have been deleted above ;) So
     # just process legs of devices belonging to user, beyond the last fixed
     # user leg. Mixed devices in leg time_end order ascending, and discard
-    # overlaps, so more dense transitions win.
+    # overlaps, so more dense transitions win. if repair is True, do scan
+    # through all here as well.
 
 
 def filter_device_data(maxtime=None):

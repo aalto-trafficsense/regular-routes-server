@@ -18,6 +18,7 @@ from pyfiles.constants import (
 from pyfiles.database_interface import (
     device_data_filtered_table_insert,
     match_mass_transit_filtered,
+    match_mass_transit_legs,
     match_mass_transit_live)
 
 from pyfiles.mass_transit_match_planner import (
@@ -50,6 +51,13 @@ class DeviceDataFilterer:
             return None, None, None
 
         line_source = None
+
+        # Reuse previously recorded matches in unchanged legs, useful when
+        # reconstructing legs with changed algorithm or parameters.
+        match = self._match_mass_transit_legs(activity, device_data_queue)
+        if match is not None: # matched same start/end/activity
+            print "reuselegmatch",
+            return match # line_type, line_name, line_source
 
         # If legacy filtered data exists, just copy matches from there.
         # Filtered data should be generated after legs so this copying won't
@@ -247,6 +255,14 @@ class DeviceDataFilterer:
                                          "line_name": line_name})
 
         device_data_filtered_table_insert(filtered_device_data)
+
+
+    def _match_mass_transit_legs(self, activity, device_data_queue):
+        return match_mass_transit_legs(
+            device_data_queue[0]["device_id"],
+            device_data_queue[0]["time"],
+            device_data_queue[-1]["time"],
+            activity)
 
 
     def _match_mass_transit_filtered(self, activity, device_data_queue):

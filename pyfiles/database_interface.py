@@ -379,6 +379,22 @@ def data_points_filtered(user_id, datetime_start, datetime_end):
     return points
 
 
+def match_mass_transit_legs(device, tstart, tend, activity):
+    """Find mass transit match already recorded in an existing leg. Returns
+    None if no exact start/end/activity match found, otherwise (line_type,
+    line_name, line_source) triple."""
+
+    return db.engine.execute(select(
+        [   legs_table.c.line_type,
+            legs_table.c.line_name,
+            legs_table.c.line_source],
+        and_(
+            legs_table.c.device_id == device,
+            legs_table.c.time_start == tstart,
+            legs_table.c.time_end == tend,
+            legs_table.c.activity == activity))).first()
+
+
 def match_mass_transit_filtered(device, tstart, tend):
     """Find mass transit match from legacy filtered data. Returns None if
     no filtered data for this device beyond end of range; otherwise (line_type,
