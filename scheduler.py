@@ -180,12 +180,69 @@ def generate_legs(maxtime=None, repair=False):
             db.engine.execute(legs.insert(leg))
             print "-> insert"
 
-    # XXX attach device legs to users. Resume point is similar... Find last leg
-    # recorded for user ...eh, that's likely to have been deleted above ;) So
-    # just process legs of devices belonging to user, beyond the last fixed
-    # user leg. Mixed devices in leg time_end order ascending, and discard
-    # overlaps, so more dense transitions win. if repair is True, do scan
-    # through all here as well.
+    # Attach device legs to users.
+    devices = db.metadata.tables["devices"]
+
+    # Find end of last leg attached to each user.
+    usermax = select(
+        [legs.c.user_id, func.max(legs.c.time_end).label("lastend")],
+        legs.c.user_id != None,
+        group_by=legs.c.user_id).alias("usermax")
+
+    # Find later start of unattached legs for user's devices.
+    starts = select(
+        [devices.c.user_id, func.min(legs.c.time_start)],
+        and_(
+            legs.c.user_id == None,
+            legs.c.activity != None,
+            legs.c.time_end < maxtime,
+            or_(usermax.c.lastend == None,
+                legs.c.time_start > usermax.c.lastend)),
+        legs.join(devices, legs.c.device_id == devices.c.id) \
+            .outerjoin(usermax, devices.c.user_id == usermax.c.user_id),
+        group_by=[devices.c.user_id])
+
+    # In repair mode, just start from the top.
+    if repair:
+        starts = select(
+            [devices.c.user_id, func.min(legs.c.time_start)],
+            legs.c.time_end < maxtime,
+            legs.join(devices, legs.c.device_id == devices.c.id),
+            group_by=[devices.c.user_id, legs.c.device_id])
+
+    for user, start in db.engine.execute(starts):
+        print "u"+str(user), "start attach", start
+
+        # Get unattached legs from user's devices in end time order, so shorter
+        # legs get attached in favor of longer legs from a more idle device.
+        unattached = select(
+            [legs.c.id, legs.c.time_start, legs.c.time_end, legs.c.user_id],
+            and_(
+                devices.c.user_id == user,
+                legs.c.time_start >= start,
+                legs.c.time_end < maxtime,
+                legs.c.activity != None),
+            legs.join(devices, legs.c.device_id == devices.c.id),
+            order_by=legs.c.time_end)
+
+        lastend = None
+        for lid, lstart, lend, luser in db.engine.execute(unattached):
+            print " ".join(["u"+str(user), str(lstart)[:19], str(lend)[:19]]),
+            if lastend and lstart <= lastend:
+                if luser is None:
+                    print "-> detached"
+                    continue
+                db.engine.execute(legs.update(
+                    legs.c.id==lid).values(user_id=None)) # detach
+                print "-> detach"
+                continue
+            lastend = lend
+            if luser == user:
+                print "-> attached"
+                continue
+            db.engine.execute(legs.update(
+                legs.c.id==lid).values(user_id=user)) # attach
+            print "-> attach"
 
 
 def filter_device_data(maxtime=None):
