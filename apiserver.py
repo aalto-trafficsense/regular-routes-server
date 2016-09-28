@@ -4,10 +4,11 @@ from uuid import uuid4
 
 from flask import Flask, abort, jsonify, request
 from oauth2client.client import *
-from sqlalchemy.sql import and_, func, literal, select, text
+from sqlalchemy.sql import and_, between, func, literal, select, text
 import json
 
 from pyfiles.common_helpers import (
+    dict_groups,
     simplify_geometry,
     trace_linestrings,
     trace_regular_destinations,
@@ -333,49 +334,57 @@ def path(session_token):
         start = datetime.datetime.now() - datetime.timedelta(hours=12)
     end = start + datetime.timedelta(hours=24)
 
-    filtered_data = db.metadata.tables["device_data_filtered"]
-    device_data = db.metadata.tables["device_data"]
+    dd = db.metadata.tables["device_data"]
     devices = db.metadata.tables["devices"]
+    legs = db.metadata.tables["legs"]
     users = db.metadata.tables["users"]
 
-    # find end of filtered data
-    filterend = select(
-        [func.max(filtered_data.c.time)],
+    # find end of user legs
+    legsend = select(
+        [func.max(legs.c.time_end)],
         devices.c.token == session_token,
-        filtered_data.join(users).join(devices))
+        devices.join(users).join(legs))
 
-    # use filtered data if available
-    filtered = select(
-        [   func.ST_AsGeoJSON(filtered_data.c.coordinate).label("geojson"),
-            filtered_data.c.activity,
-            filtered_data.c.line_type,
-            filtered_data.c.line_name,
-            filtered_data.c.time],
+    # use user legs if available
+    legsed = select(
+        [   func.ST_AsGeoJSON(dd.c.coordinate).label("geojson"),
+            legs.c.activity,
+            legs.c.line_type,
+            legs.c.line_name,
+            legs.c.id,
+            dd.c.time],
         and_(
             devices.c.token == session_token,
-            filtered_data.c.time >= start,
-            filtered_data.c.time < end),
-        filtered_data.join(users).join(devices))
+            legs.c.activity != None,
+            dd.c.time >= start,
+            dd.c.time < end),
+        devices \
+            .join(users) \
+            .join(legs) \
+            .join(dd, and_(
+                legs.c.device_id == dd.c.device_id,
+                between(dd.c.time, legs.c.time_start, legs.c.time_end))))
 
-    # fall back on unfiltered beyond end of filtered data
-    unfiltered = select(
-        [   func.ST_AsGeoJSON(device_data.c.coordinate).label("geojson"),
-            device_data.c.activity_1.label("activity"),
+    # fall back on raw trace beyond end of user legs
+    unlegsed = select(
+        [   func.ST_AsGeoJSON(dd.c.coordinate).label("geojson"),
+            dd.c.activity_1.label("activity"),
             literal(None).label("line_type"),
             literal(None).label("line_name"),
-            device_data.c.time],
+            literal(None).label("id"),
+            dd.c.time],
         and_(
             devices.c.token == session_token,
-            device_data.c.time >= start,
-            device_data.c.time < end,
-            device_data.c.time > filterend),
-        device_data.join(devices))
+            dd.c.time >= start,
+            dd.c.time < end,
+            dd.c.time > legsend),
+        dd.join(devices))
 
-    query = filtered.union_all(unfiltered).order_by("time")
+    query = legsed.union_all(unlegsed).order_by("time")
     points = db.engine.execute(query)
 
-    # don't draw lines over too long intervals, separate trip on either side
-    segments = trace_split_sparse(points, MAX_POINT_TIME_DIFFERENCE)
+    # re-split into legs, and the raw part
+    segments = (legpts for (legid, legpts) in dict_groups(points, ["id"]))
 
     features = []
     for points in segments:
