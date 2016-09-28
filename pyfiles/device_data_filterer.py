@@ -13,7 +13,8 @@ from pyfiles.constants import (
     MAX_MASS_TRANSIT_DISTANCE_DIFFERENCE,
     MAX_MASS_TRANSIT_TIME_DIFFERENCE,
     MAX_POINT_TIME_DIFFERENCE,
-    NUMBER_OF_MASS_TRANSIT_MATCH_SAMPLES)
+    NUMBER_OF_MASS_TRANSIT_MATCH_SAMPLES,
+    STOP_BREAK_INTERVAL)
 
 from pyfiles.database_interface import (
     device_data_filtered_table_insert,
@@ -95,7 +96,7 @@ class DeviceDataFilterer:
         # Partition stationary and moving spans. Note that this loses
         # inaccurate and sharp points.
         for mov, seg in trace_partition_movement(
-                points, DEST_RADIUS_MAX, DEST_DURATION_MIN):
+                points, DEST_RADIUS_MAX, DEST_DURATION_MIN, STOP_BREAK_INTERVAL):
 
             # Emit stationary span.
             if not mov:

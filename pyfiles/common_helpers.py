@@ -195,7 +195,14 @@ def dict_groups(dicts, keys):
         yield gkey, group
 
 
-def trace_partition_movement(points, distance, interval):
+def trace_partition_movement(points, distance, interval, break_interval=None):
+    pll = break_interval and trace_split_sparse(points, break_interval) or [points]
+    for pl in pll:
+        for seg in trace_partition_movement_nobreak(pl, distance, interval):
+            yield seg
+
+
+def trace_partition_movement_nobreak(points, distance, interval):
     """Partition location trace into moving and stationary segments as a
     sequence of (bool moving, list points). A stationary segment is where the
     trace moves less than the given distance in the given time interval.

@@ -13,6 +13,9 @@ IN_VEHICLE_CO2 = 150
 #Maximum time limit between two device data points in seconds before they're considered to be two separate trips
 MAX_POINT_TIME_DIFFERENCE = 300
 
+# Maximum time allowed between points before splitting a stop segment.
+STOP_BREAK_INTERVAL = 60*60*24
+
 #If two devices for the same user id have produced activity data within this time limit (in seconds), the one with the larger device_id is dropped.
 MAX_DIFFERENT_DEVICE_TIME_DIFFERENCE = 40
 
