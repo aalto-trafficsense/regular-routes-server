@@ -1,7 +1,9 @@
 import json
 
 from pyfiles.common_helpers import (
-    get_distance_between_coordinates, trace_partition_movement)
+    get_distance_between_coordinates,
+    trace_discard_inaccurate,
+    trace_partition_movement)
 
 from pyfiles.constants import (
     ACTIVITY_WIN,
@@ -48,7 +50,13 @@ class DeviceDataFilterer:
         """Find mass transit match for leg in device_data_queue, using legacy
         filtered data, live vehicle locations, and trip planner."""
 
-        if len(device_data_queue) == 0 or activity != "IN_VEHICLE":
+        # Use only relatively accurate points for mass transit matching, also
+        # necessary so that matching previously recorded legs works...
+        if device_data_queue and "accuracy" in device_data_queue[0]:
+            device_data_queue = list(trace_discard_inaccurate(
+                device_data_queue, DEST_RADIUS_MAX / 2))
+
+        if len(device_data_queue) < 2 or activity != "IN_VEHICLE":
             return None, None, None
 
         line_source = None
@@ -93,10 +101,16 @@ class DeviceDataFilterer:
 
         lastend = None
 
-        # Partition stationary and moving spans. Note that this loses
-        # inaccurate and sharp points.
+        # Partition stationary and moving spans.
         for mov, seg in trace_partition_movement(
-                points, DEST_RADIUS_MAX, DEST_DURATION_MIN, STOP_BREAK_INTERVAL):
+                points,
+                DEST_RADIUS_MAX,
+                DEST_DURATION_MIN,
+                STOP_BREAK_INTERVAL):
+
+            # Ignore undecided inaccurate/sharp points between segments.
+            if mov is None:
+                continue
 
             # Emit stationary span.
             if not mov:
@@ -114,6 +128,15 @@ class DeviceDataFilterer:
             for legpts, legact in self._analyse_unfiltered_data(seg):
                 legtype, legname, legsource = \
                     self._match_mass_transit(legpts, legact, None)
+
+                # Inaccurate location points can be useful at the activity
+                # detection stage, but for clustering, the endpoints need to be
+                # more accurate.
+                legpts = list(trace_discard_inaccurate(
+                    legpts, DEST_RADIUS_MAX / 2))
+                if len(legpts) < 2:
+                    continue # too few points to make a move, drop leg
+
                 yield {
                     "time_start": legpts[0]["time"],
                     "time_end": legpts[-1]["time"],

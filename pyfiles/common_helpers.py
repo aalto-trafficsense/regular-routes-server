@@ -196,13 +196,44 @@ def dict_groups(dicts, keys):
 
 
 def trace_partition_movement(points, distance, interval, break_interval=None):
-    pll = break_interval and trace_split_sparse(points, break_interval) or [points]
+    """Wrapper to optionally split stops at data gaps greater than
+    break_interval."""
+
+    pll = break_interval \
+          and trace_split_sparse(points, break_interval) \
+          or [points]
     for pl in pll:
         for seg in trace_partition_movement_nobreak(pl, distance, interval):
             yield seg
 
 
 def trace_partition_movement_nobreak(points, distance, interval):
+    """Wrapper to restore inaccurate and sharp points, potentially useful for
+    activity selection, discarded by the callee."""
+
+    allpts, inpts = tee(points, 2)
+    outseg = []
+    for mov, inseg in trace_partition_movement_dropsome(
+            inpts, distance, interval):
+        p = next(allpts)
+        while p is not inseg[0]:
+            outseg.append(p)
+            p = next(allpts)
+        if outseg:
+            yield None, outseg # undecided points between stop/move segments
+            outseg = []
+        while p is not inseg[-1]:
+            outseg.append(p)
+            p = next(allpts)
+        outseg.append(p) # last point of segment
+        yield mov, outseg
+        outseg = []
+    outseg = [p for p in allpts]
+    if outseg:
+        yield None, outseg
+
+
+def trace_partition_movement_dropsome(points, distance, interval):
     """Partition location trace into moving and stationary segments as a
     sequence of (bool moving, list points). A stationary segment is where the
     trace moves less than the given distance in the given time interval.
@@ -219,7 +250,12 @@ def trace_partition_movement_nobreak(points, distance, interval):
     around, points on the exit path would interfere with entry detection and
     vice versa, resulting in more or less random knee points.
 
-    Low accuracy or otherwise suspicious points are discarded."""
+    Low accuracy or otherwise suspicious points are discarded.
+
+    XXX could rewrite this to just emit (bool moving, datetime start, datetime
+    end) since now the caller reconstructs the inaccurate or otherwise
+    suspicious points back into the output where they may be useful for
+    activity recognition."""
 
     # worst-case inaccurate point pair can break up a destination, but only if
     # helped by epsilon of real movement
@@ -329,7 +365,7 @@ def trace_partition_movement_nobreak(points, distance, interval):
 def trace_destinations(points, distance, interval):
     """Find stationary subsequences in location trace"""
     for mov, seg in trace_partition_movement(points, distance, interval):
-        if not mov:
+        if mov is False:
             yield seg
 
 
