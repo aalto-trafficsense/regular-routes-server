@@ -95,9 +95,11 @@ class DeviceDataFilterer:
         return line_type, line_name, line_source
 
 
-    def generate_device_legs(self, points):
+    def generate_device_legs(self, points, start=None):
         """Generate sequence of stationary and moving segments of same
-        activity from the raw trace of one device."""
+        activity from the raw trace of one device. If a start datetime is
+        given, no legs are emitted prior to that time, and the start of a leg
+        crossing it is set there."""
 
         lastend = None
 
@@ -108,8 +110,12 @@ class DeviceDataFilterer:
                 DEST_DURATION_MIN,
                 STOP_BREAK_INTERVAL):
 
-            # Ignore undecided inaccurate/sharp points between segments.
-            if mov is None:
+            # Crop preroll legs to start if given.
+            while start and seg and seg[0]["time"] < start:
+                seg.pop(0)
+
+            # Ignore undecided points between segments, or if not enough left.
+            if mov is None or len(seg) < 2:
                 continue
 
             # Emit stationary span.
