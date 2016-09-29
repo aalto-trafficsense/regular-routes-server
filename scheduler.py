@@ -93,30 +93,46 @@ def generate_legs(maxtime=None, repair=False):
         dd.c.time < maxtime,
         group_by=dd.c.device_id).alias("devmax")
 
-    # Find time range of last leg processed for each device.
-    legmax = select(
-        [   legs.c.device_id,
-            func.max(legs.c.time_start).label("laststart"),
-            func.max(legs.c.time_end).label("lastend")],
-        group_by=legs.c.device_id).alias("legmax")
+    # Find start of last good leg processed for each device.
+    lastgoodstart = select(
+        [legs.c.device_id, func.max(legs.c.time_start).label("time_start")],
+        legs.c.activity != None,
+        group_by=legs.c.device_id).alias("lastgoodstart")
 
-    # Find resume points: start of last leg, or first point if no legs.
+    # Find activity for the last good legs.
+    lastgood = select(
+        [legs.c.device_id, legs.c.time_start, legs.c.activity],
+        from_obj=lastgoodstart.join(legs, and_(
+            lastgoodstart.c.device_id == legs.c.device_id,
+            lastgoodstart.c.time_start == legs.c.time_start))).alias("lastgood")
+
+    # Find end of processed legs, including terminator for each device.
+    lastend = select(
+        [legs.c.device_id, func.max(legs.c.time_end).label("lastend")],
+        group_by=legs.c.device_id).alias("lastend")
+
+    # If trailing new points, resume at start of last good leg, or first point.
     starts = select(
         [   devmax.c.device_id,
-            func.coalesce(legmax.c.laststart, devmax.c.firstpoint)],
-        or_(legmax.c.lastend == None, devmax.c.lastpoint > legmax.c.lastend),
-        devmax.outerjoin(legmax, devmax.c.device_id == legmax.c.device_id))
+            func.coalesce(lastgood.c.time_start, devmax.c.firstpoint),
+            lastgood.c.activity],
+        or_(lastend.c.lastend == None, devmax.c.lastpoint > lastend.c.lastend),
+        devmax \
+            .outerjoin(lastgood, devmax.c.device_id == lastgood.c.device_id)\
+            .outerjoin(lastend, devmax.c.device_id == lastend.c.device_id))
 
     # In repair mode, just start from the top.
     if repair:
         starts = select([devmax.c.device_id, devmax.c.firstpoint])
 
-    for device, start in db.engine.execute(starts):
+    for device, start, lastact in db.engine.execute(starts):
         # When the resumed leg is a stop, the stop condition is not necessarily
         # valid anymore from the refined entry point, making the stop
         # unresumable. Rewind by the minimum stop duration to make sure a
         # resumed stop is redetected.
-        rewind = start - datetime.timedelta(seconds=DEST_DURATION_MIN)
+        rewind = start
+        if lastact == "STILL":
+            rewind -= datetime.timedelta(seconds=DEST_DURATION_MIN)
 
         query = select(
             [   func.ST_AsGeoJSON(dd.c.coordinate).label("geojson"),
@@ -148,6 +164,11 @@ def generate_legs(maxtime=None, repair=False):
             if leg["time_end"] < start:
                 print "-> early"
                 continue
+
+            # Rewind can refine a start back inappropriately, don't let it.
+            if leg["time_start"] < start:
+                print "-> setstart",
+                leg["time_start"] = start
 
             # Adjust leg for db entry
             leg.update({
