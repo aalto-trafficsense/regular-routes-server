@@ -58,6 +58,7 @@ device_data_filtered_table = None
 legs_table = None
 modes_table = None
 leg_modes_view = None
+leg_ends_table = None
 travelled_distances_table = None
 mass_transit_data_table = None
 global_statistics_table = None
@@ -152,13 +153,19 @@ def init_db(app):
 
     device_data_filtered_table.create(checkfirst=True)
 
+    # Clustered leg ends
+    global leg_ends_table
+    leg_ends_table = Table('leg_ends', metadata,
+        Column('id', Integer, primary_key=True),
+        Column('coordinate', ga2.Geography('point', 4326, spatial_index=True)))
+
     # Combined activity including mass transit submodes
     mode_enum = Enum(
         *(activity_types + mass_transit_types),
         name="mode_enum",
         metadata=metadata)
 
-    # decided activity and detected mass transit line in trace time ranges
+    # Decided activity and detected mass transit line in trace time ranges
     global legs_table
     legs_table = Table('legs', metadata,
         Column('id', Integer, primary_key=True),
@@ -170,7 +177,9 @@ def init_db(app):
             ga2.Geography('point', 4326, spatial_index=False)),
         Column('coordinate_end',
             ga2.Geography('point', 4326, spatial_index=False)),
-        Column('activity', mode_enum),
+        Column('activity', activity_type_enum),
+        Column('cluster_start', Integer, ForeignKey('leg_ends.id'), index=True),
+        Column('cluster_end', Integer, ForeignKey('leg_ends.id'), index=True),
 
         # useful near beginning of time
         Index('idx_legs_user_id_time_start_time_end',
@@ -488,9 +497,15 @@ CREATE OR REPLACE VIEW leg_modes AS SELECT
         Column("user_id", ForeignKey(users_table.c.id)),
         autoload=True)
 
+    # Functions and triggers that maintain the leg_ends table
+    with open("sql/legends.sql") as f, db.engine.begin() as t:
+        # Server restarts can result in this being run concurrently, leading to
+        # tuple concurrently updated and other racing on function and trigger
+        # updates. Lock something vaguely relevant to serialize access.
+        t.execute(text("lock only leg_ends in access exclusive mode"))
+        t.execute(text(f.read()), clustdist=2*DEST_RADIUS_MAX)
+
     return db, store
-
-
 
 
 # Helper Functions:

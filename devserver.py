@@ -7,7 +7,7 @@ import json
 import os
 
 from flask import Flask, jsonify, request, render_template, Response, make_response
-from sqlalchemy.sql import and_, func, select, text
+from sqlalchemy.sql import and_, func, or_, select, text
 
 from pyfiles.common_helpers import (
     datetime_range_str,
@@ -381,6 +381,30 @@ def visualize_device_geojson(device_id):
                 'visits': len(d["visits"]),
                 'type': 'regular-destination',
                 'title': title}})
+
+    legs = db.metadata.tables["legs"]
+    ends = db.metadata.tables["leg_ends"]
+    s = select(
+        [   func.ST_AsGeoJSON(ends.c.coordinate).label("geojson"),
+            func.count("*")],
+        and_(
+            legs.c.activity == "STILL",
+            legs.c.device_id == device_id,
+            legs.c.time_end >= longwin_start,
+            legs.c.time_start <= date_end),
+        from_obj=ends.join(legs, or_(
+            legs.c.cluster_start == ends.c.id,
+            legs.c.cluster_end == ends.c.id)),
+        group_by=ends.c.coordinate)
+
+    for geojson, count in db.engine.execute(s):
+        features.append({
+            'type': 'Feature',
+            'geometry': json.loads(geojson),
+            'properties': {
+                'visits': count,
+                'type': 'legend-cluster',
+                'title': count}})
 
     geojson = {
         'type': 'FeatureCollection',

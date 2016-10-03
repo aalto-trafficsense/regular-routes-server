@@ -84,6 +84,18 @@ $(document).ready(function() {
 		},
 		title: title
 	    };
+       } else if (type === 'legend-cluster') {
+           return {
+               icon: {
+                   path: google.maps.SymbolPath.CIRCLE,
+                   scale: 3 * feature.getProperty('visits')^.5,
+                   strokeColor: 'darkgreen',
+                   strokeWeight: 1,
+                    fillColor: 'darkgreen',
+                    fillOpacity: 0.2
+               },
+               title: title
+           };
 	}
     });
 
