@@ -20,6 +20,7 @@ begin
         -- Calling trigger may have linked a new node from a null end so...
         update legs set cluster_start = null where cluster_start = cid;
         update legs set cluster_end = null where cluster_end = cid;
+
         delete from leg_ends where id = cid;
         return;
     end if;
@@ -30,6 +31,7 @@ begin
     select * from leg_ends
         where st_dwithin(leg_ends.coordinate, cluster.coordinate, :clustdist)
             and leg_ends.id != cluster.id
+            and leg_ends.user_id = cluster.user_id
         order by st_distance(leg_ends.coordinate, cluster.coordinate) asc
         limit 1
         into neighbor;
@@ -60,75 +62,121 @@ end;
 $$ language plpgsql volatile returns null on null input;
 
 
+-- Recluster leg ends after insert/update/delete.
+create or replace function legs_changed(old legs, new legs) returns void as $$
+begin
+    if old.user_id is distinct from new.user_id then
+        perform legs_unlink_start(old);
+        perform legs_unlink_end(old);
+        perform legs_link_start(new);
+        perform legs_link_end(new);
+        return;
+    end if;
+
+    if old.coordinate_start is distinct from new.coordinate_start then
+        perform legs_unlink_start(old);
+        perform legs_link_start(new);
+    end if;
+
+    if old.coordinate_end is distinct from new.coordinate_end then
+        perform legs_unlink_end(old);
+        perform legs_link_end(new);
+    end if;
+end;
+$$ language plpgsql volatile;
+
+
 -- Cluster start of leg.
-create or replace function legs_cluster_start(legid legs.id%type)
+create or replace function legs_link_start(leg legs)
 returns void as $$
 declare
     cid legs.cluster_start%type;
 begin
-    insert into leg_ends default values returning id into cid;
-    update legs set cluster_start = cid where id = legid;
+    if leg.user_id is null then return; end if;
+    insert into leg_ends (user_id) values (leg.user_id) returning id into cid;
+    update legs set cluster_start = cid where id = leg.id;
     perform leg_ends_fixup(cid);
 end;
 $$ language plpgsql volatile;
 
 
 -- Cluster end of leg.
-create or replace function legs_cluster_end(legid legs.id%type)
+create or replace function legs_link_end(leg legs)
 returns void as $$
 declare
     cid legs.cluster_end%type;
 begin
-    insert into leg_ends default values returning id into cid;
-    update legs set cluster_end = cid where id = legid;
+    if leg.user_id is null then return; end if;
+    insert into leg_ends (user_id) values (leg.user_id) returning id into cid;
+    update legs set cluster_end = cid where id = leg.id;
     perform leg_ends_fixup(cid);
 end;
 $$ language plpgsql volatile;
 
 
--- When a leg is deleted, fixup clusters where ref disappeared.
-create or replace function legs_deleted() returns trigger as $$
+-- Uncluster start of leg.
+create or replace function legs_unlink_start(leg legs) returns void as $$
 begin
-    perform leg_ends_fixup(OLD.cluster_start);
-    perform leg_ends_fixup(OLD.cluster_end);
-    return null;
+    update legs set cluster_start = null where id = leg.id;
+    perform leg_ends_fixup(leg.cluster_start);
 end;
 $$ language plpgsql volatile;
 
+
+-- Uncluster end of leg.
+create or replace function legs_unlink_end(leg legs) returns void as $$
+begin
+    update legs set cluster_end = null where id = leg.id;
+    perform leg_ends_fixup(leg.cluster_end);
+end;
+$$ language plpgsql volatile;
+
+
+-- Sadly, can't just use same trigger function as "old" will be unassigned
+-- rather than null for inserts, and so forth.
+create or replace function legs_deleted() returns trigger as $$
+begin perform legs_changed(old, null); return null; end;
+$$ language plpgsql volatile;
 drop trigger if exists legs_deleted_trigger on legs;
 create trigger legs_deleted_trigger after delete on legs
 for each row execute procedure legs_deleted();
 
 
--- When a leg is inserted, cluster its ends.
 create or replace function legs_inserted() returns trigger as $$
-begin
-    perform legs_cluster_start(NEW.id);
-    perform legs_cluster_end(NEW.id);
-    return null;
-end;
+begin perform legs_changed(null, new); return null; end;
 $$ language plpgsql volatile;
-
 drop trigger if exists legs_inserted_trigger on legs;
 create trigger legs_inserted_trigger after insert on legs
 for each row execute procedure legs_inserted();
 
 
--- If a leg's end coordinates changed, relink clusters appropriately.
 create or replace function legs_updated() returns trigger as $$
-begin
-    if NEW.coordinate_start is distinct from OLD.coordinate_start then
-        perform legs_cluster_start(NEW.id);
-        perform leg_ends_fixup(OLD.cluster_start);
-    end if;
-    if NEW.coordinate_end is distinct from OLD.coordinate_end then
-        perform legs_cluster_end(NEW.id);
-        perform leg_ends_fixup(OLD.cluster_end);
-    end if;
-    return null;
-end;
+begin perform legs_changed(old, new); return null; end;
 $$ language plpgsql volatile;
-
 drop trigger if exists legs_updated_trigger on legs;
 create trigger legs_updated_trigger after update on legs
 for each row execute procedure legs_updated();
+
+
+-- Function that can be called to cluster legs created before leg_ends set up.
+create or replace function legs_cluster() returns void as $$
+declare
+    leg legs%rowtype;
+begin
+    for leg in select * from legs
+        where user_id is not null
+          and coordinate_start is not null
+          and cluster_start is null
+    loop
+        perform legs_link_start(leg);
+    end loop;
+
+    for leg in select * from legs
+        where user_id is not null
+          and coordinate_end is not null
+          and cluster_end is null
+    loop
+        perform legs_link_end(leg);
+    end loop;
+end;
+$$ language plpgsql volatile;

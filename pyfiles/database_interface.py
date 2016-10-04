@@ -157,6 +157,7 @@ def init_db(app):
     global leg_ends_table
     leg_ends_table = Table('leg_ends', metadata,
         Column('id', Integer, primary_key=True),
+        Column('user_id', Integer, ForeignKey('users.id'), nullable=False),
         Column('coordinate', ga2.Geography('point', 4326, spatial_index=True)))
 
     # Combined activity including mass transit submodes
