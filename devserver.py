@@ -308,9 +308,9 @@ def visualize_device_geojson(device_id):
                     d["visits_rank"],
                     timedelta_str(d["total_time"]),
                     d["total_time_rank"])
-        visits = sorted(d["visits"], key=lambda x: x[0]["time"])
+        visits = sorted(d["visits"], key=lambda x: x["time_start"])
         vislist = [
-            " - ".join(datetime_range_str(v[0]["time"], v[-1]["time"]))
+            " - ".join(datetime_range_str(v["time_start"], v["time_end"]))
             for v in visits[-10:]] # XXX arbitrary
         title += "\n" + "\n".join(vislist)
 

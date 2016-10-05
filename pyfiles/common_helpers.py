@@ -527,9 +527,17 @@ def trace_regular_destinations(points, threshold_distance, threshold_interval):
         {   "coordinates": tuple(
                 sum(c) / len(visit)
                 for c in zip(*(point_coordinates(p) for p in visit))),
-            "visits": [visit]}
+            "time_start": visit[0]["time"],
+            "time_end": visit[-1]["time"]}
         for visit in trace_destinations(
             points, threshold_distance, threshold_interval)]
+
+    return stop_clusters(dests, cluster_distance)
+
+
+def stop_clusters(stops, cluster_distance):
+    """Cluster stops {coordinates: (x, y), time_start: datetime, time_end:
+    datetime} into regular destinations."""
 
     def dest_dist(d0, d1):
         return get_distance_between_coordinates(
@@ -547,6 +555,14 @@ def trace_regular_destinations(points, threshold_distance, threshold_interval):
         return (min([dest_dist(d0, d1),
                      d1] for d1 in dests if d1 is not d0)
                   + [d0])
+
+    # Start by making each stop a destination with a single visit.
+    dests = [{
+            "coordinates": x["coordinates"],
+            "visits": [{
+                "time_start": x["time_start"],
+                "time_end": x["time_end"]}]}
+        for x in stops]
 
     heap = [[None, None, d] for d in dests]
     d0 = d1 = merged = None
@@ -583,15 +599,15 @@ def trace_regular_destinations(points, threshold_distance, threshold_interval):
 
     groups = [x[2] for x in heap]
     for g in groups:
-        g["total_time"] = sum(point_interval(v[0], v[-1]) for v in g["visits"])
-        coords = []
+        g["total_time"] = sum(
+            (v["time_end"] - v["time_start"]).total_seconds()
+            for v in g["visits"])
         entries = []
         exits = []
         for v in g["visits"]:
-            coords += [point_coordinates(p) for p in v]
-            entries.append((v[0]["time"] - v[0]["time"].replace(
+            entries.append((v["time_start"] - v["time_start"].replace(
                 hour=0, minute=0, second=0, microsecond=0)).total_seconds())
-            exits.append((v[-1]["time"] - v[-1]["time"].replace(
+            exits.append((v["time_end"] - v["time_end"].replace(
                 hour=0, minute=0, second=0, microsecond=0)).total_seconds())
 
     for r, g in enumerate(sorted(
