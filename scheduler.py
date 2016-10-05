@@ -11,8 +11,9 @@ from pyfiles.database_interface import (
     init_db, data_points_by_user_id_after, get_filtered_device_data_points)
 from pyfiles.device_data_filterer import DeviceDataFilterer
 from pyfiles.energy_rating import EnergyRating
+from pyfiles.common_helpers import (
+    get_distance_between_coordinates, trace_discard_sidesteps)
 from pyfiles.constants import *
-from pyfiles.common_helpers import get_distance_between_coordinates
 from apscheduler.schedulers.background import BackgroundScheduler
 from flask import Flask
 from sqlalchemy.sql import and_, func, or_, select, text
@@ -272,6 +273,10 @@ def generate_distance_data():
     for id_row in user_ids:
         time = get_max_time_from_table("time", "travelled_distances", "user_id", id_row["id"]) + timedelta(days=1)
         data_rows = get_filtered_device_data_points(id_row["id"], time, last_midnight)
+
+        # discard suspiciously sharp movement from bogus location jumps
+        data_rows = trace_discard_sidesteps(data_rows, 2)
+
         ratings += get_ratings_from_rows(data_rows, id_row["id"])
     if len(ratings) > 0:
         db.engine.execute(travelled_distances_table.insert(ratings))
@@ -286,7 +291,7 @@ def generate_distance_data():
 
 def get_ratings_from_rows(filtered_data_rows, user_id):
     ratings = []
-    rows = filtered_data_rows.fetchall()
+    rows = list(filtered_data_rows)
     if len(rows) == 0:
         return ratings
     previous_time = rows[0]["time"]
