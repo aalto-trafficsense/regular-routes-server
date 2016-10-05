@@ -501,13 +501,26 @@ def timedelta_str(td):
     return "%6s" % ''.join(rv[:2])
 
 
+def vector_average(vv):
+    """Calculate average from iterable of vectors."""
+    c = None
+    for i, v in enumerate(vv):
+        c = v if c is None else tuple((i*a+b)/(i+1) for (a, b) in zip(c, v))
+    return c
+
+
+def trace_center(points):
+    """Calculate rough center for given points. Not correct across dateline."""
+    return vector_average(point_coordinates(p) for p in points)
+
+
 def trace_regular_destinations(points, threshold_distance, threshold_interval):
     """Find regular destinations in location
     trace. Distance and interval thresholds passed on to trace_destinations."""
 
     # With refined entry/exit, the visit centres should not be too biased by
     # the entry/exit traces, so using double cluster distance should not too
-    # often lead to two sdjacent stops clustering into one destination.
+    # often lead to two adjacent stops clustering into one destination.
     cluster_distance = threshold_distance * 2
 
     dests = [

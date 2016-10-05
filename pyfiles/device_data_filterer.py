@@ -2,6 +2,7 @@ import json
 
 from pyfiles.common_helpers import (
     get_distance_between_coordinates,
+    trace_center,
     trace_discard_inaccurate,
     trace_partition_movement)
 
@@ -118,13 +119,13 @@ class DeviceDataFilterer:
             if mov is None or len(seg) < 2:
                 continue
 
-            # Emit stationary span.
+            # Emit stationary span, with rough centre as coordinate_start.
             if not mov:
                 yield {
                     "time_start": seg[0]["time"],
                     "time_end": seg[-1]["time"],
-                    "geojson_start": seg[0]["geojson"],
-                    "geojson_end": seg[-1]["geojson"],
+                    "geojson_start": json.dumps({
+                        "type": "Point", "coordinates": trace_center(seg)}),
                     "activity": "STILL"}
                 lastend = seg[-1]["time"]
                 continue

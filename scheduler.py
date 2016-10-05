@@ -153,23 +153,27 @@ def generate_legs(maxtime=None, repair=False):
                 "activity", "line_type", "line_name", "line_source"]]),
 
             # Adjust leg for db entry
+            gj0 = leg.pop("geojson_start", None)
+            gj1 = leg.pop("geojson_end", None)
             leg.update({
                 "device_id": device,
-                "coordinate_start": func.ST_GeomFromGeoJSON(
-                    leg["geojson_start"]),
-                "coordinate_end": func.ST_GeomFromGeoJSON(
-                    leg["geojson_end"])})
-            del leg["geojson_start"]
-            del leg["geojson_end"]
+                "coordinate_start": gj0 and func.ST_GeomFromGeoJSON(gj0),
+                "coordinate_end": gj1 and func.ST_GeomFromGeoJSON(gj1)})
 
-            # Don't touch if same leg already recorded.
+            # Don't touch if same leg already recorded. Ignore id, user_id,
+            # cluster_start/end, handled elsewhere.
             existing = db.engine.execute(legs.select(and_(
                 legs.c.device_id == leg["device_id"],
                 legs.c.time_start == leg["time_start"],
-                legs.c.time_end == leg["time_end"]))).first()
-            # oh don't want to compare id and stuff...
-            if existing and all(leg.get(x) == existing[x] for x in [
-                    "activity", "line_type", "line_name", "line_source"]):
+                legs.c.time_end == leg["time_end"],
+                legs.c.coordinate_start == leg["coordinate_start"],
+                legs.c.coordinate_end == leg["coordinate_end"],
+                legs.c.activity == leg["activity"],
+                legs.c.line_type == leg.get("line_type"),
+                legs.c.line_name == leg.get("line_name"),
+                legs.c.line_source == leg.get("line_source")))).first()
+
+            if existing:
                 print "-> unchanged"
                 continue
 
