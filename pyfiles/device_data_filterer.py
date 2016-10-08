@@ -125,7 +125,9 @@ class DeviceDataFilterer:
                     "time_start": seg[0]["time"],
                     "time_end": seg[-1]["time"],
                     "geojson_start": json.dumps({
-                        "type": "Point", "coordinates": trace_center(seg)}),
+                        "type": "Point",
+                        "coordinates": trace_center(trace_discard_inaccurate(
+                            seg, DEST_RADIUS_MAX / 2))}),
                     "activity": "STILL"}
                 lastend = seg[-1]["time"]
                 continue

@@ -195,7 +195,12 @@ def dict_groups(dicts, keys):
         yield gkey, group
 
 
-def trace_partition_movement(points, distance, interval, break_interval=None):
+def trace_partition_movement(
+        points,
+        distance,
+        interval,
+        break_interval=None,
+        include_inaccurate=True):
     """Wrapper to optionally split stops at data gaps greater than
     break_interval."""
 
@@ -203,13 +208,20 @@ def trace_partition_movement(points, distance, interval, break_interval=None):
           and trace_split_sparse(points, break_interval) \
           or [points]
     for pl in pll:
-        for seg in trace_partition_movement_nobreak(pl, distance, interval):
+        for seg in trace_partition_movement_nobreak(
+                pl, distance, interval, include_inaccurate):
             yield seg
 
 
-def trace_partition_movement_nobreak(points, distance, interval):
-    """Wrapper to restore inaccurate and sharp points, potentially useful for
-    activity selection, discarded by the callee."""
+def trace_partition_movement_nobreak(
+        points, distance, interval, include_inaccurate=True):
+    """Wrapper to optionally restore inaccurate and sharp points which may be
+    useful for activity selection, but are discarded by the callee."""
+
+    if not include_inaccurate:
+        for x in trace_partition_movement_dropsome(points, distance, interval):
+            yield x
+        return
 
     allpts, inpts = tee(points, 2)
     outseg = []
@@ -362,9 +374,10 @@ def trace_partition_movement_dropsome(points, distance, interval):
         yield False, stopseg
 
 
-def trace_destinations(points, distance, interval):
+def trace_destinations(points, distance, interval, include_inaccurate=True):
     """Find stationary subsequences in location trace"""
-    for mov, seg in trace_partition_movement(points, distance, interval):
+    for mov, seg in trace_partition_movement(
+            points, distance, interval, None, include_inaccurate):
         if mov is False:
             yield seg
 
@@ -530,7 +543,7 @@ def trace_regular_destinations(points, threshold_distance, threshold_interval):
             "time_start": visit[0]["time"],
             "time_end": visit[-1]["time"]}
         for visit in trace_destinations(
-            points, threshold_distance, threshold_interval)]
+            points, threshold_distance, threshold_interval, False)]
 
     return stop_clusters(dests, cluster_distance)
 
