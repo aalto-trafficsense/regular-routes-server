@@ -111,16 +111,18 @@ class DeviceDataFilterer:
                 DEST_DURATION_MIN,
                 STOP_BREAK_INTERVAL):
 
-            # Crop preroll legs to start if given.
-            while start and seg and seg[0]["time"] < start:
-                seg.pop(0)
-
-            # Ignore undecided points between segments, or if not enough left.
-            if mov is None or len(seg) < 2:
+            # Ignore undecided points between segments.
+            if mov is None:
                 continue
 
             # Emit stationary span, with rough centre as coordinate_start.
             if not mov:
+                # Crop preroll legs to start if given, discard if too short.
+                while start and seg and seg[0]["time"] < start:
+                    seg.pop(0)
+                if len(seg) < 2:
+                    continue
+
                 yield {
                     "time_start": seg[0]["time"],
                     "time_end": seg[-1]["time"],
@@ -135,16 +137,24 @@ class DeviceDataFilterer:
             # Feed moving span to activity stabilizer, mass transit detection.
             # This loses unstabilizable point spans.
             for legpts, legact in self._analyse_unfiltered_data(seg):
-                legtype, legname, legsource = \
-                    self._match_mass_transit(legpts, legact, None)
 
-                # Inaccurate location points can be useful at the activity
-                # detection stage, but for clustering, the endpoints need to be
-                # more accurate.
+                # Crop preroll legs to start if given, after activity selection
+                # to give it the same context on resume, but before mass
+                # transit detect to avoid repeated querying on unsaved rewind
+                # range.
+                while start and legpts and legpts[0]["time"] < start:
+                    legpts.pop(0)
+
+                # Inaccurate points can be useful at the activity detection
+                # stage, but for mass transit matching and clustering, location
+                # needs to be more accurate.
                 legpts = list(trace_discard_inaccurate(
                     legpts, DEST_RADIUS_MAX / 2))
                 if len(legpts) < 2:
                     continue # too few points to make a move, drop leg
+
+                legtype, legname, legsource = \
+                    self._match_mass_transit(legpts, legact, None)
 
                 yield {
                     "time_start": legpts[0]["time"],

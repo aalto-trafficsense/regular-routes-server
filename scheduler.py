@@ -94,25 +94,25 @@ def generate_legs(maxtime=None, repair=False):
         dd.c.time < maxtime,
         group_by=dd.c.device_id).alias("devmax")
 
-    # Find start of last good leg processed for each device.
-    lastgood = select(
+    # Find start of last move leg processed for each device.
+    lastmove = select(
         [legs.c.device_id, func.max(legs.c.time_start).label("time_start")],
-        legs.c.activity != None,
-        group_by=legs.c.device_id).alias("lastgood")
+        and_(legs.c.activity != None, legs.c.activity != "STILL"),
+        group_by=legs.c.device_id).alias("lastmove")
 
     # Find end of processed legs, including terminator for each device.
     lastleg = select(
         [legs.c.device_id, func.max(legs.c.time_end).label("time_end")],
         group_by=legs.c.device_id).alias("lastleg")
 
-    # If trailing new points, resume at start of last good leg, or first point.
+    # If trailing new points, resume at start of last move leg, or first point.
     starts = select(
         [   devmax.c.device_id,
-            func.coalesce(lastgood.c.time_start, devmax.c.firstpoint)],
+            func.coalesce(lastmove.c.time_start, devmax.c.firstpoint)],
         or_(lastleg.c.time_end == None,
             devmax.c.lastpoint > lastleg.c.time_end),
         devmax \
-            .outerjoin(lastgood, devmax.c.device_id == lastgood.c.device_id) \
+            .outerjoin(lastmove, devmax.c.device_id == lastmove.c.device_id) \
             .outerjoin(lastleg, devmax.c.device_id == lastleg.c.device_id))
 
     # In repair mode, just start from the top.
