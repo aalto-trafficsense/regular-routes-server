@@ -372,46 +372,48 @@ def visualize_device_geojson(device_id):
             for v in visits[-10:]] # XXX arbitrary
         title += "\n" + "\n".join(vislist)
 
-        features.append({
-            'type': 'Feature',
-            'geometry': {
-                'type': 'Point',
-                'coordinates': d["coordinates"]},
-            'properties': {
-                'visits': len(d["visits"]),
-                'type': 'regular-destination',
-                'title': title}})
+#        features.append({
+#            'type': 'Feature',
+#            'geometry': {
+#                'type': 'Point',
+#                'coordinates': d["coordinates"]},
+#            'properties': {
+#                'visits': len(d["visits"]),
+#                'type': 'regular-destination',
+#                'title': title}})
 
     legs = db.metadata.tables["legs"]
     ends = db.metadata.tables["leg_ends"]
+
     s = select(
         [   func.ST_AsGeoJSON(ends.c.coordinate).label("geojson"),
+            ends.c.id,
+            func.bool_or(legs.c.activity == "STILL").label("stop"),
             func.count("*")],
         and_(
-            legs.c.activity == "STILL",
             legs.c.device_id == device_id,
             legs.c.time_end >= longwin_start,
             legs.c.time_start <= date_end),
         from_obj=ends.join(legs, or_(
             legs.c.cluster_start == ends.c.id,
             legs.c.cluster_end == ends.c.id)),
-        group_by=ends.c.coordinate)
+        group_by=[ends.c.coordinate, ends.c.id])
 
-    for geojson, count in db.engine.execute(s):
+    for geojson, id, stop, count in db.engine.execute(s):
         features.append({
             'type': 'Feature',
             'geometry': json.loads(geojson),
             'properties': {
-                'visits': count,
+                'stop': stop,
+                'title': "%d: %d visits" % (id, count),
                 'type': 'legend-cluster',
-                'title': count}})
+                'visits': count}})
 
     geojson = {
         'type': 'FeatureCollection',
         'features': features
     }
     return jsonify(geojson)
-
 
 
 @app.route('/logtest')

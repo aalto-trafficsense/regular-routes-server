@@ -76,7 +76,8 @@ $(document).ready(function() {
 	    return {
 		icon: {
 		    path: google.maps.SymbolPath.CIRCLE,
-		    scale: 3 * feature.getProperty('visits')^.5,
+//		    scale: 3 * feature.getProperty('visits')^(1/3),
+		    scale: 5,
 		    strokeColor: 'darkred',
 		    strokeWeight: 1,
                     fillColor: 'darkred',
@@ -84,18 +85,21 @@ $(document).ready(function() {
 		},
 		title: title
 	    };
-       } else if (type === 'legend-cluster') {
-           return {
-               icon: {
-                   path: google.maps.SymbolPath.CIRCLE,
-                   scale: 3 * feature.getProperty('visits')^.5,
-                   strokeColor: 'darkgreen',
-                   strokeWeight: 1,
-                    fillColor: 'darkgreen',
+        } else if (type === 'legend-cluster') {
+            var stop = feature.getProperty('stop');
+            var color = stop ? 'darkblue' : 'darkgreen';
+            return {
+                icon: {
+                    path: google.maps.SymbolPath.CIRCLE,
+//                  scale: 3 * feature.getProperty('visits')^(1/3),
+                    scale: stop ? 8 : 5,
+                    strokeColor: color,
+                    strokeWeight: 1,
+                    fillColor: color,
                     fillOpacity: 0.2
-               },
-               title: title
-           };
+                },
+                title: title
+            };
 	}
     });
 
