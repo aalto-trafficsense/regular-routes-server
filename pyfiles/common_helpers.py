@@ -319,6 +319,28 @@ def trace_discard_sidesteps(points, factor=2):
     """Discard points in trace that make the distance between their neighbors
     suspiciously long compared to the straight line."""
 
+    # For repeated bogus points to be discarded, need to look ahead past
+    # unmoved points. Split into three progressively more filtered streams.
+    points, feed = tee(points, 2)
+    moved, feed = tee(trace_discard_unmoved(feed), 2)
+    smooth = trace_discard_single_sidesteps(feed, factor)
+
+    # Reconstruct the unmoved back in, needed for stop detection and such
+    bad = next(moved, None)
+    good = next(smooth, None)
+    for p in points:
+        if p is bad:
+            discard = True
+            bad = next(moved, None)
+        if p is good: # good overrides bad
+            discard = False
+            good = next(smooth, None)
+        if discard:
+            continue
+        yield p
+
+
+def trace_discard_single_sidesteps(points, factor=2):
     d = point_distance
     def badness(p0, p1, p2):
         hyp = d(p0, p2)

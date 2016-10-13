@@ -12,7 +12,7 @@ from pyfiles.database_interface import (
 from pyfiles.device_data_filterer import DeviceDataFilterer
 from pyfiles.energy_rating import EnergyRating
 from pyfiles.common_helpers import (
-    get_distance_between_coordinates, trace_discard_sidesteps)
+    get_distance_between_coordinates, trace_discard_single_sidesteps)
 from pyfiles.constants import *
 from apscheduler.schedulers.background import BackgroundScheduler
 from flask import Flask
@@ -92,7 +92,7 @@ def generate_distance_data():
         data_rows = get_filtered_device_data_points(id_row["id"], time, last_midnight)
 
         # discard suspiciously sharp movement from bogus location jumps
-        data_rows = trace_discard_sidesteps(data_rows, 2)
+        data_rows = trace_discard_single_sidesteps(data_rows, 2)
 
         ratings += get_ratings_from_rows(data_rows, id_row["id"])
     if len(ratings) > 0:
