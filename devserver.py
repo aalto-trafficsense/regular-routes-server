@@ -11,6 +11,7 @@ from pyfiles.common_helpers import (
     simplify_geometry,
     timedelta_str,
     trace_destinations,
+    trace_discard_sidesteps,
     trace_linestrings,
     trace_regular_destinations)
 
@@ -223,6 +224,7 @@ def visualize_device_geojson(device_id):
     # these args can be given to test simplify on the linestring rendering
     maxpts = int(request.args.get("maxpts") or 0)
     mindist = int(request.args.get("mindist") or 0)
+    jumpfilter = bool(request.args.get("jumpfilter") or 0)
 
     points = data_points_snapping(device_id, date_start, date_end).fetchall()
 
@@ -282,8 +284,9 @@ def visualize_device_geojson(device_id):
                 'type': 'dest-line',
                 'title': '%s\n%s' % (dest[0]['time'], dest[-1]['time'])}})
 
+    linepoints = jumpfilter and trace_discard_sidesteps(points, 2) or points
     simplified = simplify_geometry(
-            points, maxpts=maxpts, mindist=mindist, keep_activity=True)
+            linepoints, maxpts=maxpts, mindist=mindist, keep_activity=True)
     features += trace_linestrings(
         simplified, ('activity',), {'type': 'trace-line'})
 

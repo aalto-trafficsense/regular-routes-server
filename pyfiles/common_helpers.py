@@ -391,12 +391,33 @@ def trace_discard_sidesteps(points, factor=2):
     """Discard points in trace that make the distance between their neighbors
     suspiciously long compared to the straight line."""
 
+    # For repeated bogus points to be discarded, need to look ahead past
+    # unmoved points. Split into three progressively more filtered streams.
+    points, feed = tee(points, 2)
+    moved, feed = tee(trace_discard_unmoved(feed), 2)
+    smooth = trace_discard_single_sidesteps(feed, factor)
+
+    # Reconstruct the unmoved back in, needed for stop detection and such
+    bad = next(moved, None)
+    good = next(smooth, None)
+    for p in points:
+        if p is bad:
+            discard = True
+            bad = next(moved, None)
+        if p is good: # good overrides bad
+            discard = False
+            good = next(smooth, None)
+        if discard:
+            continue
+        yield p
+
+
+def trace_discard_single_sidesteps(points, factor=2):
     d = point_distance
     def badness(p0, p1, p2):
         hyp = d(p0, p2)
         return hyp and (d(p0, p1) + d(p1, p2)) / hyp or float("inf")
 
-    # sidestep can make prior point look bad so drop only if next is not worse
     buf = []
     for p in points:
         buf.append(p)
@@ -404,7 +425,13 @@ def trace_discard_sidesteps(points, factor=2):
             continue
         badness1 = badness(*buf[0:3])
         badness2 = badness(*buf[1:4])
-        if badness1 > factor and badness1 > badness2:
+
+        # The false side of the trace has the property of being still with
+        # little noise, tens of centimetres. The true side of the trace
+        # typically has movement, or at least greater noise. This is why if
+        # both p1 and p2 look bad, we want to keep the one that looks worse,
+        # due to getting a narrower neighbor base from the false side.
+        if badness1 > factor and (badness2 <= factor or badness1 <= badness2):
             buf.pop(1)
             continue
         yield buf.pop(0)
