@@ -8,6 +8,7 @@ from pyfiles.common_helpers import (
 
 from pyfiles.constants import (
     ACTIVITY_WIN,
+    BAD_LOCATION_RADIUS,
     CONSECUTIVE_DIFFERENCE_LIMIT,
     DEST_DURATION_MIN,
     DEST_RADIUS_MAX,

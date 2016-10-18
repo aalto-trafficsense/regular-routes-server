@@ -262,7 +262,8 @@ def trace_partition_movement_dropsome(points, distance, interval):
     around, points on the exit path would interfere with entry detection and
     vice versa, resulting in more or less random knee points.
 
-    Low accuracy or otherwise suspicious points are discarded.
+    Low accuracy points (radius > distance / 2) are discarded. Caller should
+    discard otherwise suspicious points if necessary.
 
     XXX could rewrite this to just emit (bool moving, datetime start, datetime
     end) since now the caller reconstructs the inaccurate or otherwise
@@ -272,9 +273,6 @@ def trace_partition_movement_dropsome(points, distance, interval):
     # worst-case inaccurate point pair can break up a destination, but only if
     # helped by epsilon of real movement
     points = trace_discard_inaccurate(points, distance / 2)
-
-    # prevent false faraway location points breaking up visits
-    points = trace_discard_sidesteps(points, 2)
 
     inf = float("inf")
     entryend = exitend = None
@@ -387,14 +385,15 @@ def trace_discard_inaccurate(points, accuracy):
     return (p for p in points if p["accuracy"] <= accuracy)
 
 
-def trace_discard_sidesteps(points, factor=2):
-    """Discard points in trace that make the distance between their neighbors
-    suspiciously long compared to the straight line."""
+def trace_discard_sidesteps(points, badradius=None, factor=2):
+    """Discard sequences of points located within their accuracy radius (if
+    available; or badradius if given) in trace that make the distance between
+    their neighbors suspiciously long compared to the straight line."""
 
     # For repeated bogus points to be discarded, need to look ahead past
     # unmoved points. Split into three progressively more filtered streams.
     points, feed = tee(points, 2)
-    moved, feed = tee(trace_discard_unmoved(feed), 2)
+    moved, feed = tee(trace_discard_unmoved(feed, badradius), 2)
     smooth = trace_discard_single_sidesteps(feed, factor)
 
     # Reconstruct the unmoved back in, needed for stop detection and such
@@ -413,6 +412,11 @@ def trace_discard_sidesteps(points, factor=2):
 
 
 def trace_discard_single_sidesteps(points, factor=2):
+    """Discard individual points in trace, that have distance from prior point
+    greater than the given accuracy (if available), but make the distance
+    between neighbors suspiciously long, by given factor, compared to the
+    straight line."""
+
     d = point_distance
     def badness(p0, p1, p2):
         hyp = d(p0, p2)
@@ -431,7 +435,9 @@ def trace_discard_single_sidesteps(points, factor=2):
         # typically has movement, or at least greater noise. This is why if
         # both p1 and p2 look bad, we want to keep the one that looks worse,
         # due to getting a narrower neighbor base from the false side.
-        if badness1 > factor and (badness2 <= factor or badness1 <= badness2):
+        if (d(buf[0], buf[1]) > dict(buf[1]).get("accuracy", 0)
+                and badness1 > factor
+                and (badness2 <= factor or badness1 <= badness2)):
             buf.pop(1)
             continue
         yield buf.pop(0)
@@ -444,14 +450,16 @@ def trace_discard_single_sidesteps(points, factor=2):
         yield p
 
 
-def trace_discard_unmoved(points):
-    """Discard points in trace where the accuracy radius includes the
-    previously accepted point, so no clear evidence of movement."""
+def trace_discard_unmoved(points, radius=None):
+    """Discard points in trace where the accuracy radius (or given fixed
+    radius) includes the previously accepted point, so not presenting evidence
+    of movement."""
 
     previous = None
     for p in points:
         if previous:
-            if point_distance(previous, p) <= p["accuracy"]:
+            r = p["accuracy"] if radius is None else radius
+            if point_distance(previous, p) <= r:
                 continue
             yield previous
         previous = p

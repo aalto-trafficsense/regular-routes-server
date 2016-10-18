@@ -42,6 +42,11 @@ CONSECUTIVE_DIFFERENCE_LIMIT = 6
 # 2 * CONSECUTIVE_DIFFERENCE_LIMIT * client reporting interval.
 ACTIVITY_WIN = 120
 
+# Repeat false accurate location points are typically clustered close together;
+# this threshold distance is used to collect them together for discarding.
+# Increasing it may lose useful points in valid stops.
+BAD_LOCATION_RADIUS = 1
+
 
 #Regexes for the HSL api
 jore_ferry_regex = re.compile("^1019")
