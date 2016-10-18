@@ -15,7 +15,8 @@ from pyfiles.common_helpers import (
     trace_linestrings,
     trace_regular_destinations)
 
-from pyfiles.constants import DEST_DURATION_MIN, DEST_RADIUS_MAX
+from pyfiles.constants import (
+    BAD_LOCATION_RADIUS, DEST_DURATION_MIN, DEST_RADIUS_MAX)
 from pyfiles.database_interface import init_db, db_engine_execute, data_points_snapping
 from pyfiles.prediction.run_prediction import predict
 
@@ -224,7 +225,7 @@ def visualize_device_geojson(device_id):
     # these args can be given to test simplify on the linestring rendering
     maxpts = int(request.args.get("maxpts") or 0)
     mindist = int(request.args.get("mindist") or 0)
-    jumpfilter = bool(request.args.get("jumpfilter") or 0)
+    jumpfilter = float(request.args.get("jumpfilter") or 0)
 
     points = data_points_snapping(device_id, date_start, date_end).fetchall()
 
@@ -273,7 +274,9 @@ def visualize_device_geojson(device_id):
             })
 
     for dest in trace_destinations(
-            points, distance=DEST_RADIUS_MAX, interval=DEST_DURATION_MIN):
+            trace_discard_sidesteps(points, BAD_LOCATION_RADIUS),
+            distance=DEST_RADIUS_MAX,
+            interval=DEST_DURATION_MIN):
         features.append({
             'type': 'Feature',
             'geometry': {
@@ -284,7 +287,9 @@ def visualize_device_geojson(device_id):
                 'type': 'dest-line',
                 'title': '%s\n%s' % (dest[0]['time'], dest[-1]['time'])}})
 
-    linepoints = jumpfilter and trace_discard_sidesteps(points, 2) or points
+    linepoints = jumpfilter \
+        and trace_discard_sidesteps(points, jumpfilter) \
+        or points
     simplified = simplify_geometry(
             linepoints, maxpts=maxpts, mindist=mindist, keep_activity=True)
     features += trace_linestrings(

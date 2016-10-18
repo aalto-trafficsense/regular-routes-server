@@ -4,6 +4,7 @@ from pyfiles.common_helpers import get_distance_between_coordinates
 
 from pyfiles.constants import (
     ACTIVITY_WIN,
+    BAD_LOCATION_RADIUS,
     CONSECUTIVE_DIFFERENCE_LIMIT,
     MAXIMUM_MASS_TRANSIT_MISSES,
     MAX_DIFFERENT_DEVICE_TIME_DIFFERENCE,
