@@ -4,6 +4,7 @@ from pyfiles.common_helpers import (
     get_distance_between_coordinates,
     trace_center,
     trace_discard_inaccurate,
+    trace_discard_sidesteps,
     trace_partition_movement)
 
 from pyfiles.constants import (
@@ -103,7 +104,8 @@ class DeviceDataFilterer:
         given, no legs are emitted prior to that time, and the start of a leg
         crossing it is set there."""
 
-        lastend = None
+        # Filter out bogus location points.
+        points = trace_discard_sidesteps(points, BAD_LOCATION_RADIUS)
 
         # Partition stationary and moving spans.
         for mov, seg in trace_partition_movement(
@@ -132,7 +134,6 @@ class DeviceDataFilterer:
                         "coordinates": trace_center(trace_discard_inaccurate(
                             seg, DEST_RADIUS_MAX / 2))}),
                     "activity": "STILL"}
-                lastend = seg[-1]["time"]
                 continue
 
             # Feed moving span to activity stabilizer, mass transit detection.
@@ -166,17 +167,6 @@ class DeviceDataFilterer:
                     "line_type": legtype,
                     "line_name": legname,
                     "line_source": legsource}
-                lastend = legpts[-1]["time"]
-
-        # Emit trailing undecided points as a null activity terminator leg.
-        rejects = [x for x in points if not lastend or x["time"] > lastend]
-        if rejects:
-            yield {
-                "time_start": rejects[0]["time"],
-                "time_end": rejects[-1]["time"],
-                "geojson_start": rejects[0]["geojson"],
-                "geojson_end": rejects[-1]["geojson"],
-                "activity": None}
 
 
     def generate_filtered_data(self, device_data_rows, user_id):

@@ -146,8 +146,11 @@ def generate_legs(maxtime=None, repair=False):
             "rewind", str(rewind)[:19], str(len(points))+"p"
 
         filterer = DeviceDataFilterer() # not very objecty rly
-        first = True
+        lastend = None
+
         for leg in filterer.generate_device_legs(points, start):
+            lastend = leg["time_end"]
+
             print " ".join(["d"+str(device), str(leg["time_start"])[:19],
                 str(leg["time_end"])[:19]] + [repr(leg.get(x)) for x in [
                 "activity", "line_type", "line_name", "line_source"]]),
@@ -186,6 +189,16 @@ def generate_legs(maxtime=None, repair=False):
                 print "-> delete %d" % rowcount,
             db.engine.execute(legs.insert(leg))
             print "-> insert"
+
+        # Emit null activity terminator leg to mark trailing undecided points,
+        # if any, to avoid unnecessary reprocessing on resume.
+        rejects = [x for x in points if not lastend or x["time"] > lastend]
+        if rejects:
+            db.engine.execute(legs.insert({
+                "device_id": device,
+                "time_start": rejects[0]["time"],
+                "time_end": rejects[-1]["time"],
+                "activity": None}))
 
     # Attach device legs to users.
     devices = db.metadata.tables["devices"]
