@@ -1,0 +1,49 @@
+html, body, #map-canvas {
+  height: 100%;
+}
+#controls-wrap {
+/*  position: absolute;*/
+  width: 100%;
+  top: 0;
+  z-index: 42;
+  text-align: center;
+  pointer-events: none; /* don't block map controls in corner */
+}
+#controls {
+  display: inline-block;
+  border-bottom: 1px solid #fff;
+  border-left: 1px solid #fff;
+  border-right: 1px solid #fff;
+  -moz-border-radius: 0 0 5px 5px;
+  -webkit-border-radius: 0 0 5px 5px;
+  border-radius: 0 0 5px 5px;
+  background-color: rgba(255, 255, 255, 0.7);
+  padding: 10px;
+  margin-left: auto;
+  margin-right: auto;
+  pointer-events: auto;
+}
+#date {
+  text-align: center;
+}
+
+#trip td {
+    border: grey solid thin;
+    text-align: center;
+    font-family: sans;
+    font-size: xx-small;
+    padding: .2em;
+}
+
+.ON_BICYCLE { background-color: #008c5822 }
+.WALKING, .ON_FOOT { background-color: #20ac2922 }
+.RUNNING { background-color: #add50022 }
+.IN_VEHICLE { background-color: #dd002022 }
+.TRAIN { background-color: #f7f70022 }
+.SUBWAY, .TRAM { background-color: #f6bd0022 }
+.FERRY, .BUS { background-color: #e6631322 }
+.TILTING { background-color: #00f2 }
+.STILL { background-color: #fff2 }
+.UNKNOWN { background-color: #8882 }
+
+#trip div { font-size: xx-large; margin: .2em }

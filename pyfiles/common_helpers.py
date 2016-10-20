@@ -547,7 +547,7 @@ def timedelta_str(td):
             break
         rv = [ notfirst % rem ] + rv
         rem = div
-    return "%6s" % ''.join(rv[:2])
+    return ''.join(rv[:2])
 
 
 def vector_average(vv):

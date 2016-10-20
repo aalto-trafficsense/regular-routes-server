@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 from datetime import timedelta
+from itertools import groupby
 
 from flask import Flask, jsonify, request, render_template, Response
 from oauth2client.client import *
@@ -206,6 +207,52 @@ def predict_dev(device_id):
     return render_template('predict.html',
                            api_key=app.config['MAPS_API_KEY'],
                            device_id=device_id)
+
+
+@app.route('/users/<int:user>/trips')
+def user_trips(user):
+    return render_template('usertrips.html',
+                           api_key=app.config['MAPS_API_KEY'],
+                           user=user)
+
+
+@app.route('/users/<int:user>/trips_json')
+def user_trips_json(user):
+    date_start = 'date' in request.args \
+        and datetime.datetime.strptime(request.args['date'], '%Y-%m-%d') \
+        or datetime.datetime.now()
+
+    date_start = date_start.replace(hour=0, minute=0, second=0, microsecond=0)
+    date_end = date_start + timedelta(hours=24)
+
+    legs = db.metadata.tables["legs"]
+
+    s = select(
+        [   legs.c.time_start,
+            legs.c.time_end,
+            legs.c.activity,
+            legs.c.line_type,
+            legs.c.line_name],
+        and_(
+            legs.c.user_id == int(user),
+            legs.c.time_end >= date_start,
+            legs.c.time_start <= date_end),
+        order_by=legs.c.time_start)
+
+    steps = []
+    state = (None, None) # (timestamp/duration, activity) updates
+    for tstart, tend, activity, ltype, lname in db.engine.execute(s):
+        state = (
+            str(tstart)[11:16], ltype and " ".join([ltype, lname]) or activity)
+        steps.append(state)
+        state = (timedelta_str(tend - tstart), state[1])
+        steps.append(state)
+        state = (str(tend)[11:16], state[1])
+        steps.append(state)
+    pivot = zip(*steps)
+    rle = [[(y, len(list(z))) for y, z in groupby(x)] for x in pivot]
+    return json.dumps(rle)
+
 
 @app.route('/visualize/<int:device_id>')
 def visualize(device_id):
