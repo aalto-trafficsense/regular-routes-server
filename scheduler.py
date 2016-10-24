@@ -293,7 +293,8 @@ def generate_distance_data():
         hour=0, minute=0, second=0, microsecond=0)
     for id_row in user_ids:
         time = get_max_time_from_table("time", "travelled_distances", "user_id", id_row["id"]) + timedelta(days=1)
-        data_rows = get_filtered_device_data_points(id_row["id"], time, last_midnight)
+        data_rows = get_filtered_device_data_points(
+            id_row["id"], time, last_midnight)
 
         # discard suspiciously sharp movement from bogus location jumps
         data_rows = trace_discard_sidesteps(data_rows, BAD_LOCATION_RADIUS)

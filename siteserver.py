@@ -11,7 +11,8 @@ from oauth2client.client import *
 from sqlalchemy.sql import text
 
 from pyfiles import svg_generation
-from pyfiles.database_interface import init_db, get_svg, data_points_filtered, get_users_table_id
+from pyfiles.database_interface import (
+    get_filtered_device_data_points, get_svg, get_users_table_id, init_db)
 from pyfiles.authentication_helper import user_hash, verify_and_get_account_id
 
 import logging
@@ -223,7 +224,8 @@ def energymap_device_geojson():
     # Debug-code:
     # user_id = 14
 
-    points = data_points_filtered(user_id, datetime.datetime.fromordinal(date_start.toordinal()),
+    points = get_filtered_device_data_points(
+        user_id, datetime.datetime.fromordinal(date_start.toordinal()),
                                   datetime.datetime.fromordinal(date_end.toordinal()))
     # points = data_points_filtered(user_id, date_start, date_end)
 

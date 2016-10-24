@@ -8,7 +8,7 @@ from sqlalchemy import MetaData, Table, Column, ForeignKey, Enum, BigInteger, In
     Float
 from sqlalchemy.dialects.postgres import DOUBLE_PRECISION, TIMESTAMP, UUID
 from sqlalchemy.exc import DataError
-from sqlalchemy.sql import and_, text, func, column, table, select
+from sqlalchemy.sql import and_, between, text, func, column, table, select
 import svg_generation
 from datetime import timedelta
 
@@ -299,6 +299,32 @@ def get_distinct_device_ids(datetime_start, datetime_end):
 
 
 def get_filtered_device_data_points(user_id, datetime_start, datetime_end):
+    """Get trace with activity stabilized and mass transit detected, fusing
+    legs and raw device data."""
+
+    dd = db.metadata.tables["device_data"]
+    legs = db.metadata.tables["legs"]
+
+    return db.engine.execute(select(
+        [   func.ST_AsGeoJSON(dd.c.coordinate).label("geojson"),
+            dd.c.time,
+            legs.c.activity,
+            legs.c.line_type,
+            legs.c.line_name],
+        and_(
+            legs.c.user_id == user_id,
+            legs.c.activity != None,
+            dd.c.time >= datetime_start,
+            dd.c.time < datetime_end),
+        legs.join(dd, and_(
+            legs.c.device_id == dd.c.device_id,
+            between(dd.c.time, legs.c.time_start, legs.c.time_end)))))
+
+
+def get_filtered_device_data_points_OLD(user_id, datetime_start, datetime_end):
+    """Get trace with activity stabilized and mass transit detected, from
+    legacy device_data_filtered."""
+
     query = '''
         SELECT time,
             ST_AsGeoJSON(coordinate) AS geojson,
@@ -359,23 +385,6 @@ def data_points_snapping(device_id, datetime_start, datetime_end):
         ORDER BY time ASC
     '''
         points =  db.engine.execute(text(qstring), device_id=device_id, time_start=datetime_start, time_end=datetime_end)
-    return points
-
-def data_points_filtered(user_id, datetime_start, datetime_end):
-    qstring = '''
-        SELECT id,
-            ST_AsGeoJSON(coordinate) AS geojson,
-            time,
-            activity,
-            line_type,
-            line_name
-        FROM device_data_filtered
-        WHERE user_id = :user_id
-        AND time >= :time_start
-        AND time < :time_end
-        ORDER BY time ASC
-    '''
-    points =  db.engine.execute(text(qstring), user_id=user_id, time_start=datetime_start, time_end=datetime_end)
     return points
 
 
