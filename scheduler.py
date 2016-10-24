@@ -194,6 +194,10 @@ def generate_legs(maxtime=None, repair=False):
         # if any, to avoid unnecessary reprocessing on resume.
         rejects = [x for x in points if not lastend or x["time"] > lastend]
         if rejects:
+            db.engine.execute(legs.delete(and_(
+                legs.c.device_id == device,
+                legs.c.time_start <= rejects[0]["time"],
+                legs.c.time_end >= rejects[-1]["time"])))
             db.engine.execute(legs.insert({
                 "device_id": device,
                 "time_start": rejects[0]["time"],
