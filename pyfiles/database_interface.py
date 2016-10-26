@@ -576,7 +576,7 @@ def verify_device_token(token):
 def update_last_activity(devices_table_id):
     update = devices_table.update() \
         .values({'last_activity': datetime.datetime.now()}) \
-        .where(devices_table_id==devices_table_id)
+        .where(devices_table.c.id == devices_table_id)
     db.engine.execute(update)
 
 
