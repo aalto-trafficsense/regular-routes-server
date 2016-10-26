@@ -11,13 +11,10 @@ from pyfiles.common_helpers import (
     dict_groups,
     simplify_geometry,
     stop_clusters,
-    trace_linestrings,
-    trace_split_sparse)
+    trace_discard_sidesteps,
+    trace_linestrings)
 
-from pyfiles.constants import (
-    DEST_DURATION_MIN,
-    DEST_RADIUS_MAX,
-    MAX_POINT_TIME_DIFFERENCE)
+from pyfiles.constants import BAD_LOCATION_RADIUS, DEST_RADIUS_MAX
 
 from pyfiles.database_interface import init_db, db_engine_execute, users_table_insert, users_table_update, devices_table_insert, device_data_table_insert
 from pyfiles.database_interface import verify_user_id, update_last_activity, get_users_table_id_for_device, get_device_table_id
@@ -387,6 +384,9 @@ def path(session_token):
 
     features = []
     for points in segments:
+        # discard the less credible location points
+        points = trace_discard_sidesteps(points, BAD_LOCATION_RADIUS)
+
         # simplify the path geometry by dropping redundant points
         points = simplify_geometry(
             points, maxpts=maxpts, mindist=mindist, keep_activity=True)

@@ -71,6 +71,7 @@ def simplify_geometry(
     """
 
     # avoid building heap if input already conformant
+    points = list(points)
     if (not points or not mindist and (not maxpts or len(points) <= maxpts)):
         return points
 
