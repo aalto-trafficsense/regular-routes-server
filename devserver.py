@@ -11,12 +11,12 @@ from sqlalchemy.sql import and_, func, or_, select, text
 
 from pyfiles.common_helpers import (
     datetime_range_str,
+    dict_groups,
     simplify_geometry,
     timedelta_str,
     trace_destinations,
     trace_discard_sidesteps,
-    trace_linestrings,
-    trace_regular_destinations)
+    trace_linestrings)
 
 from pyfiles.constants import (
     BAD_LOCATION_RADIUS, DEST_DURATION_MIN, DEST_RADIUS_MAX)
@@ -345,51 +345,20 @@ def visualize_device_geojson(device_id):
     features += trace_linestrings(
         simplified, ('activity',), {'type': 'trace-line'})
 
-    device_data = db.metadata.tables["device_data"]
     longwin_start = date_end - datetime.timedelta(days=30) # XXX arbitrary
-    query = select(
-        [   func.ST_AsGeoJSON(device_data.c.coordinate).label("geojson"),
-            device_data.c.accuracy,
-            device_data.c.time],
-        and_(
-            device_data.c.device_id == device_id,
-            device_data.c.time > longwin_start,
-            device_data.c.time <= date_end),
-        device_data,
-        order_by=device_data.c.time)
-    longwin = db.engine.execute(query)
-
-    for d in trace_regular_destinations(
-            longwin, DEST_RADIUS_MAX, DEST_DURATION_MIN):
-        title = "{} visits (rank {}), {} total (rank {})".format(
-                    len(d["visits"]),
-                    d["visits_rank"],
-                    timedelta_str(d["total_time"]),
-                    d["total_time_rank"])
-        visits = sorted(d["visits"], key=lambda x: x["time_start"])
-        vislist = [
-            " - ".join(datetime_range_str(v["time_start"], v["time_end"]))
-            for v in visits[-10:]] # XXX arbitrary
-        title += "\n" + "\n".join(vislist)
-
-#        features.append({
-#            'type': 'Feature',
-#            'geometry': {
-#                'type': 'Point',
-#                'coordinates': d["coordinates"]},
-#            'properties': {
-#                'visits': len(d["visits"]),
-#                'type': 'regular-destination',
-#                'title': title}})
-
-    legs = db.metadata.tables["legs"]
+    legs = db.metadata.tables["leg_modes"]
     ends = db.metadata.tables["leg_ends"]
 
     s = select(
         [   func.ST_AsGeoJSON(ends.c.coordinate).label("geojson"),
             ends.c.id,
-            func.bool_or(legs.c.activity == "STILL").label("stop"),
-            func.count("*")],
+            legs.c.activity,
+            legs.c.line_type,
+            legs.c.line_name,
+            legs.c.time_start,
+            legs.c.time_end,
+            (legs.c.cluster_start == ends.c.id).label("start"),
+            (legs.c.cluster_end == ends.c.id).label("end")],
         and_(
             legs.c.device_id == device_id,
             legs.c.time_end >= longwin_start,
@@ -397,17 +366,49 @@ def visualize_device_geojson(device_id):
         from_obj=ends.join(legs, or_(
             legs.c.cluster_start == ends.c.id,
             legs.c.cluster_end == ends.c.id)),
-        group_by=[ends.c.coordinate, ends.c.id])
+        order_by=ends.c.id)
 
-    for geojson, id, stop, count in db.engine.execute(s):
+    def actormass(p):
+        mode = (p["line_type"]
+            and " ".join([p["line_type"], p["line_name"]])
+            or p["activity"])
+        return "_" in mode and mode or "by " + mode # preposition it if not yet
+
+    # Group by hand here to collect visit summaries
+    clusters = []
+    for keys, ends in dict_groups(db.engine.execute(s), ["id"]):
+        events = []
+        stopcount = 0
+        for l in sorted(ends, key=lambda x: x["time_start"]):
+            if l["activity"] == "STILL":
+                events.append(" - ".join(datetime_range_str(
+                    l["time_start"], l["time_end"])) + " stop")
+                stopcount += 1
+            elif l["start"] and l["end"]:
+                events.append(" - ".join(datetime_range_str(
+                    l["time_start"], l["time_end"])) + " there and back "
+                    + actormass(l))
+            elif l["start"]:
+                events.append(
+                    str(l["time_start"])[:16] + " depart " + actormass(l))
+            elif l["end"]:
+                events.append(
+                    str(l["time_end"])[:16] + " arrive " + actormass(l))
+            else:
+                assert False
+        clusters.append((l["geojson"], l["id"], stopcount, events))
+
+    for geojson, cluster, stopcount, visits in clusters:
+        title = "user cluster %d: %d stops" % (cluster, stopcount)
+        title += "\n" + "\n".join(visits[-10:]) # XXX arbitrary
         features.append({
             'type': 'Feature',
             'geometry': json.loads(geojson),
             'properties': {
-                'stop': stop,
-                'title': "%d: %d visits" % (id, count),
+                'stop': stopcount > 0,
+                'title': title,
                 'type': 'legend-cluster',
-                'visits': count}})
+                'visits': stopcount}})
 
     geojson = {
         'type': 'FeatureCollection',

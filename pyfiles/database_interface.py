@@ -444,6 +444,8 @@ CREATE OR REPLACE VIEW leg_modes AS SELECT
     l.coordinate_start,
     l.coordinate_end,
     l.activity activity_device, -- rename in favor of user-corrected activity
+    l.cluster_start,
+    l.cluster_end,
     mu.mode mode_user, mu.line line_user,
     ml.mode mode_live, ml.line line_live,
     mp.mode mode_planner, mp.line line_planner,
