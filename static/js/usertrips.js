@@ -33,14 +33,16 @@ $(document).ready(function() {
                     td.addClass(classname);
                     tr.append(td);
                     td.attr("colspan", col[1]);
-                    if (classname == "time" && col[0]) {
+                    if (!col[0]) {
+                        td.addClass("gap");
+                    } else if (classname == "time") {
                         td.text(col[0]);
 
                         // this is way too incidental :D
                         td.addClass(col[1] == 2 ? "center"
                             : (flippy = !flippy) ? "right"
                             : "left");
-                    } else if (classname == "activity" && col[0]) {
+                    } else if (classname == "activity") {
                         var activity = col[0][0];
                         td.text(activity);
                         var mode = activity.split(" ")[0];
@@ -71,7 +73,7 @@ $(document).ready(function() {
 
                         td.append(col[0][1]); // duration
 
-                    } else if (classname == "place" && col[0]) {
+                    } else if (classname == "place") {
                         var lonlat = col[0]["coordinates"];
 	                $.getJSON(
                             'http://api.digitransit.fi/geocoding/v1/reverse'
