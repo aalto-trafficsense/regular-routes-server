@@ -216,9 +216,8 @@ def predict_dev(device_id):
 
 @app.route('/users/<int:user>/trips')
 def user_trips(user):
-    return render_template('usertrips.html',
-                           api_key=app.config['MAPS_API_KEY'],
-                           user=user)
+    return render_template(
+        'usertrips.html', api_key=app.config['MAPS_API_KEY'], user=user)
 
 
 @app.route('/users/<int:user>/trips_json')
@@ -235,8 +234,11 @@ def user_trips_json(user):
     s = select(
         [   legs.c.time_start,
             legs.c.time_end,
-            legs.c.mode,
-            legs.c.line_name],
+            legs.c.activity,
+            legs.c.line_type,
+            legs.c.line_name,
+            legs.c.cluster_start,
+            legs.c.cluster_end],
         and_(
             legs.c.user_id == int(user),
             legs.c.time_end >= date_start,
@@ -245,13 +247,19 @@ def user_trips_json(user):
 
     steps = []
     state = (None, None) # (timestamp/duration, activity) updates
-    for tstart, tend, mode, lname in db.engine.execute(s):
-        state = (str(tstart)[11:16], lname and " ".join([mode, lname]) or mode)
+    for t0, t1, activity, ltype, lname, c0, c1 in db.engine.execute(s):
+        state = (
+            str(t0)[11:16],
+            ltype and " ".join([ltype, lname]) or activity,
+            str(c0))
         steps.append(state)
-        state = (timedelta_str(tend - tstart), state[1])
+        state = (timedelta_str(t1 - t0),) + state[1:]
         steps.append(state)
-        state = (str(tend)[11:16], state[1])
+        state = state[:2] + (str(c1 or c0),)
         steps.append(state)
+        state = (str(t1)[11:16],) + state[1:]
+        steps.append(state)
+
     pivot = zip(*steps)
     rle = [[(y, len(list(z))) for y, z in groupby(x)] for x in pivot]
     return json.dumps(rle)
