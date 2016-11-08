@@ -47,3 +47,10 @@ html, body, #map-canvas {
 .UNKNOWN { background-color: #8882 }
 
 #trip div { font-size: xx-large; margin: .2em }
+
+#trip td.left { text-align: left }
+#trip td.center { text-align: center }
+#trip td.right { text-align: right }
+#trip td.time { border-top: none; border-left: none; border-right: none }
+
+#trip { margin: 1em }

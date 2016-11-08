@@ -265,6 +265,8 @@ def user_trips_json(user):
             timedelta_str(t1 - t0))
         state = (t0str, actcell, place)
         steps.append(state)
+        state = (None,) + state[1:]
+        steps.append(state)
         state = state[:2] + (json.loads(cc1 or cc0 or "null"),)
         steps.append(state)
         state = (str(t1)[11:16],) + state[1:]

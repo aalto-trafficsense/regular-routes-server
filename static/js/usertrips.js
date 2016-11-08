@@ -27,13 +27,20 @@ $(document).ready(function() {
                 var cells = row[1];
                 var tr = $(document.createElement("tr"));
                 trip.append(tr);
+                var flippy = true;
                 cells.forEach(function (col) {
                     var td = $(document.createElement("td"));
                     td.addClass(classname);
                     tr.append(td);
                     td.attr("colspan", col[1]);
-                    td.text(col[0]);
-                    if (classname == "activity" && col[0]) {
+                    if (classname == "time" && col[0]) {
+                        td.text(col[0]);
+
+                        // this is way too incidental :D
+                        td.addClass(col[1] == 2 ? "center"
+                            : (flippy = !flippy) ? "right"
+                            : "left");
+                    } else if (classname == "activity" && col[0]) {
                         var activity = col[0][0];
                         td.text(activity);
                         var mode = activity.split(" ")[0];
