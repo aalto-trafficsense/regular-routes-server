@@ -239,8 +239,6 @@ def user_trips_json(user):
             legs.c.activity,
             legs.c.line_type,
             legs.c.line_name,
-            legs.c.cluster_start,
-            legs.c.cluster_end,
             func.ST_AsGeoJSON(legends0.c.coordinate.label("startcc")),
             func.ST_AsGeoJSON(legends1.c.coordinate.label("endcc"))],
         and_(
@@ -252,12 +250,17 @@ def user_trips_json(user):
         order_by=legs.c.time_start)
 
     steps = []
-    state = (None, None) # (timestamp/duration, activity) updates
-    for t0, t1, activity, ltype, lname, c0, c1, cc0, cc1 in db.engine.execute(s):
-        state = (
-            str(t0)[11:16],
-            ltype and " ".join([ltype, lname]) or activity,
-            json.loads(cc0 or "null"))
+    state = (None, None, None) # (timestamp/duration, activity, place) updates
+    for t0, t1, activity, ltype, lname, cc0, cc1 in db.engine.execute(s):
+
+        # Prevent activity running over gap where time and place change
+        t0str = str(t0)[11:16]
+        place = json.loads(cc0 or "null")
+        if state[0] is not None and t0str != state[0] and place != state[2]:
+            state = (None, None, None)
+            steps.append(state)
+
+        state = (t0str, ltype and " ".join([ltype, lname]) or activity, place)
         steps.append(state)
         state = (timedelta_str(t1 - t0),) + state[1:]
         steps.append(state)

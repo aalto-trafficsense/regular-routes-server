@@ -33,7 +33,7 @@ $(document).ready(function() {
                     tr.append(td);
                     td.attr("colspan", col[1]);
                     td.text(col[0]);
-                    if (classname == "activity") {
+                    if (classname == "activity" && col[0]) {
                         var mode = col[0].split(" ")[0];
                         td.addClass(mode);
                         var glyph = null;
