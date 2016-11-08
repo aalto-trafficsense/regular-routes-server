@@ -260,9 +260,10 @@ def user_trips_json(user):
             state = (None, None, None)
             steps.append(state)
 
-        state = (t0str, ltype and " ".join([ltype, lname]) or activity, place)
-        steps.append(state)
-        state = (timedelta_str(t1 - t0),) + state[1:]
+        actcell = (
+            ltype and " ".join([ltype, lname]) or activity,
+            timedelta_str(t1 - t0))
+        state = (t0str, actcell, place)
         steps.append(state)
         state = state[:2] + (json.loads(cc1 or cc0 or "null"),)
         steps.append(state)

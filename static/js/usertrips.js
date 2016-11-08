@@ -34,7 +34,9 @@ $(document).ready(function() {
                     td.attr("colspan", col[1]);
                     td.text(col[0]);
                     if (classname == "activity" && col[0]) {
-                        var mode = col[0].split(" ")[0];
+                        var activity = col[0][0];
+                        td.text(activity);
+                        var mode = activity.split(" ")[0];
                         td.addClass(mode);
                         var glyph = null;
                         switch (mode) {
@@ -55,11 +57,13 @@ $(document).ready(function() {
                         case 'UNKNOWN':    glyph = "?"; break;
 //                      default:           glyph = "!"; break;
                         }
-                        if (glyph) {
-                            var icon = $(document.createElement("div"));
-                            td.append(icon);
-                            icon.text(glyph);
-                        }
+
+                        var icon = $(document.createElement("div"));
+                        td.append(icon);
+                        icon.text(glyph);
+
+                        td.append(col[0][1]); // duration
+
                     } else if (classname == "place" && col[0]) {
                         var lonlat = col[0]["coordinates"];
 	                $.getJSON(
