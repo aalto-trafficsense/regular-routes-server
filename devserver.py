@@ -230,6 +230,8 @@ def user_trips_json(user):
     date_end = date_start + timedelta(hours=24)
 
     legs = db.metadata.tables["leg_modes"]
+    legends0 = db.metadata.tables["leg_ends"]
+    legends1 = legends0.alias("leg_ends1")
 
     s = select(
         [   legs.c.time_start,
@@ -238,30 +240,41 @@ def user_trips_json(user):
             legs.c.line_type,
             legs.c.line_name,
             legs.c.cluster_start,
-            legs.c.cluster_end],
+            legs.c.cluster_end,
+            func.ST_AsGeoJSON(legends0.c.coordinate.label("startcc")),
+            func.ST_AsGeoJSON(legends1.c.coordinate.label("endcc"))],
         and_(
             legs.c.user_id == int(user),
             legs.c.time_end >= date_start,
             legs.c.time_start <= date_end),
+        legs.outerjoin(legends0, legs.c.cluster_start == legends0.c.id) \
+            .outerjoin(legends1, legs.c.cluster_end == legends1.c.id),
         order_by=legs.c.time_start)
 
     steps = []
     state = (None, None) # (timestamp/duration, activity) updates
-    for t0, t1, activity, ltype, lname, c0, c1 in db.engine.execute(s):
+    for t0, t1, activity, ltype, lname, c0, c1, cc0, cc1 in db.engine.execute(s):
         state = (
             str(t0)[11:16],
             ltype and " ".join([ltype, lname]) or activity,
-            str(c0))
+            json.loads(cc0 or "null"))
         steps.append(state)
         state = (timedelta_str(t1 - t0),) + state[1:]
         steps.append(state)
-        state = state[:2] + (str(c1 or c0),)
+        state = state[:2] + (json.loads(cc1 or cc0 or "null"),)
         steps.append(state)
         state = (str(t1)[11:16],) + state[1:]
         steps.append(state)
 
     pivot = zip(*steps)
     rle = [[(y, len(list(z))) for y, z in groupby(x)] for x in pivot]
+
+    # XXX yeah this could be done a bit cleaner
+    if rle:
+        rle[0] = "time", rle[0]
+        rle[1] = "activity", rle[1]
+        rle[2] = "place", rle[2]
+
     return json.dumps(rle)
 
 

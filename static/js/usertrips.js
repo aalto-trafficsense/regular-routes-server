@@ -23,16 +23,19 @@ $(document).ready(function() {
             if (response.length == 0)
                 trip.html("<tr><td>No trips.</td></tr>");
             response.forEach(function (row) {
+                var classname = row[0];
+                var cells = row[1];
                 var tr = $(document.createElement("tr"));
                 trip.append(tr);
-                row.forEach(function (col) {
+                cells.forEach(function (col) {
                     var td = $(document.createElement("td"));
+                    td.addClass(classname);
                     tr.append(td);
                     td.attr("colspan", col[1]);
                     td.text(col[0]);
-                    var mode = col[0].split(" ")[0];
-                    if (mode.match(/[A-Z]/)) { // activity cell, kinda rough...
-                        td.attr("class", mode);
+                    if (classname == "activity") {
+                        var mode = col[0].split(" ")[0];
+                        td.addClass(mode);
                         var glyph = null;
                         switch (mode) {
                         case 'ON_BICYCLE': glyph = "\uD83D\uDEB4\uFE0E"; break;
@@ -57,9 +60,33 @@ $(document).ready(function() {
                             td.append(icon);
                             icon.text(glyph);
                         }
+                    } else if (classname == "place" && col[0]) {
+                        var lonlat = col[0]["coordinates"];
+	                $.getJSON(
+                            'http://api.digitransit.fi/geocoding/v1/reverse'
+                                + '?point.lat=' + lonlat[1]
+                                + '&point.lon=' + lonlat[0],
+                        function(response) {
+                            var names = [];
+                            ["street", "name"].forEach(function (prop) {
+                                response["features"].forEach(function (feat) {
+                                    var name = feat["properties"][prop];
+                                    if (name === undefined)
+                                        return;
+                                    name = name.split(",")[0]; // complex names
+                                    if (-1 == $.inArray(name, names))
+                                        names.push(name);
+                                });
+                            });
+                            var text = names[0];
+                            if (names.length > 1)
+                                text += " / " + names[1];
+                            $(td).text(text);
+                        });
                     }
                 });
             });
+
 	    content.css('opacity', '');
 	});
     }
