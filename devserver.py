@@ -12,6 +12,7 @@ from sqlalchemy.sql import and_, func, or_, select, text
 from pyfiles.common_helpers import (
     datetime_range_str,
     dict_groups,
+    get_distance_between_coordinates,
     simplify_geometry,
     timedelta_str,
     trace_destinations,
@@ -249,6 +250,10 @@ def user_trips_json(user):
             .outerjoin(legends1, legs.c.cluster_end == legends1.c.id),
         order_by=legs.c.time_start)
 
+    def fmt_duration(t0, t1):
+        h, m = divmod(int(round((t1 - t0).total_seconds() / 60)), 60)
+        return h and "{}h{:02}".format(h, m) or "{}min".format(m)
+
     steps = []
     state = (None, None, None) # (timestamp/duration, activity, place) updates
     for t0, t1, activity, ltype, lname, cc0, cc1 in db.engine.execute(s):
@@ -260,9 +265,18 @@ def user_trips_json(user):
             state = (None, None, None)
             steps.append(state)
 
+        distr = ""
+        if cc1:
+            cc0c = json.loads(cc0)["coordinates"]
+            cc1c = json.loads(cc1)["coordinates"]
+            dist = get_distance_between_coordinates(cc0c, cc1c)
+            if dist > 999:
+                distr = str(int(round(dist / 1000))) + "km"
+            elif dist > 0:
+                distr = str(int(round(dist))) + "m"
         actcell = (
             ltype and " ".join([ltype, lname]) or activity,
-            timedelta_str(t1 - t0))
+            " ".join([fmt_duration(t0, t1), distr]))
         state = (t0str, actcell, place)
         steps.append(state)
         state = (None,) + state[1:]

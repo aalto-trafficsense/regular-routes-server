@@ -87,6 +87,7 @@ $(document).ready(function() {
                                     if (name === undefined)
                                         return;
                                     name = name.split(",")[0]; // complex names
+                                    name = name.split("/")[0]; // complex names
                                     if (-1 == $.inArray(name, names))
                                         names.push(name);
                                 });
