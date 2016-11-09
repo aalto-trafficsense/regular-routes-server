@@ -27,7 +27,6 @@ $(document).ready(function() {
                 var cells = row[1];
                 var tr = $(document.createElement("tr"));
                 trip.append(tr);
-                var flippy = true;
                 cells.forEach(function (col) {
                     var td = $(document.createElement("td"));
                     td.addClass(classname);
@@ -36,12 +35,13 @@ $(document).ready(function() {
                     if (!col[0]) {
                         td.addClass("gap");
                     } else if (classname == "time") {
-                        td.text(col[0]);
+                        td.text(col[0][0]);
 
                         // this is way too incidental :D
-                        td.addClass(col[1] == 2 ? "center"
-                            : (flippy = !flippy) ? "right"
-                            : "left");
+                        td.addClass(col[0][1] == "start" ? "left"
+                            : col[1] < 3 ? "right"
+                            : "center");
+
                     } else if (classname == "activity") {
                         var activity = col[0][0];
                         td.text(activity);

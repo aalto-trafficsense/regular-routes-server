@@ -261,7 +261,7 @@ def user_trips_json(user):
         # Prevent activity running over gap where time and place change
         t0str = str(t0)[11:16]
         place = json.loads(cc0 or "null")
-        if state[0] is not None and t0str != state[0] and place != state[2]:
+        if state[0] is not None and t0str != state[0][0] and place != state[2]:
             state = (None, None, None)
             steps.append(state)
 
@@ -277,13 +277,20 @@ def user_trips_json(user):
         actcell = (
             ltype and " ".join([ltype, lname]) or activity,
             " ".join([fmt_duration(t0, t1), distr]))
-        state = (t0str, actcell, place)
+        state = (state[0], actcell, place)
+        if not state[0] or t0str != state[0][0]:
+            state = ((t0str, "start"),) + state[1:]
         steps.append(state)
+
+        if cc1 and cc0 != cc1:
+            state = state[:2] + (None,)
+            steps.append(state)
+
         state = (None,) + state[1:]
         steps.append(state)
-        state = state[:2] + (json.loads(cc1 or cc0 or "null"),)
+        state = ((str(t1)[11:16], "end"),) + state[1:]
         steps.append(state)
-        state = (str(t1)[11:16],) + state[1:]
+        state = state[:2] + (json.loads(cc1 or cc0 or "null"),)
         steps.append(state)
 
     pivot = zip(*steps)
