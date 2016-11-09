@@ -3,7 +3,7 @@
 from datetime import timedelta
 from itertools import groupby
 
-from flask import Flask, jsonify, request, render_template, Response
+from flask import Flask, jsonify, request, render_template, Response, make_response
 from oauth2client.client import *
 from sqlalchemy.sql import and_, func, select, text
 
@@ -19,12 +19,16 @@ from pyfiles.common_helpers import (
 from pyfiles.constants import (
     BAD_LOCATION_RADIUS, DEST_DURATION_MIN, DEST_RADIUS_MAX)
 from pyfiles.database_interface import init_db, db_engine_execute, data_points_snapping
+
 from pyfiles.prediction.run_prediction import predict
 
 import json
 
 import logging
 logging.basicConfig()
+
+# Used for client_log testing
+from pyfiles.database_interface import client_log_table_insert, users_table_insert, devices_table_insert
 
 APPLICATION_NAME = 'TrafficSense'
 
@@ -384,6 +388,20 @@ def visualize_device_geojson(device_id):
         'features': features
     }
     return jsonify(geojson)
+
+
+
+@app.route('/logtest')
+def logtest():
+    user_id = 1
+    device_id = 1
+    # users_table_insert("user", "foobar", "barfoo")
+    devices_table_insert(1, "foobar", "f548ef8f-74b1-4197-aae9-29141c0ed6e9", "model", "f548ef8f-74b1-4197-aae9-29141c0ed6e9")
+    client_log_table_insert(device_id, user_id, "MOBILE-REGISTER", "v1.0.4")
+    response = make_response(json.dumps('Logtest successfully executed.'), 200)
+    response.headers['Content-Type'] = 'application/json'
+    return response
+
 
 
 # Helper Functions:

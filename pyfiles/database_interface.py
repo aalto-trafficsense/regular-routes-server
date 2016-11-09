@@ -226,6 +226,24 @@ def init_db(app):
                               Index('idx_global_statistics_time', 'time'),)
     global_statistics_table.create(checkfirst=True)
 
+    # log activity from both mobile and web clients
+    # Note: Web client doesn't have a device_id: Using the latest one for the user
+    global client_log_table
+    client_log_table = Table('client_log', metadata,
+        Column('id', Integer, primary_key=True),
+        Column('device_id', Integer, ForeignKey('devices.id'), nullable=False),
+        Column('user_id', Integer, ForeignKey('users.id')),
+        Column('time', TIMESTAMP, nullable=False, default=func.current_timestamp(),
+                                    server_default=func.current_timestamp()),
+        Column('function',
+            Enum("MOBILE-REGISTER", "MOBILE-AUTHENTICATE",
+                 "MOBILE-PATH", "MOBILE-DESTINATIONS", "MOBILE-CERTIFICATE",
+                 "WEB-CONNECT", "WEB-MAP", "WEB-CERTIFICATE",
+                 name="client_function_enum")),
+        Column('info', String))
+
+    if not client_log_table.exists():
+        client_log_table.create(checkfirst=True)
 
     metadata.create_all(checkfirst=True)
 
@@ -699,6 +717,15 @@ def device_data_table_insert(batch):
 
 def device_data_filtered_table_insert(batch):
     db.engine.execute(device_data_filtered_table.insert(batch))
+
+def client_log_table_insert(device_id, user_id, client_function, info):
+    client_log_insertion = client_log_table.insert(
+            {'device_id': device_id,
+             'user_id': user_id,
+             'function': client_function,
+             'info': info})
+    db.engine.execute(client_log_insertion)
+
 
 def db_engine_execute(query):
     return db.engine.execute(query)
