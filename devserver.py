@@ -279,7 +279,12 @@ def user_trips_json(user):
         place0 = json.loads(cc0 or "null")
         place1 = json.loads(cc1 or cc0 or "null")
 
-        # If prior end place differs from new start place, emit it on prior act
+        # Emit prior end time with appropriate aligment based on change
+        timealign = (t0str == pt1str) and "center" or "right"
+        if pt1str:
+            step(time=(pt1str, timealign))
+
+        # If place changed, or transfer, emit prior place on prior leg
         if pplace1 and place0 != pplace1 or activity != "STILL":
             step(place=pplace1)
 
@@ -289,7 +294,9 @@ def user_trips_json(user):
                 or (pplace1 and pplace1 != place0)):
             step(time=None, activity=None, place=None)
 
-        timecell = (t0str, not pt1str or t0str != pt1str and "start" or "end")
+        # If going from stop to move starting from same but with internal
+        # location change, terminate place label and use activity there instead
+        timecell = (t0str, ((timealign == "right") and "left") or "center")
         actcell = (
             ltype and " ".join([ltype, lname]) or activity,
             " ".join([fmt_duration(t0, t1), fmt_distance(cc0, cc1)]))
@@ -299,27 +306,22 @@ def user_trips_json(user):
             placecell = actcell[0].split(" ")[0]
         step(time=timecell, activity=actcell, place=placecell)
 
+        # Needed for move with internal place change and gap on both sides
         if cc1 and cc0 != cc1:
             step(place=actcell[0].split(" ")[0])
 
-        step(time=None)
-        step(time=(t1str, "end"))
-
         pt1str, pactivity, pplace1 = t1str, activity, place1
 
-    if place1:
-        step(place=place1)
+    if pt1str:
+        step(time=(pt1str, "right"))
+    if pplace1:
+        step(place=pplace1)
 
     pivot = zip(*steps)
     rle = [[(y, len(list(z))) for y, z in groupby(x)] for x in pivot]
+    named = zip(State._fields, rle)
 
-    # XXX yeah this could be done a bit cleaner
-    if rle:
-        rle[0] = "time", rle[0]
-        rle[1] = "activity", rle[1]
-        rle[2] = "place", rle[2]
-
-    return json.dumps(rle)
+    return json.dumps(named)
 
 
 @app.route('/visualize/<int:device_id>')

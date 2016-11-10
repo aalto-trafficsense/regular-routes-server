@@ -36,12 +36,7 @@ $(document).ready(function() {
                         td.addClass("gap");
                     } else if (classname == "time") {
                         td.text(col[0][0]);
-
-                        // this is way too incidental :D
-                        td.addClass(col[0][1] == "start" ? "left"
-                            : col[1] < 3 ? "right"
-                            : "center");
-
+                        td.addClass(col[0][1]); // align
                     } else if (classname == "activity") {
                         var activity = col[0][0];
                         td.text(activity);
