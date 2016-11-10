@@ -73,7 +73,8 @@ def register_post():
     device_id = data['deviceId']
     installation_id = data['installationId']
     device_model = data['deviceModel']
-    client_version = "ClientVersion:" + data['clientVersion']
+    # Get optionally - old clients do not send this
+    client_version = "ClientVersion:" + data.get('clientVersion', '')
     # print 'deviceModel=' + str(device_model)
 
     # 1. authenticate with Google
@@ -133,7 +134,8 @@ def authenticate_post():
     user_id = json['userId']
     device_id = json['deviceId']
     installation_id = json['installationId']
-    client_version = "ClientVersion:" + json['clientVersion']
+    # Get optionally - old clients do not send this
+    client_version = "ClientVersion:" + json.get('clientVersion', '')
 
     # 1. check that user exists or abort
     verify_user_id(user_id)
