@@ -401,7 +401,7 @@ def logtest():
     # devices_table_insert(1, "foobar", "a5b8ef8f-73b1-4197-ade9-29141c0ed6e9", "model", "a5b8ef8f-73b1-4197-ade9-29141c0ed6e9")
     print 'get_user_id_from_device_id: ' + str(get_user_id_from_device_id(device_id))
     print 'get_max_devices_table_id_from_users_table_id: ' + str(get_max_devices_table_id_from_users_table_id(user_id))
-    client_log_table_insert(device_id, get_user_id_from_device_id(device_id), "MOBILE-SHARE-CERTIFICATE", "")
+    client_log_table_insert(device_id, get_user_id_from_device_id(device_id), "WEB-PATH", "Kukkuluuruu")
     response = make_response(json.dumps('Logtest successfully executed.'), 200)
     response.headers['Content-Type'] = 'application/json'
     return response

@@ -239,7 +239,7 @@ def init_db(app):
             Enum("MOBILE-REGISTER", "MOBILE-AUTHENTICATE", "MOBILE-PATH",
                  "MOBILE-DESTINATIONS", "MOBILE-DEST-HISTORY", "MOBILE-CERTIFICATE",
                  "MOBILE-SHARE-CERTIFICATE", "MOBILE-PATH-EDIT"
-                 "WEB-CONNECT", "WEB-MAP", "WEB-CERTIFICATE", "WEB-TRIP-COMPARISON", "WEB-DEST-HISTORY",
+                 "WEB-CONNECT", "WEB-PATH", "WEB-CERTIFICATE", "WEB-TRIP-COMPARISON", "WEB-DEST-HISTORY",
                  name="client_function_enum")),
         Column('info', String),
         Index('idx_client_log_time', 'time'))
@@ -732,6 +732,7 @@ def devices_table_insert(users_table_id, device_id, installation_id, device_mode
              'device_model': device_model,
              'token': session_token})
     db.engine.execute(device_insertion)
+    return get_device_table_id(device_id, installation_id)
 
 def device_data_table_insert(batch):
     db.engine.execute(device_data_table.insert(batch))

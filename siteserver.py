@@ -12,7 +12,8 @@ from sqlalchemy.sql import text
 
 from pyfiles import svg_generation
 from pyfiles.database_interface import (
-    get_filtered_device_data_points, get_svg, get_users_table_id, init_db)
+    get_filtered_device_data_points, get_svg, get_users_table_id, init_db,
+    client_log_table_insert, get_max_devices_table_id_from_users_table_id)
 from pyfiles.authentication_helper import user_hash, verify_and_get_account_id
 
 import logging
@@ -136,6 +137,7 @@ def connect():
       response = make_response(json.dumps('Nodata.'), 200)
       response.headers['Content-Type'] = 'application/json'
       return response
+  client_log_table_insert(get_max_devices_table_id_from_users_table_id(user_id), user_id, "WEB-CONNECT", "")
   session['rr_user_id'] = user_id
   response = make_response(json.dumps('Successfully connected user.'), 200)
   response.headers['Content-Type'] = 'application/json'
@@ -200,6 +202,7 @@ def energymap():
     if user_id == None:
         # Not authenticated -> throw back to front page
         return index()
+    client_log_table_insert(get_max_devices_table_id_from_users_table_id(user_id), user_id, "WEB-PATH", "")
     return render_template('energymap.html',
                            RR_URL_PREFIX=app.config['RR_URL_PREFIX'],
                            api_key=app.config['MAPS_API_KEY'])
@@ -262,6 +265,7 @@ def energycertificate():
     if user_id == None:
         # Not authenticated -> throw back to front page
         return index()
+    client_log_table_insert(get_max_devices_table_id_from_users_table_id(user_id), user_id, "WEB-CERTIFICATE", "")
     return get_svg(user_id)
 
 # App starting point:

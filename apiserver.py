@@ -16,11 +16,12 @@ from pyfiles.common_helpers import (
 
 from pyfiles.constants import BAD_LOCATION_RADIUS, DEST_RADIUS_MAX
 
-from pyfiles.database_interface import init_db, db_engine_execute, users_table_insert, users_table_update, devices_table_insert, device_data_table_insert
-from pyfiles.database_interface import verify_user_id, update_last_activity, get_users_table_id_for_device, get_device_table_id
-from pyfiles.database_interface import get_device_table_id_for_session, get_users_table_id, get_session_token_for_device, get_user_id_from_device_id
-from pyfiles.database_interface import activity_types
-from pyfiles.database_interface import get_svg
+from pyfiles.database_interface import (init_db, db_engine_execute, users_table_insert, users_table_update, devices_table_insert, device_data_table_insert,
+                                        verify_user_id, update_last_activity, get_users_table_id_for_device, get_device_table_id,
+                                        get_device_table_id_for_session, get_users_table_id, get_session_token_for_device, get_user_id_from_device_id,
+                                        activity_types,
+                                        get_svg,
+                                        client_log_table_insert)
 
 from pyfiles.authentication_helper import user_hash, authenticate_with_google_oauth
 
@@ -63,7 +64,7 @@ db, store = init_db(app)
 @app.route('/register', methods=['POST'])
 def register_post():
     """
-        Server should receive valid one-time tokan that can be used to authenticate user via Google+ API
+        Server should receive valid one-time token that can be used to authenticate user via Google+ API
         See: https://developers.google.com/+/web/signin/server-side-flow#step_6_send_the_authorization_code_to_the_server
 
     """
@@ -72,7 +73,8 @@ def register_post():
     device_id = data['deviceId']
     installation_id = data['installationId']
     device_model = data['deviceModel']
-    print 'deviceModel=' + str(device_model)
+    client_version = "ClientVersion:" + data['clientVersion']
+    # print 'deviceModel=' + str(device_model)
 
     # 1. authenticate with Google
     validation_data = authenticate_with_google_oauth(app.config['AUTH_REDIRECT_URI'], CLIENT_SECRET_FILE, CLIENT_ID, google_one_time_token)
@@ -113,10 +115,13 @@ def register_post():
     # 5. Create/update device to db
     if devices_table_id is None:
         session_token = uuid4().hex
-        devices_table_insert(users_table_id, device_id, installation_id, device_model, session_token)
+        devices_table_id = devices_table_insert(users_table_id, device_id, installation_id, device_model, session_token)
     else:
         update_last_activity(devices_table_id)
         session_token = get_session_token_for_device(devices_table_id)
+
+    # 6. Log the registration
+    client_log_table_insert(devices_table_id, users_table_id, "MOBILE-REGISTER", client_version)
 
     resp = jsonify({'sessionToken': session_token})
     return resp
@@ -128,6 +133,7 @@ def authenticate_post():
     user_id = json['userId']
     device_id = json['deviceId']
     installation_id = json['installationId']
+    client_version = "ClientVersion:" + json['clientVersion']
 
     # 1. check that user exists or abort
     verify_user_id(user_id)
@@ -138,7 +144,9 @@ def authenticate_post():
         print 'User is not registered. userId=' + user_id
         abort(403)
 
+    # 2. Update logs
     update_last_activity(devices_table_id)
+    client_log_table_insert(devices_table_id, get_user_id_from_device_id(devices_table_id), "MOBILE-AUTHENTICATE", client_version)
 
     return jsonify({
         'sessionToken': session_token
@@ -259,8 +267,10 @@ def destinations(session_token):
         del f["properties"]["coordinates"] # included in geometry
         f["properties"]["visits"] = len(f["properties"]["visits"])
 
-    return jsonify(geojson)
+    devices_table_id = get_device_table_id_for_session(session_token)
+    client_log_table_insert(devices_table_id, get_user_id_from_device_id(devices_table_id), "MOBILE-DESTINATIONS", "")
 
+    return jsonify(geojson)
 
 """
 * JSU: Devices are disabled since it's not secure to give out session tokens for all users
@@ -400,6 +410,9 @@ def path(session_token):
 
         features += trace_linestrings(points, ('activity', 'line_name'))
 
+    devices_table_id = get_device_table_id_for_session(session_token)
+    client_log_table_insert(devices_table_id, get_user_id_from_device_id(devices_table_id), "MOBILE-PATH", "")
+
     return jsonify({'type': 'FeatureCollection', 'features': features})
 
 
@@ -411,6 +424,7 @@ def svg(session_token):
     user_id = get_user_id_from_device_id(device_id)
     if user_id < 0:
         return ""
+    client_log_table_insert(device_id, user_id, "MOBILE-CERTIFICATE", "")
     return get_svg(user_id)
 
 # App starting point:
