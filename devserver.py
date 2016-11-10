@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+from collections import namedtuple
 import datetime
 from datetime import timedelta
 from itertools import groupby
@@ -254,44 +255,60 @@ def user_trips_json(user):
         h, m = divmod(int(round((t1 - t0).total_seconds() / 60)), 60)
         return h and "{}h{:02}".format(h, m) or "{}min".format(m)
 
+    def fmt_distance(cc0, cc1):
+        if not (cc0 and cc1):
+            return ""
+        cc0c = json.loads(cc0)["coordinates"]
+        cc1c = json.loads(cc1)["coordinates"]
+        dist = get_distance_between_coordinates(cc0c, cc1c)
+        if dist > 9999:
+            return str(int(round(dist / 1000))) + "km"
+        if dist >= 50:
+            return str(round(dist / 1000, 1)) + "km"
+        return ""
+
+    State = namedtuple("State", ["time", "activity", "place"])
     steps = []
-    state = (None, None, None) # (timestamp/duration, activity, place) updates
+    def step(**kw):
+        prior = steps and steps[-1] or State(None, None, None)
+        steps.append(prior._replace(**kw))
+
+    pt1str = pactivity = pplace1 = None
     for t0, t1, activity, ltype, lname, cc0, cc1 in db.engine.execute(s):
+        t0str, t1str = str(t0)[11:16], str(t1)[11:16]
+        place0 = json.loads(cc0 or "null")
+        place1 = json.loads(cc1 or cc0 or "null")
 
-        # Prevent activity running over gap where time and place change
-        t0str = str(t0)[11:16]
-        place = json.loads(cc0 or "null")
-        if state[0] is not None and t0str != state[0][0] and place != state[2]:
-            state = (None, None, None)
-            steps.append(state)
+        # If prior end place differs from new start place, emit it on prior act
+        if pplace1 and place0 != pplace1 or activity != "STILL":
+            step(place=pplace1)
 
-        distr = ""
-        if cc1:
-            cc0c = json.loads(cc0)["coordinates"]
-            cc1c = json.loads(cc1)["coordinates"]
-            dist = get_distance_between_coordinates(cc0c, cc1c)
-            if dist > 999:
-                distr = str(int(round(dist / 1000))) + "km"
-            elif dist > 0:
-                distr = str(int(round(dist))) + "m"
+        # Visualize time gap if place changes, or activity is same
+        if pt1str and t0str != pt1str and (
+                (pactivity and pactivity == activity)
+                or (pplace1 and pplace1 != place0)):
+            step(time=None, activity=None, place=None)
+
+        timecell = (t0str, not pt1str or t0str != pt1str and "start" or "end")
         actcell = (
             ltype and " ".join([ltype, lname]) or activity,
-            " ".join([fmt_duration(t0, t1), distr]))
-        state = (state[0], actcell, place)
-        if not state[0] or t0str != state[0][0]:
-            state = ((t0str, "start"),) + state[1:]
-        steps.append(state)
+            " ".join([fmt_duration(t0, t1), fmt_distance(cc0, cc1)]))
+        placecell = place0
+        if (pactivity == "STILL" and activity != "STILL"
+                and pplace1 == place0 and pplace1 != place1):
+            placecell = actcell[0].split(" ")[0]
+        step(time=timecell, activity=actcell, place=placecell)
 
         if cc1 and cc0 != cc1:
-            state = state[:2] + (actcell[0].split(" ")[0],)
-            steps.append(state)
+            step(place=actcell[0].split(" ")[0])
 
-        state = (None,) + state[1:]
-        steps.append(state)
-        state = ((str(t1)[11:16], "end"),) + state[1:]
-        steps.append(state)
-        state = state[:2] + (json.loads(cc1 or cc0 or "null"),)
-        steps.append(state)
+        step(time=None)
+        step(time=(t1str, "end"))
+
+        pt1str, pactivity, pplace1 = t1str, activity, place1
+
+    if place1:
+        step(place=place1)
 
     pivot = zip(*steps)
     rle = [[(y, len(list(z))) for y, z in groupby(x)] for x in pivot]
