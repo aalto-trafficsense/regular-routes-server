@@ -236,11 +236,13 @@ def init_db(app):
         Column('time', TIMESTAMP, nullable=False, default=func.current_timestamp(),
                                     server_default=func.current_timestamp()),
         Column('function',
-            Enum("MOBILE-REGISTER", "MOBILE-AUTHENTICATE",
-                 "MOBILE-PATH", "MOBILE-DESTINATIONS", "MOBILE-CERTIFICATE",
-                 "WEB-CONNECT", "WEB-MAP", "WEB-CERTIFICATE",
+            Enum("MOBILE-REGISTER", "MOBILE-AUTHENTICATE", "MOBILE-PATH",
+                 "MOBILE-DESTINATIONS", "MOBILE-DEST-HISTORY", "MOBILE-CERTIFICATE",
+                 "MOBILE-SHARE-CERTIFICATE", "MOBILE-PATH-EDIT"
+                 "WEB-CONNECT", "WEB-MAP", "WEB-CERTIFICATE", "WEB-TRIP-COMPARISON", "WEB-DEST-HISTORY",
                  name="client_function_enum")),
-        Column('info', String))
+        Column('info', String),
+        Index('idx_client_log_time', 'time'))
 
     if not client_log_table.exists():
         client_log_table.create(checkfirst=True)
@@ -640,8 +642,11 @@ def get_device_table_id_for_session(session_token):
         # invalid session token
         return -1
 
-
 def get_user_id_from_device_id(device_id):
+    """
+    :param devices.id (client number, integer)
+    :return: users.id (integer)
+    """
     try:
         query = select([devices_table.c.user_id]) \
             .where(devices_table.c.id==device_id)
@@ -650,9 +655,25 @@ def get_user_id_from_device_id(device_id):
             return None
         return int(row[0])
     except DataError as e:
-        print 'Exception: ' + e.message
-
+        print 'Exception in get_user_id_from_device_id: ' + e.message
     return -1
+
+def get_max_devices_table_id_from_users_table_id(users_table_id):
+    """
+    :param users.id (devices.user_id, integer)
+    :return: devices.id (max, integer)
+    """
+    try:
+        query = select([func.max(devices_table.c.id)]) \
+            .where(devices_table.c.id==users_table_id)
+        row = db.engine.execute(query).first()
+        if not row:
+            return None
+        return int(row[0])
+    except DataError as e:
+        print 'Exception in get_max_devices_table_id_from_users_table_id: ' + e.message
+    return -1
+
 
 def get_users_table_id(user_id):
     """
