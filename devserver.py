@@ -283,7 +283,7 @@ def user_trips_json(user):
         steps.append(state)
 
         if cc1 and cc0 != cc1:
-            state = state[:2] + (None,)
+            state = state[:2] + (actcell[0].split(" ")[0],)
             steps.append(state)
 
         state = (None,) + state[1:]

@@ -75,6 +75,13 @@ $(document).ready(function() {
 
                     } else if (classname == "place") {
                         var lonlat = col[0]["coordinates"];
+                        if (lonlat === undefined) {
+                            var div = $(document.createElement("div"));
+                            td.append(div);
+                            $(td).addClass(col[0]);
+                            $(td).addClass("move");
+                            return; // uh
+                        }
 	                $.getJSON(
                             'http://api.digitransit.fi/geocoding/v1/reverse'
                                 + '?point.lat=' + lonlat[1]
