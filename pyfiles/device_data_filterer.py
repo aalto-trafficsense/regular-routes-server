@@ -1,7 +1,11 @@
 import json
 
+from itertools import chain
+
 from pyfiles.common_helpers import (
     get_distance_between_coordinates,
+    pairwise,
+    point_interval,
     trace_center,
     trace_discard_inaccurate,
     trace_discard_sidesteps,
@@ -107,16 +111,19 @@ class DeviceDataFilterer:
         # Filter out bogus location points.
         points = trace_discard_sidesteps(points, BAD_LOCATION_RADIUS)
 
-        # Partition stationary and moving spans.
-        for mov, seg in trace_partition_movement(
+        lastpt = None
+
+        # Ignore undecided points between segments
+        partitioned = ((mov, seg) for (mov, seg) in trace_partition_movement(
                 points,
                 DEST_RADIUS_MAX,
                 DEST_DURATION_MIN,
-                STOP_BREAK_INTERVAL):
+                STOP_BREAK_INTERVAL)
+            if mov is not None)
 
-            # Ignore undecided points between segments.
-            if mov is None:
-                continue
+        # Partition stationary and moving spans, with peekahead to next item
+        for ms, nextms in pairwise(chain(partitioned, [(None, None)])):
+            (mov, seg), (nextmov, nextseg) = (ms, nextms)
 
             # Emit stationary span, with rough centre as coordinate_start.
             if not mov:
@@ -134,11 +141,22 @@ class DeviceDataFilterer:
                         "coordinates": trace_center(trace_discard_inaccurate(
                             seg, DEST_RADIUS_MAX / 2))}),
                     "activity": "STILL"}
+                lastpt = seg[-1]
                 continue
+
+            # Join move segment to subsequent stop if it comes soon enough
+            if nextmov is False and point_interval(
+                    seg[-1], nextseg[0]) <= MAX_POINT_TIME_DIFFERENCE:
+                seg.append(nextseg[0])
 
             # Feed moving span to activity stabilizer, mass transit detection.
             # This loses unstabilizable point spans.
             for legpts, legact in self._analyse_unfiltered_data(seg):
+
+                # Join to previous leg on shared point if close enough in time
+                if lastpt and point_interval(
+                        lastpt, legpts[0]) <= MAX_POINT_TIME_DIFFERENCE:
+                    legpts.insert(0, lastpt)
 
                 # Crop preroll legs to start if given, after activity selection
                 # to give it the same context on resume, but before mass
@@ -167,6 +185,7 @@ class DeviceDataFilterer:
                     "line_type": legtype,
                     "line_name": legname,
                     "line_source": legsource}
+                lastpt = legpts[-1]
 
 
     def generate_filtered_data(self, device_data_rows, user_id):

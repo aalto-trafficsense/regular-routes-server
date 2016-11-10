@@ -180,11 +180,11 @@ def generate_legs(maxtime=None, repair=False):
                 print "-> unchanged"
                 continue
 
-            # Replace overlapping legs.
+            # Replace legs overlapping on more than a transition point
             rowcount = db.engine.execute(legs.delete(and_(
                 legs.c.device_id == leg["device_id"],
-                legs.c.time_start <= leg["time_end"],
-                legs.c.time_end >= leg["time_start"]))).rowcount
+                legs.c.time_start < leg["time_end"],
+                legs.c.time_end > leg["time_start"]))).rowcount
             if rowcount:
                 print "-> delete %d" % rowcount,
             db.engine.execute(legs.insert(leg))
@@ -252,7 +252,7 @@ def generate_legs(maxtime=None, repair=False):
         lastend = None
         for lid, lstart, lend, luser in db.engine.execute(unattached):
             print " ".join(["u"+str(user), str(lstart)[:19], str(lend)[:19]]),
-            if lastend and lstart <= lastend:
+            if lastend and lstart < lastend:
                 if luser is None:
                     print "-> detached"
                     continue
