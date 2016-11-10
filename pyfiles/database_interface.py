@@ -665,7 +665,7 @@ def get_max_devices_table_id_from_users_table_id(users_table_id):
     """
     try:
         query = select([func.max(devices_table.c.id)]) \
-            .where(devices_table.c.id==users_table_id)
+            .where(devices_table.c.user_id==users_table_id)
         row = db.engine.execute(query).first()
         if not row:
             return None
