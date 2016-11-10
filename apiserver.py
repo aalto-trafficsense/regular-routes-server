@@ -73,10 +73,9 @@ def register_post():
     device_id = data['deviceId']
     installation_id = data['installationId']
     device_model = data['deviceModel']
-    print 'deviceModel=' + str(device_model)
+    # print 'deviceModel=' + str(device_model)
     # Get optionally - old clients do not send this
     client_version = "ClientVersion:" + data.get('clientVersion', '')
-    print '/register called with: ' + client_version
 
     # 1. authenticate with Google
     validation_data = authenticate_with_google_oauth(app.config['AUTH_REDIRECT_URI'], CLIENT_SECRET_FILE, CLIENT_ID, google_one_time_token)
@@ -137,7 +136,6 @@ def authenticate_post():
     installation_id = json['installationId']
     # Get optionally - old clients do not send this
     client_version = "ClientVersion:" + json.get('clientVersion', '')
-    print '/authenticate called with: ' + client_version
 
     # 1. check that user exists or abort
     verify_user_id(user_id)
