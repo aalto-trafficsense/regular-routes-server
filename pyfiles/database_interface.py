@@ -238,7 +238,7 @@ def init_db(app):
         Column('function',
             Enum("MOBILE-REGISTER", "MOBILE-AUTHENTICATE", "MOBILE-PATH",
                  "MOBILE-DESTINATIONS", "MOBILE-DEST-HISTORY", "MOBILE-CERTIFICATE",
-                 "MOBILE-SHARE-CERTIFICATE", "MOBILE-PATH-EDIT"
+                 "MOBILE-SHARE-CERTIFICATE", "MOBILE-PATH-EDIT",
                  "WEB-CONNECT", "WEB-PATH", "WEB-CERTIFICATE", "WEB-TRIP-COMPARISON", "WEB-DEST-HISTORY",
                  name="client_function_enum")),
         Column('info', String),
