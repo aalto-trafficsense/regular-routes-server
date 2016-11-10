@@ -73,7 +73,7 @@ def register_post():
     device_id = data['deviceId']
     installation_id = data['installationId']
     device_model = data['deviceModel']
-    # print 'deviceModel=' + str(device_model)
+    print 'deviceModel=' + str(device_model)
     # Get optionally - old clients do not send this
     client_version = "ClientVersion:" + data.get('clientVersion', '')
     print '/register called with: ' + client_version
