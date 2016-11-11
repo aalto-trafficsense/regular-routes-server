@@ -66,4 +66,6 @@ html, body, #map-canvas {
 .activity.STILL { border-radius: 0 }
 
 #trip .time { border: none; padding-bottom: 0 }
+#trip .time.both { position: relative; left: -4ex }
+
 #trip .gap { visibility: hidden }

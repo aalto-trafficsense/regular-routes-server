@@ -280,9 +280,8 @@ def user_trips_json(user):
         place1 = json.loads(cc1 or cc0 or "null")
 
         # Emit prior end time with appropriate aligment based on change
-        timealign = (t0str == pt1str) and "center" or "right"
-        if pt1str:
-            step(time=(pt1str, timealign))
+        if pt1str and t0str != pt1str:
+            step(time=(pt1str, "end"))
 
         # If place changed, or transfer, emit prior place on prior leg
         if pplace1 and place0 != pplace1 or activity != "STILL":
@@ -296,7 +295,7 @@ def user_trips_json(user):
 
         # If going from stop to move starting from same but with internal
         # location change, terminate place label and use activity there instead
-        timecell = (t0str, ((timealign == "right") and "left") or "center")
+        timecell = (t0str, t0str == pt1str and "both" or "start")
         actcell = (
             ltype and " ".join([ltype, lname]) or activity,
             " ".join([fmt_duration(t0, t1), fmt_distance(cc0, cc1)]))
@@ -313,7 +312,7 @@ def user_trips_json(user):
         pt1str, pactivity, pplace1 = t1str, activity, place1
 
     if pt1str:
-        step(time=(pt1str, "right"))
+        step(time=(pt1str, "end"))
     if pplace1:
         step(place=pplace1)
 

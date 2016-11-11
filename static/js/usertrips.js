@@ -36,7 +36,11 @@ $(document).ready(function() {
                         td.addClass("gap");
                     } else if (classname == "time") {
                         td.text(col[0][0]);
-                        td.addClass(col[0][1]); // align
+                        switch (col[0][1]) { // align
+                        case "start": td.addClass("left"); break;
+                        case "both": td.addClass("left both"); break;
+                        case "end": td.addClass("right"); break;
+                        }
                     } else if (classname == "activity") {
                         var activity = col[0][0];
                         td.text(activity);
