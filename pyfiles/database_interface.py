@@ -338,7 +338,8 @@ def get_filtered_device_data_points(user_id, datetime_start, datetime_end):
             dd.c.time < datetime_end),
         legs.join(dd, and_(
             legs.c.device_id == dd.c.device_id,
-            between(dd.c.time, legs.c.time_start, legs.c.time_end)))))
+            between(dd.c.time, legs.c.time_start, legs.c.time_end))),
+        order_by=dd.c.time))
 
 
 def get_filtered_device_data_points_OLD(user_id, datetime_start, datetime_end):
