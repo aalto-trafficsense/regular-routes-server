@@ -1,5 +1,6 @@
 import datetime
 from datetime import timedelta
+from itertools import chain
 
 import json
 import os
@@ -12,7 +13,7 @@ from pyfiles.database_interface import (
 from pyfiles.device_data_filterer import DeviceDataFilterer
 from pyfiles.energy_rating import EnergyRating
 from pyfiles.common_helpers import (
-    get_distance_between_coordinates, trace_discard_sidesteps)
+    get_distance_between_coordinates, pairwise, trace_discard_sidesteps)
 from pyfiles.constants import *
 from apscheduler.schedulers.background import BackgroundScheduler
 from flask import Flask
@@ -147,8 +148,9 @@ def generate_legs(maxtime=None, repair=False):
 
         filterer = DeviceDataFilterer() # not very objecty rly
         lastend = None
+        newlegs = filterer.generate_device_legs(points, start)
 
-        for leg in filterer.generate_device_legs(points, start):
+        for prevleg, leg in pairwise(chain([None], newlegs)):
             lastend = leg["time_end"]
 
             print " ".join(["d"+str(device), str(leg["time_start"])[:19],
@@ -181,10 +183,11 @@ def generate_legs(maxtime=None, repair=False):
                 continue
 
             # Replace legs overlapping on more than a transition point
+            overlapstart = prevleg and prevleg["time_end"] or start
             rowcount = db.engine.execute(legs.delete(and_(
                 legs.c.device_id == leg["device_id"],
                 legs.c.time_start < leg["time_end"],
-                legs.c.time_end > leg["time_start"]))).rowcount
+                legs.c.time_end > overlapstart))).rowcount
             if rowcount:
                 print "-> delete %d" % rowcount,
             db.engine.execute(legs.insert(leg))
@@ -196,8 +199,8 @@ def generate_legs(maxtime=None, repair=False):
         if rejects:
             db.engine.execute(legs.delete(and_(
                 legs.c.device_id == device,
-                legs.c.time_start <= rejects[0]["time"],
-                legs.c.time_end >= rejects[-1]["time"])))
+                legs.c.time_start <= rejects[-1]["time"],
+                legs.c.time_end >= rejects[0]["time"])))
             db.engine.execute(legs.insert({
                 "device_id": device,
                 "time_start": rejects[0]["time"],
@@ -232,7 +235,7 @@ def generate_legs(maxtime=None, repair=False):
             [devices.c.user_id, func.min(legs.c.time_start)],
             legs.c.time_end < maxtime,
             legs.join(devices, legs.c.device_id == devices.c.id),
-            group_by=[devices.c.user_id, legs.c.device_id])
+            group_by=[devices.c.user_id])
 
     for user, start in db.engine.execute(starts):
         print "u"+str(user), "start attach", start
