@@ -4,6 +4,7 @@ from datetime import timedelta
 from heapq import heapify, heappop, heappush
 from itertools import tee
 from math import cos, pi
+from pyfiles.constants import *
 
 
 def get_distance_between_coordinates(coord1, coord2):
@@ -686,3 +687,26 @@ def trace_split_sparse(points, interval):
         segment.append(p)
     if segment:
         yield segment
+
+
+def interpret_jore(jore_code):
+    if re.search(jore_ferry_regex, jore_code):
+        line_name = "Ferry"
+        line_type = "FERRY"
+    elif re.search(jore_subway_regex, jore_code):
+        line_name = jore_code[4:5]
+        line_type = "SUBWAY"
+    elif re.search(jore_rail_regex, jore_code):
+        line_name = jore_code[4:5]
+        line_type = "TRAIN"
+    elif re.search(jore_tram_regex, jore_code):
+        line_name = re.sub(jore_tram_replace_regex, "", jore_code)
+        line_type = "TRAM"
+    elif re.search(jore_bus_regex, jore_code):
+        line_name = re.sub(jore_tram_replace_regex, "", jore_code)
+        line_type = "BUS"
+    else:
+        # unknown, assume bus
+        line_name = jore_code
+        line_type = "BUS"
+    return line_name, line_type

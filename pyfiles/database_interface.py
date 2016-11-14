@@ -6,7 +6,7 @@ from flask.ext.sqlalchemy import SQLAlchemy
 from oauth2client.client import *
 from sqlalchemy import MetaData, Table, Column, ForeignKey, Enum, BigInteger, Integer, String, Index, UniqueConstraint, \
     Float
-from sqlalchemy.dialects.postgres import DOUBLE_PRECISION, TIMESTAMP, UUID
+from sqlalchemy.dialects.postgresql import DOUBLE_PRECISION, TIMESTAMP, UUID
 from sqlalchemy.exc import DataError
 from sqlalchemy.sql import and_, between, text, func, column, table, select
 import svg_generation
@@ -24,6 +24,9 @@ from flask_kvsession import KVSessionExtension
 
 import logging
 logging.basicConfig()
+log = logging.getLogger(__name__)
+log.setLevel(logging.INFO)
+
 
 '''
 These types are the same as are defined in:
@@ -39,7 +42,7 @@ https://github.com/HSLdevcom/navigator-proto/blob/master/src/routing.coffee#L43
 mass_transit_types = ("FERRY", "SUBWAY", "TRAIN", "TRAM", "BUS")
 mass_transit_type_enum = Enum(*mass_transit_types, name='mass_transit_type_enum')
 
-# Declare the db and tables global, so they can be referenced from outside the ini_db procedure
+# Declare the db and tables global, so they can be referenced from outside the init_db procedure
 db = None
 users_table = None
 devices_table = None
@@ -215,6 +218,26 @@ def init_db(app):
                         WHERE (vehicle_ref, time)=(NEW.vehicle_ref, NEW.time))
             DO INSTEAD NOTHING;
             '''))
+
+    # HSL mass transit vehicle locations.
+    global hsl_alerts_table
+    hsl_alerts_table = Table('hsl_alerts', metadata,
+                              Column('id', Integer, primary_key=True),
+                              Column('alert_id', Integer, nullable=False),
+                              Column('alert_start', TIMESTAMP, nullable=False),
+                              Column('trip_start', TIMESTAMP, nullable=False),
+                              Column('alert_end', TIMESTAMP, nullable=False),
+                              Column('line_type', mass_transit_type_enum, nullable=False),
+                              Column('line_name', String, nullable=False),
+                              Column('direction', Integer),
+                              Column('effect', Integer),
+                              Column('fi_description', String),
+                              Column('sv_description', String),
+                              Column('en_description', String))
+
+    if not hsl_alerts_table.exists():
+        hsl_alerts_table.create(checkfirst=True)
+
 
     global global_statistics_table
     global_statistics_table = Table('global_statistics', metadata,
@@ -560,6 +583,30 @@ nearest AS (
         dradius=dradius,
         nsamples=nsamples)
 
+
+def hsl_alerts_insert(alerts):
+    if alerts:
+        db.engine.execute(hsl_alerts_table.insert(alerts))
+
+def hsl_alerts_get_max():
+    """
+    :return: max_alert_id, max_alert_end (max int, max timestamp)
+    """
+    try:
+        max_alert_id = None
+        query = select([func.max(hsl_alerts_table.c.alert_id)])
+        row = db.engine.execute(query).first()
+        if row and row[0]:
+            max_alert_id = int(row[0])
+        max_alert_end = None
+        query = select([func.max(hsl_alerts_table.c.alert_end)])
+        row = db.engine.execute(query).first()
+        if row and row[0]:
+            max_alert_end = row[0]
+        return max_alert_id, max_alert_end
+    except DataError as e:
+        print 'Exception in get_max_devices_table_id_from_users_table_id: ' + e.message
+    return -1, -1
 
 def verify_user_id(user_id):
     if user_id is None or user_id == '':

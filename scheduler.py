@@ -8,12 +8,15 @@ import time
 import re
 import urllib2
 from pyfiles.database_interface import (
-    init_db, data_points_by_user_id_after, get_filtered_device_data_points)
+    init_db, data_points_by_user_id_after, get_filtered_device_data_points,
+    hsl_alerts_insert)
 from pyfiles.device_data_filterer import DeviceDataFilterer
 from pyfiles.energy_rating import EnergyRating
 from pyfiles.common_helpers import (
-    get_distance_between_coordinates, trace_discard_sidesteps)
+    get_distance_between_coordinates, trace_discard_sidesteps,
+    interpret_jore)
 from pyfiles.constants import *
+from pyfiles.information_services import retrieve_hsl_alerts
 from apscheduler.schedulers.background import BackgroundScheduler
 from flask import Flask
 from sqlalchemy.sql import and_, func, or_, select, text
@@ -55,12 +58,13 @@ global_statistics_table = db.metadata.tables['global_statistics']
 
 def initialize():
     print "initialising scheduler"
-    scheduler = BackgroundScheduler()
-    scheduler.start()
-    scheduler.add_job(retrieve_hsl_data, "cron", second="*/30")
-    run_daily_tasks()
-    scheduler.add_job(generate_legs, "cron", minute=24)
-    scheduler.add_job(run_daily_tasks, "cron", hour="3")
+    # scheduler = BackgroundScheduler()
+    # scheduler.start()
+    # scheduler.add_job(retrieve_hsl_data, "cron", second="*/30")
+    # run_daily_tasks()
+    # scheduler.add_job(generate_legs, "cron", minute=24)
+    # scheduler.add_job(run_daily_tasks, "cron", hour="3")
+    hsl_alerts_insert(retrieve_hsl_alerts())
     print "scheduler init done"
 
 
@@ -521,30 +525,6 @@ def retrieve_hsl_data():
     else:
         log.warning(
             "No mass transit data received at %s" % datetime.datetime.now())
-
-
-def interpret_jore(jore_code):
-    if re.search(jore_ferry_regex, jore_code):
-        line_name = "Ferry"
-        line_type = "FERRY"
-    elif re.search(jore_subway_regex, jore_code):
-        line_name = jore_code[4:5]
-        line_type = "SUBWAY"
-    elif re.search(jore_rail_regex, jore_code):
-        line_name = jore_code[4:5]
-        line_type = "TRAIN"
-    elif re.search(jore_tram_regex, jore_code):
-        line_name = re.sub(jore_tram_replace_regex, "", jore_code)
-        line_type = "TRAM"
-    elif re.search(jore_bus_regex, jore_code):
-        line_name = re.sub(jore_tram_replace_regex, "", jore_code)
-        line_type = "BUS"
-    else:
-        # unknown, assume bus
-        line_name = jore_code
-        line_type = "BUS"
-    return line_name, line_type
-
 
 
 def get_max_time_from_table(time_column_name, table_name, id_field_name, id):
