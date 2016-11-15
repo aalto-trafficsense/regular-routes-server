@@ -273,11 +273,17 @@ def user_trips_json(user):
         prior = steps and steps[-1] or State(None, None, None)
         steps.append(prior._replace(**kw))
 
+    strings = (
+        (   str(t0)[11:16],
+            str(t1)[11:16],
+            ltype and " ".join([ltype, lname]) or activity,
+            " ".join([fmt_duration(t0, t1), fmt_distance(cc0, cc1)]),
+            json.loads(cc0 or "null"),
+            json.loads(cc1 or cc0 or "null"))
+        for t0, t1, activity, ltype, lname, cc0, cc1 in db.engine.execute(s))
+
     pt1str = pactivity = pplace1 = None
-    for t0, t1, activity, ltype, lname, cc0, cc1 in db.engine.execute(s):
-        t0str, t1str = str(t0)[11:16], str(t1)[11:16]
-        place0 = json.loads(cc0 or "null")
-        place1 = json.loads(cc1 or cc0 or "null")
+    for t0str, t1str, activity, duration, place0, place1 in strings:
 
         # Emit prior end time with appropriate aligment based on change
         if pt1str and t0str != pt1str:
@@ -296,9 +302,7 @@ def user_trips_json(user):
         # If going from stop to move starting from same but with internal
         # location change, terminate place label and use activity there instead
         timecell = (t0str, t0str == pt1str and "both" or "start")
-        actcell = (
-            ltype and " ".join([ltype, lname]) or activity,
-            " ".join([fmt_duration(t0, t1), fmt_distance(cc0, cc1)]))
+        actcell = (activity, duration)
         placecell = place0
         if (pactivity == "STILL" and activity != "STILL"
                 and pplace1 == place0 and pplace1 != place1):
@@ -306,7 +310,7 @@ def user_trips_json(user):
         step(time=timecell, activity=actcell, place=placecell)
 
         # Needed for move with internal place change and gap on both sides
-        if cc1 and cc0 != cc1:
+        if place1 and place0 != place1:
             step(place=actcell[0].split(" ")[0])
 
         pt1str, pactivity, pplace1 = t1str, activity, place1
