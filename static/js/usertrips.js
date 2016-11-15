@@ -35,20 +35,22 @@ $(document).ready(function() {
                         td.attr("class", mode);
                         var glyph = null;
                         switch (mode) {
-	                case 'ON_BICYCLE': glyph = "\uD83D\uDEB4"; break;
-	                case 'WALKING':
-	                case 'ON_FOOT':    glyph = "\uD83D\uDEB6"; break;
-	                case 'RUNNING':    glyph = "\uD83C\uDFC3"; break;
-	                case 'IN_VEHICLE': glyph = "\uD83D\uDE98"; break;
-                        case "TRAIN":      glyph = "\uD83D\uDE82"; break;
-	                case 'SUBWAY':     glyph = "\uD83D\uDE87"; break;
-	                case 'TRAM':       glyph = "\uD83D\uDE8B"; break;
-	                case 'FERRY':      glyph = "\u26F4"; break;
-	                case 'BUS':        glyph = "\uD83D\uDE8D"; break;
-//	                case 'BUS':        glyph = "\uD83D\uDE8C"; break;
-	                case 'TILTING':    glyph = "/"; break;
-//	                case 'STILL':      glyph = "\uD83D\uDECB"; break;
-	                case 'UNKNOWN':    glyph = "?"; break;
+                        case 'ON_BICYCLE': glyph = "\uD83D\uDEB4\uFE0E"; break;
+                        case 'WALKING':
+                        case 'ON_FOOT':    glyph = "\uD83D\uDEB6\uFE0E"; break;
+                        case 'RUNNING':    glyph = "\uD83C\uDFC3\uFE0E"; break;
+                        case 'IN_VEHICLE': glyph = "\uD83D\uDE98\uFE0E"; break;
+                        case "TRAIN":      glyph = "\uD83D\uDE82\uFE0E"; break;
+                        case 'SUBWAY':     glyph = "\uD83D\uDE87\uFE0E"; break;
+                        case 'TRAM':       glyph = "\uD83D\uDE8B\uFE0E"; break;
+                        case 'FERRY':      glyph = "\u26F4\uFE0E"; break;
+                        case 'BUS':        glyph = "\uD83D\uDE8D\uFE0E"; break;
+//                      case 'BUS':        glyph = "\uD83D\uDE8C\uFE0E"; break;
+                        case 'TILTING':    glyph = "/"; break;
+                        case 'STILL':      glyph = "\xa0"; break;
+//                      case 'STILL':      glyph = "\uD83D\uDECB\uFE0E"; break;
+                        case 'UNKNOWN':    glyph = "?"; break;
+//                      default:           glyph = "!"; break;
                         }
                         if (glyph) {
                             var icon = $(document.createElement("div"));
