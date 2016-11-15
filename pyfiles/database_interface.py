@@ -256,7 +256,7 @@ def init_db(app):
         Column('id', Integer, primary_key=True),
         Column('device_id', Integer, ForeignKey('devices.id'), nullable=False),
         Column('user_id', Integer, ForeignKey('users.id')),
-        Column('time', TIMESTAMP, nullable=False, default=func.current_timestamp(),
+        Column('time', TIMESTAMP(timezone=True), nullable=False, default=func.current_timestamp(),
                                     server_default=func.current_timestamp()),
         Column('function',
             Enum("MOBILE-REGISTER", "MOBILE-AUTHENTICATE", "MOBILE-PATH",

@@ -21,4 +21,5 @@ wsgiref==0.1.2
 requests
 polyline
 gtfs-realtime-bindings
+OWSLib
 
