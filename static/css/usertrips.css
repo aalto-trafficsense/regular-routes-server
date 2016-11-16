@@ -60,7 +60,11 @@ html, body, #map-canvas {
 
 #trip .place { border: none; vertical-align: middle }
 #trip .place.move { background: none; padding: 0 }
-#trip .place.move div { border-bottom: dotted medium lightgrey }
+
+#trip .place.move div {
+    border-bottom: dotted medium lightgrey;
+    min-width: 4ex;
+}
 
 .activity { border-radius: 0 1em 1em 0 }
 .activity.STILL { border-radius: 0 }

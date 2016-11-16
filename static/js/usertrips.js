@@ -92,15 +92,23 @@ $(document).ready(function() {
                                     var name = feat["properties"][prop];
                                     if (name === undefined)
                                         return;
-                                    name = name.split(",")[0]; // complex names
-                                    name = name.split("/")[0]; // complex names
+                                    name = name.split(",")[0];
+                                    name = name.split("/")[0];
+                                    name = name.split(/ *[0-9]/)[0];
                                     if (-1 == $.inArray(name, names))
                                         names.push(name);
                                 });
                             });
                             var text = names[0];
-                            if (names.length > 1)
-                                text += " / " + names[1];
+                            if (names.length > 1) {
+                                // Disallow slash alone on a line, bind to
+                                // shorter word
+                                var lof = names[0].split(" ").slice(-1)[0];
+                                var fol = names[1].split(" ")[0];
+                                var sep = lof.length < fol.length
+                                    ? "\xa0/ " : " /\xa0";
+                                text += sep + names[1];
+                            }
                             $(td).text(text);
                         });
                     }
