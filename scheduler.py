@@ -339,13 +339,14 @@ def generate_legs(maxtime=None, repair=False):
 
 
 def cluster_legs(limit):
-    """New leg ends are clustered live by triggers; this can be used to cluster
-    legs created before clustering."""
+    """New leg ends and places are clustered live by triggers; this can be used
+    to cluster data created earlier."""
 
     print "cluster_legs up to", limit
 
     with db.engine.begin() as t:
         t.execute(text("SELECT legs_cluster(:limit)"), limit=limit)
+        t.execute(text("SELECT leg_ends_cluster(:limit)"), limit=limit)
 
 
 def filter_device_data(maxtime=None):

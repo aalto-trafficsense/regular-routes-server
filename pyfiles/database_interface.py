@@ -153,12 +153,20 @@ def init_db(app):
 
     device_data_filtered_table.create(checkfirst=True)
 
+    # User leg ends are clustered into shared places
+    global places_table
+    places_table = Table('places', metadata,
+        Column('id', Integer, primary_key=True),
+        Column('coordinate', ga2.Geography('point', 4326, spatial_index=True)),
+        Column('label', String))
+
     # Clustered leg ends
     global leg_ends_table
     leg_ends_table = Table('leg_ends', metadata,
         Column('id', Integer, primary_key=True),
         Column('user_id', Integer, ForeignKey('users.id'), nullable=False),
-        Column('coordinate', ga2.Geography('point', 4326, spatial_index=True)))
+        Column('coordinate', ga2.Geography('point', 4326, spatial_index=True)),
+        Column('place', Integer, ForeignKey('places.id')))
 
     # Combined activity including mass transit submodes
     mode_enum = Enum(
@@ -505,7 +513,12 @@ CREATE OR REPLACE VIEW leg_modes AS SELECT
         # Server restarts can result in this being run concurrently, leading to
         # tuple concurrently updated and other racing on function and trigger
         # updates. Lock something vaguely relevant to serialize access.
-        t.execute(text("lock only leg_ends in access exclusive mode"))
+        t.execute(text("lock leg_ends in access exclusive mode"))
+        t.execute(text(f.read()), clustdist=2*DEST_RADIUS_MAX)
+
+    # Functions and triggers that maintain the places table
+    with open("sql/places.sql") as f, db.engine.begin() as t:
+        t.execute(text("lock places in access exclusive mode"))
         t.execute(text(f.read()), clustdist=2*DEST_RADIUS_MAX)
 
     return db, store
