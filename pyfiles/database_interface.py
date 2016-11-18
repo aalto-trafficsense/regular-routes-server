@@ -225,7 +225,7 @@ def init_db(app):
                               Column('id', Integer, primary_key=True),
                               Column('alert_id', Integer, nullable=False),
                               Column('alert_start', TIMESTAMP, nullable=False),
-                              Column('trip_start', TIMESTAMP, nullable=False),
+                              Column('trip_start', TIMESTAMP, nullable=True),
                               Column('alert_end', TIMESTAMP, nullable=False),
                               Column('line_type', mass_transit_type_enum, nullable=False),
                               Column('line_name', String, nullable=False),
