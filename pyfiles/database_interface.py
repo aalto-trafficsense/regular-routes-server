@@ -52,7 +52,7 @@ legs_table = None
 travelled_distances_table = None
 mass_transit_data_table = None
 global_statistics_table = None
-
+# hsl_alerts_table = None
 
 def init_db(app):
     global db
@@ -237,6 +237,39 @@ def init_db(app):
 
     if not hsl_alerts_table.exists():
         hsl_alerts_table.create(checkfirst=True)
+
+    global weather_forecast_table
+    weather_forecast_table = Table('weather_forecast', metadata,
+        Column('id', Integer, primary_key=True),
+        Column('time_retrieved', TIMESTAMP(timezone=True), nullable=False, default=func.current_timestamp(),
+                                    server_default=func.current_timestamp()),
+        Column('time_forecast', TIMESTAMP(timezone=True), nullable=False, default=func.current_timestamp(),
+                                    server_default=func.current_timestamp()),
+        Column('temperature', Float, nullable=False),
+        Column('windspeed_ms', Float, nullable=False),
+        Column('total_cloud_cover', Float, nullable=False),
+        Column('precipitation_1h', Float, nullable=False))
+
+
+    if not weather_forecast_table.exists():
+        weather_forecast_table.create(checkfirst=True)
+
+
+    global weather_observations_table
+    weather_observations_table = Table('weather_observations', metadata,
+        Column('id', Integer, primary_key=True),
+        Column('time_retrieved', TIMESTAMP(timezone=True), nullable=False, default=func.current_timestamp(),
+                                    server_default=func.current_timestamp()),
+        Column('time_observed', TIMESTAMP(timezone=True), nullable=False, default=func.current_timestamp(),
+                                    server_default=func.current_timestamp()),
+        Column('temperature', Float, nullable=False),
+        Column('windspeed_ms', Float, nullable=False),
+        Column('precipitation_1h', Float, nullable=False))
+
+
+    if not weather_observations_table.exists():
+        weather_observations_table.create(checkfirst=True)
+
 
 
     global global_statistics_table
@@ -588,6 +621,7 @@ def hsl_alerts_insert(alerts):
     if alerts:
         db.engine.execute(hsl_alerts_table.insert(alerts))
 
+
 def hsl_alerts_get_max():
     """
     :return: max_alert_id, max_alert_end (max int, max timestamp)
@@ -607,6 +641,17 @@ def hsl_alerts_get_max():
     except DataError as e:
         print 'Exception in get_max_devices_table_id_from_users_table_id: ' + e.message
     return -1, -1
+
+
+def weather_forecast_insert(weather):
+    if weather:
+        db.engine.execute(weather_forecast_table.insert(weather))
+
+
+def weather_observations_insert(weather):
+    if weather:
+        db.engine.execute(weather_observations_table.insert(weather))
+
 
 def verify_user_id(user_id):
     if user_id is None or user_id == '':

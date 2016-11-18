@@ -9,14 +9,14 @@ import re
 import urllib2
 from pyfiles.database_interface import (
     init_db, data_points_by_user_id_after, get_filtered_device_data_points,
-    hsl_alerts_insert)
+    hsl_alerts_insert, weather_forecast_insert, weather_observations_insert)
 from pyfiles.device_data_filterer import DeviceDataFilterer
 from pyfiles.energy_rating import EnergyRating
 from pyfiles.common_helpers import (
     get_distance_between_coordinates, trace_discard_sidesteps,
     interpret_jore)
 from pyfiles.constants import *
-from pyfiles.information_services import retrieve_hsl_alerts
+from pyfiles.information_services import hsl_alert_request, fmi_forecast_request, fmi_observations_request
 from apscheduler.schedulers.background import BackgroundScheduler
 from flask import Flask
 from sqlalchemy.sql import and_, func, or_, select, text
@@ -54,7 +54,7 @@ device_data_filtered_table = db.metadata.tables['device_data_filtered']
 travelled_distances_table = db.metadata.tables['travelled_distances']
 mass_transit_data_table = db.metadata.tables['mass_transit_data']
 global_statistics_table = db.metadata.tables['global_statistics']
-
+# hsl_alerts_table = db.metadata.tables['hsl_alerts']
 
 def initialize():
     print "initialising scheduler"
@@ -64,7 +64,10 @@ def initialize():
     # run_daily_tasks()
     # scheduler.add_job(generate_legs, "cron", minute=24)
     # scheduler.add_job(run_daily_tasks, "cron", hour="3")
-    hsl_alerts_insert(retrieve_hsl_alerts())
+    hsl_alerts_insert(hsl_alert_request())
+    # TODO: If either one returns an empty set, re-schedule fetch after a few minutes and try to keep some max_retry counter?
+    # weather_forecast_insert(fmi_forecast_request())
+    # weather_observations_insert(fmi_observations_request())
     print "scheduler init done"
 
 
@@ -542,6 +545,8 @@ def get_max_time_from_table(time_column_name, table_name, id_field_name, id):
         time = time_row["time"]
     return time
 
+def get_config(varname):
+    return app.config[varname]
 
 def main_loop():
     while 1:
