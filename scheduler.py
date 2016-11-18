@@ -545,8 +545,6 @@ def get_max_time_from_table(time_column_name, table_name, id_field_name, id):
         time = time_row["time"]
     return time
 
-def get_config(varname):
-    return app.config[varname]
 
 def main_loop():
     while 1:
