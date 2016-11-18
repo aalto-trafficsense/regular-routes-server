@@ -103,10 +103,9 @@ class DeviceDataFilterer:
 
 
     def generate_device_legs(self, points, start=None):
-        """Generate sequence of stationary and moving segments of same
-        activity from the raw trace of one device. If a start datetime is
-        given, no legs are emitted prior to that time, and the start of a leg
-        crossing it is set there."""
+        """Generate sequence of stationary and moving segments of same activity
+        from the raw trace of one device. Legs found in points before the start
+        time, if given, are not emitted."""
 
         # Filter out bogus location points.
         points = trace_discard_sidesteps(points, BAD_LOCATION_RADIUS)
@@ -127,10 +126,12 @@ class DeviceDataFilterer:
 
             # Emit stationary span, with rough centre as coordinate_start.
             if not mov:
-                # Crop preroll legs to start if given, discard if too short.
-                while start and seg and seg[0]["time"] < start:
-                    seg.pop(0)
                 if len(seg) < 2:
+                    continue
+
+                lastpt = seg[-1]
+
+                if start and seg[0]["time"] < start:
                     continue
 
                 yield {
@@ -141,7 +142,6 @@ class DeviceDataFilterer:
                         "coordinates": trace_center(trace_discard_inaccurate(
                             seg, DEST_RADIUS_MAX / 2))}),
                     "activity": "STILL"}
-                lastpt = seg[-1]
                 continue
 
             # Join move segment to subsequent stop if it comes soon enough
@@ -153,25 +153,23 @@ class DeviceDataFilterer:
             # This loses unstabilizable point spans.
             for legpts, legact in self._analyse_unfiltered_data(seg):
 
-                # Join to previous leg on shared point if close enough in time
-                if lastpt and point_interval(
-                        lastpt, legpts[0]) <= MAX_POINT_TIME_DIFFERENCE:
-                    legpts.insert(0, lastpt)
-
-                # Crop preroll legs to start if given, after activity selection
-                # to give it the same context on resume, but before mass
-                # transit detect to avoid repeated querying on unsaved rewind
-                # range.
-                while start and legpts and legpts[0]["time"] < start:
-                    legpts.pop(0)
-
                 # Inaccurate points can be useful at the activity detection
                 # stage, but for mass transit matching and clustering, location
                 # needs to be more accurate.
                 legpts = list(trace_discard_inaccurate(
                     legpts, DEST_RADIUS_MAX / 2))
+
                 if len(legpts) < 2:
                     continue # too few points to make a move, drop leg
+
+                # Join to previous leg on shared point if close enough in time
+                if lastpt and point_interval(
+                        lastpt, legpts[0]) <= MAX_POINT_TIME_DIFFERENCE:
+                    legpts.insert(0, lastpt)
+                lastpt = legpts[-1]
+
+                if start and legpts[0]["time"] < start:
+                    continue
 
                 legtype, legname, legsource = \
                     self._match_mass_transit(legpts, legact, None)
@@ -185,7 +183,6 @@ class DeviceDataFilterer:
                     "line_type": legtype,
                     "line_name": legname,
                     "line_source": legsource}
-                lastpt = legpts[-1]
 
 
     def generate_filtered_data(self, device_data_rows, user_id):
