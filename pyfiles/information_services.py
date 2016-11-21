@@ -47,8 +47,8 @@ def hsl_alert_request():
 
     new_alerts = []
     max_alert_id, max_alert_end = hsl_alerts_get_max()
-    print 'max_alert_id: ', max_alert_id
-    print 'max_alert_end: ', max_alert_end
+    # print 'max_alert_id: ', max_alert_id
+    # print 'max_alert_end: ', max_alert_end
 
     def hsl_alert_row(inf_ent):
         try:
@@ -279,6 +279,7 @@ def fmi_request(query_id, start_time, end_time, weather_params, time_row_label):
     if nan_counter > 24: response_table = None  # Sometimes all values return as 'NaN' all the way from FMI. Useless result - rather reload later
     return response_table
 
+
 def graphql_request(urlstr, querystr):
     json_data = '{}'
     try:
@@ -291,6 +292,7 @@ def graphql_request(urlstr, querystr):
     except Exception as e:
         print "graphql_request / exception: ", e
     return json_data
+
 
 def toDateTime(hsl_sec):
     return datetime.datetime.fromtimestamp(hsl_sec)

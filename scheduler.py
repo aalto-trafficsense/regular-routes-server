@@ -58,16 +58,14 @@ global_statistics_table = db.metadata.tables['global_statistics']
 
 def initialize():
     print "initialising scheduler"
-    # scheduler = BackgroundScheduler()
-    # scheduler.start()
+    scheduler = BackgroundScheduler()
+    scheduler.start()
     # scheduler.add_job(retrieve_hsl_data, "cron", second="*/30")
     # run_daily_tasks()
     # scheduler.add_job(generate_legs, "cron", minute=24)
     # scheduler.add_job(run_daily_tasks, "cron", hour="3")
-    hsl_alerts_insert(hsl_alert_request())
-    # TODO: If either one returns an empty set, re-schedule fetch after a few minutes and try to keep some max_retry counter?
-    # weather_forecast_insert(fmi_forecast_request())
-    # weather_observations_insert(fmi_observations_request())
+    scheduler.add_job(retrieve_public_transport_alerts, "cron", minute="*/10")
+    scheduler.add_job(retrieve_weather_info, "cron", hour="6")
     print "scheduler init done"
 
 
@@ -544,6 +542,15 @@ def get_max_time_from_table(time_column_name, table_name, id_field_name, id):
     else:
         time = time_row["time"]
     return time
+
+
+def retrieve_public_transport_alerts():
+    hsl_alerts_insert(hsl_alert_request())
+
+def retrieve_weather_info():
+    # TODO: If either one returns an empty set, re-schedule fetch after a few minutes and try to keep some max_retry counter?
+    weather_forecast_insert(fmi_forecast_request())
+    weather_observations_insert(fmi_observations_request())
 
 
 def main_loop():
