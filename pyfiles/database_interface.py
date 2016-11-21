@@ -273,6 +273,7 @@ def init_db(app):
         Column('id', Integer, primary_key=True),
         Column('time_retrieved', TIMESTAMP(timezone=True), nullable=False, default=func.current_timestamp(),
                                     server_default=func.current_timestamp()),
+        Column('record_creation_time', TIMESTAMP(timezone=True), nullable=True),
         Column('disorder_id', String, nullable=False),
         Column('start_time', TIMESTAMP(timezone=True), nullable=True),
         Column('end_time', TIMESTAMP(timezone=True), nullable=True),
@@ -680,6 +681,22 @@ def traffic_disorder_id_exists(disorder_id):
     except DataError as e:
         print 'Traffic disorder id query exception: ' + e.message
         abort(403)
+
+
+def traffic_disorder_max_creation():
+    """
+    :return: max record creation time (timestamp with tz)
+    """
+    try:
+        max_time = None
+        query = select([func.max(traffic_disorders_table.c.record_creation_time)])
+        row = db.engine.execute(query).first()
+        if row and row[0]:
+            max_time = row[0]
+        return max_time
+    except DataError as e:
+        print 'Exception in traffic_disorder_max_creation: ' + e.message
+    return -1
 
 
 def traffic_disorder_insert(disorders):

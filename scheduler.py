@@ -66,7 +66,7 @@ def initialize():
     # run_daily_tasks()
     # scheduler.add_job(generate_legs, "cron", minute=24)
     # scheduler.add_job(run_daily_tasks, "cron", hour="3")
-    # scheduler.add_job(retrieve_public_transport_alerts, "cron", minute="*/10")
+    # scheduler.add_job(retrieve_transport_alerts, "cron", minute="*/10")
     # scheduler.add_job(retrieve_weather_info, "cron", hour="6")
     traffic_disorder_insert(traffic_disorder_request())
     print "scheduler init done"
@@ -547,8 +547,10 @@ def get_max_time_from_table(time_column_name, table_name, id_field_name, id):
     return time
 
 
-def retrieve_public_transport_alerts():
+def retrieve_transport_alerts():
     hsl_alerts_insert(hsl_alert_request())
+    traffic_disorder_insert(traffic_disorder_request())
+
 
 def retrieve_weather_info():
     # TODO: If either one returns an empty set, re-schedule fetch after a few minutes and try to keep some max_retry counter?

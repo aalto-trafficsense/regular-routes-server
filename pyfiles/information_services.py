@@ -8,13 +8,14 @@ import json
 import urllib2
 import datetime
 from datetime import timedelta
+import dateutil.parser
 import requests
 from google.transit import gtfs_realtime_pb2
 from owslib.wfs import WebFeatureService
 import xml.etree.ElementTree as ET
 
 from pyfiles.common_helpers import interpret_jore
-from pyfiles.database_interface import hsl_alerts_get_max, traffic_disorder_id_exists
+from pyfiles.database_interface import hsl_alerts_get_max, traffic_disorder_id_exists, traffic_disorder_max_creation
 from pyfiles.constants import gtfs_route_types, gtfs_effects
 from pyfiles.config_helper import get_config
 
@@ -310,30 +311,38 @@ def traffic_disorder_request():
             print "Traffic disorder fetch exception: ", e
 
     new_disorders = []
+    max_creation_time = traffic_disorder_max_creation()
+    # print "Max creation time: ", max_creation_time
 
     def traffic_disorder_row(record):
-        disorder_id = "Missing"
-        start_time = None
+        # disorder_id = "Missing"
+        # start_time = None
         end_time = None
         fi_description = None
         sv_description = None
         en_description = None
         try:
             disorder_id = record.get('id')
-            if traffic_disorder_id_exists(disorder_id): return None
+            # if traffic_disorder_id_exists(disorder_id): return None
+            record_creation_time = dateutil.parser.parse(record.find('pp:situationRecordCreationTime', ns).text)
+            # print "Record creation time: ", record_creation_time
+            if max_creation_time:
+                if record_creation_time <= max_creation_time: return None
             validity = record.find('pp:validity', ns)
             validity_time_spec = validity.find('pp:validityTimeSpecification', ns)
             start_time = validity_time_spec.find('pp:overallStartTime', ns).text
             try:
                 end_time = validity_time_spec.find('pp:overallEndTime', ns).text
             except:
-                print "Traffic disorder retrieval: No end time specified"
+                "Common issue - end time frequently not included."
             # print disorder_id, start_time, end_time
             comments = record.find('pp:generalPublicComment', ns).find('pp:comment', ns).find('pp:values', ns).iterfind(
                 'pp:value', ns)
             for language_variant in comments:
                 language = language_variant.get('lang')
                 description = language_variant.text
+                # Only take the ones under "tieliikennekeskus Helsinki"
+                if description.find("Helsinki") < 0: return None
                 if language == 'fi':
                     fi_description = description
                 elif language == 'en':
@@ -341,6 +350,7 @@ def traffic_disorder_request():
                 elif language == 'sv':
                     sv_description = description
             return {
+                'record_creation_time': record_creation_time,
                 'disorder_id': disorder_id,
                 'start_time': start_time,
                 'end_time': end_time,
@@ -367,4 +377,4 @@ def toDateTime(hsl_sec):
 # hsl_alert_request()
 # print fmi_observations_request()
 # print fmi_forecast_request()
-# print traffic_disorder_request()
+# traffic_disorder_request()
