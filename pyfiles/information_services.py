@@ -14,11 +14,8 @@ from owslib.wfs import WebFeatureService
 import xml.etree.ElementTree as ET
 
 from pyfiles.common_helpers import interpret_jore
-
-from pyfiles.database_interface import hsl_alerts_get_max
-
+from pyfiles.database_interface import hsl_alerts_get_max, traffic_disorder_id_exists
 from pyfiles.constants import gtfs_route_types, gtfs_effects
-
 from pyfiles.config_helper import get_config
 
 import logging
@@ -248,8 +245,7 @@ def fmi_request(query_id, start_time, end_time, weather_params, time_row_label):
                        'timestep': 60,  # minutes
                        'parameters': keys}
         try:
-            feature = fmi_wfs.getfeature(storedQueryID=query_id, storedQueryParams=query_params)
-            feature_read = feature.read()
+            feature_read = fmi_wfs.getfeature(storedQueryID=query_id, storedQueryParams=query_params).read()
             xml_root = ET.fromstring(feature_read)
             if save_alert_sample:
                 with open(debug_input_filename, "w") as data_file:
@@ -294,9 +290,81 @@ def graphql_request(urlstr, querystr):
     return json_data
 
 
+def traffic_disorder_request():
+    debug_input_filename = "pyfiles/TrafficAlertSample.xml"
+    ns = {'sju': 'http://tie.digitraffic.fi/sujuvuus/schemas',
+          'soap': 'http://schemas.xmlsoap.org/soap/envelope/',
+          'pp': 'http://datex2.eu/schema/2/2_0'}
+    xml_root = ""
+    if debug_input:
+        xml_root = ET.parse(debug_input_filename).getroot()
+    else:
+        try:
+            url = 'http://tie.digitraffic.fi/sujuvuus/ws/trafficDisorders'
+            response_read = urllib2.urlopen(url, timeout=50).read()
+            xml_root = ET.fromstring(response_read)
+            if save_alert_sample:
+                with open(debug_input_filename, "w") as data_file:
+                    data_file.write(bytes(response_read))
+        except Exception as e:
+            print "Traffic disorder fetch exception: ", e
+
+    new_disorders = []
+
+    def traffic_disorder_row(record):
+        disorder_id = "Missing"
+        start_time = None
+        end_time = None
+        fi_description = None
+        sv_description = None
+        en_description = None
+        try:
+            disorder_id = record.get('id')
+            if traffic_disorder_id_exists(disorder_id): return None
+            validity = record.find('pp:validity', ns)
+            validity_time_spec = validity.find('pp:validityTimeSpecification', ns)
+            start_time = validity_time_spec.find('pp:overallStartTime', ns).text
+            try:
+                end_time = validity_time_spec.find('pp:overallEndTime', ns).text
+            except:
+                print "Traffic disorder retrieval: No end time specified"
+            # print disorder_id, start_time, end_time
+            comments = record.find('pp:generalPublicComment', ns).find('pp:comment', ns).find('pp:values', ns).iterfind(
+                'pp:value', ns)
+            for language_variant in comments:
+                language = language_variant.get('lang')
+                description = language_variant.text
+                if language == 'fi':
+                    fi_description = description
+                elif language == 'en':
+                    en_description = description
+                elif language == 'sv':
+                    sv_description = description
+            return {
+                'disorder_id': disorder_id,
+                'start_time': start_time,
+                'end_time': end_time,
+                'fi_description': fi_description,
+                'sv_description': sv_description,
+                'en_description': en_description
+            }
+        except Exception as e:
+            print "Traffic disorder row build exception: ", e
+            return None
+
+    for disorder in list(xml_root.find('soap:Body', ns).find('sju:TrafficDisordersDatex2Response', ns)):
+        row = traffic_disorder_row(disorder.find('sju:d2LogicalModel', ns)
+                             .find('pp:payloadPublication', ns)
+                             .find('pp:situation', ns)
+                             .find('pp:situationRecord', ns))
+        if row: new_disorders.append(row)
+    return new_disorders
+
+
 def toDateTime(hsl_sec):
     return datetime.datetime.fromtimestamp(hsl_sec)
 
 # hsl_alert_request()
 # print fmi_observations_request()
 # print fmi_forecast_request()
+# print traffic_disorder_request()

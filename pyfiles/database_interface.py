@@ -243,8 +243,7 @@ def init_db(app):
         Column('id', Integer, primary_key=True),
         Column('time_retrieved', TIMESTAMP(timezone=True), nullable=False, default=func.current_timestamp(),
                                     server_default=func.current_timestamp()),
-        Column('time_forecast', TIMESTAMP(timezone=True), nullable=False, default=func.current_timestamp(),
-                                    server_default=func.current_timestamp()),
+        Column('time_forecast', TIMESTAMP(timezone=True), nullable=False),
         Column('temperature', Float, nullable=False),
         Column('windspeed_ms', Float, nullable=False),
         Column('total_cloud_cover', Float, nullable=False),
@@ -260,8 +259,7 @@ def init_db(app):
         Column('id', Integer, primary_key=True),
         Column('time_retrieved', TIMESTAMP(timezone=True), nullable=False, default=func.current_timestamp(),
                                     server_default=func.current_timestamp()),
-        Column('time_observed', TIMESTAMP(timezone=True), nullable=False, default=func.current_timestamp(),
-                                    server_default=func.current_timestamp()),
+        Column('time_observed', TIMESTAMP(timezone=True), nullable=False),
         Column('temperature', Float, nullable=False),
         Column('windspeed_ms', Float, nullable=False),
         Column('precipitation_1h', Float, nullable=False))
@@ -270,6 +268,21 @@ def init_db(app):
     if not weather_observations_table.exists():
         weather_observations_table.create(checkfirst=True)
 
+    global traffic_disorders_table
+    traffic_disorders_table = Table('traffic_disorders', metadata,
+        Column('id', Integer, primary_key=True),
+        Column('time_retrieved', TIMESTAMP(timezone=True), nullable=False, default=func.current_timestamp(),
+                                    server_default=func.current_timestamp()),
+        Column('disorder_id', String, nullable=False),
+        Column('start_time', TIMESTAMP(timezone=True), nullable=True),
+        Column('end_time', TIMESTAMP(timezone=True), nullable=True),
+        Column('fi_description', String, nullable=True),
+        Column('sv_description', String, nullable=True),
+        Column('en_description', String, nullable=True))
+
+
+    if not traffic_disorders_table.exists():
+        traffic_disorders_table.create(checkfirst=True)
 
 
     global global_statistics_table
@@ -651,6 +664,27 @@ def weather_forecast_insert(weather):
 def weather_observations_insert(weather):
     if weather:
         db.engine.execute(weather_observations_table.insert(weather))
+
+
+def traffic_disorder_id_exists(disorder_id):
+    """
+    :return: boolean (True = the parameter exists in the traffic_disorder_table)
+    """
+    try:
+        query = select([traffic_disorders_table.c.id]) \
+            .where(traffic_disorders_table.c.disorder_id==disorder_id)
+        row = db.engine.execute(query).first()
+        if not row:
+            return False
+        return True
+    except DataError as e:
+        print 'Traffic disorder id query exception: ' + e.message
+        abort(403)
+
+
+def traffic_disorder_insert(disorders):
+    if disorders:
+        db.engine.execute(traffic_disorders_table.insert(disorders))
 
 
 def verify_user_id(user_id):
