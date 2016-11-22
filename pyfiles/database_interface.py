@@ -653,7 +653,7 @@ def hsl_alerts_get_max():
             max_alert_end = row[0]
         return max_alert_id, max_alert_end
     except DataError as e:
-        print 'Exception in get_max_devices_table_id_from_users_table_id: ' + e.message
+        print 'Exception in hsl_alerts_get_max: ' + e.message
     return -1, -1
 
 
