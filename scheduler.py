@@ -224,9 +224,12 @@ def generate_legs(maxtime=None, repair=False):
     # Attach device legs to users.
     devices = db.metadata.tables["devices"]
 
-    # Find end of last leg attached to each user.
+    # Find end of last leg attached to each user, also by id to find legs
+    # inserted into earlier time in a multiple device case.
     usermax = select(
-        [legs.c.user_id, func.max(legs.c.time_end).label("lastend")],
+        [   legs.c.user_id,
+            func.max(legs.c.id).label("id"),
+            func.max(legs.c.time_end).label("time_end")],
         legs.c.user_id != None,
         group_by=legs.c.user_id).alias("usermax")
 
@@ -237,8 +240,9 @@ def generate_legs(maxtime=None, repair=False):
             legs.c.user_id == None,
             legs.c.activity != None,
             legs.c.time_end < maxtime,
-            or_(usermax.c.lastend == None,
-                legs.c.time_start >= usermax.c.lastend)),
+            or_(usermax.c.id == None, # case where no legs attached to user yet
+                legs.c.id > usermax.c.id,
+                legs.c.time_start >= usermax.c.time_end)),
         legs.join(devices, legs.c.device_id == devices.c.id) \
             .outerjoin(usermax, devices.c.user_id == usermax.c.user_id),
         group_by=[devices.c.user_id])
@@ -252,6 +256,10 @@ def generate_legs(maxtime=None, repair=False):
             group_by=[devices.c.user_id])
 
     for user, start in db.engine.execute(starts):
+        # Ignore the special legacy user linking userless data
+        if user == 0:
+            continue
+
         print "u"+str(user), "start attach", start
 
         # Get unattached legs from user's devices in end time order, so shorter
