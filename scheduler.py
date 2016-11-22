@@ -56,19 +56,18 @@ device_data_filtered_table = db.metadata.tables['device_data_filtered']
 travelled_distances_table = db.metadata.tables['travelled_distances']
 mass_transit_data_table = db.metadata.tables['mass_transit_data']
 global_statistics_table = db.metadata.tables['global_statistics']
-# hsl_alerts_table = db.metadata.tables['hsl_alerts']
 
 def initialize():
     print "initialising scheduler"
     scheduler = BackgroundScheduler()
     scheduler.start()
-    # scheduler.add_job(retrieve_hsl_data, "cron", second="*/30")
-    # run_daily_tasks()
-    # scheduler.add_job(generate_legs, "cron", minute=24)
-    # scheduler.add_job(run_daily_tasks, "cron", hour="3")
-    # scheduler.add_job(retrieve_transport_alerts, "cron", minute="*/10")
-    # scheduler.add_job(retrieve_weather_info, "cron", hour="6")
-    traffic_disorder_insert(traffic_disorder_request())
+    scheduler.add_job(retrieve_hsl_data, "cron", second="*/30")
+    run_daily_tasks()
+    scheduler.add_job(generate_legs, "cron", minute=24)
+    scheduler.add_job(run_daily_tasks, "cron", hour="3")
+    scheduler.add_job(retrieve_transport_alerts, "cron", minute="*/10")
+    scheduler.add_job(retrieve_weather_info, "cron", hour="6")
+    # traffic_disorder_insert(traffic_disorder_request())
     print "scheduler init done"
 
 
