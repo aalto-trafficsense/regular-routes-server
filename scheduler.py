@@ -6,7 +6,6 @@ import json
 import os
 import sys
 import time
-import re
 import urllib2
 from pyfiles.database_interface import (
     init_db, data_points_by_user_id_after, get_filtered_device_data_points,
@@ -17,15 +16,20 @@ from pyfiles.push_messaging import push_ptp_alert  # push_ptp_pubtrans, push_ptp
 from pyfiles.push_messaging import PTP_TYPE_PUBTRANS, PTP_TYPE_DIGITRAFFIC
 from pyfiles.device_data_filterer import DeviceDataFilterer
 from pyfiles.energy_rating import EnergyRating
+
 from pyfiles.common_helpers import (
-    get_distance_between_coordinates, pairwise, trace_discard_sidesteps,
-    interpret_jore)
+    get_distance_between_coordinates,
+    interpret_jore,
+    pairwise,
+    point_coordinates,
+    trace_discard_sidesteps)
+
 from pyfiles.constants import *
 from pyfiles.information_services import (
     hsl_alert_request, fmi_forecast_request, fmi_observations_request, traffic_disorder_request)
 from apscheduler.schedulers.background import BackgroundScheduler
 from flask import Flask
-from sqlalchemy.sql import and_, func, or_, select, text
+from sqlalchemy.sql.expression import and_, desc, func, nullsfirst, or_, select, text
 
 import logging
 logging.basicConfig()
@@ -337,6 +341,9 @@ def generate_legs(maxtime=None, repair=False):
     # Cluster backlog in batches
     cluster_legs(1000)
 
+    # Reverse geocode labels for places created or shifted by new legs
+    label_places(60)
+
 
 def cluster_legs(limit):
     """New leg ends and places are clustered live by triggers; this can be used
@@ -347,6 +354,63 @@ def cluster_legs(limit):
     with db.engine.begin() as t:
         t.execute(text("SELECT legs_cluster(:limit)"), limit=limit)
         t.execute(text("SELECT leg_ends_cluster(:limit)"), limit=limit)
+
+
+def label_places(timeout):
+    """Add labels to places that have no labels, or position has shifted
+    significantly since labeling.
+
+    Reverse geocoding api url and rate limit are read from configuration, for
+    example:
+
+    REVERSE_GEOCODING_URI_TEMPLATE = 'https://search.mapzen.com/v1/reverse?api_key=API_KEY&layers=street&point.lat={lat}&point.lon={lon}'
+    REVERSE_GEOCODING_QUERIES_PER_SECOND = 6"""
+
+    print "label_places up to %ds" % timeout
+
+    url_template = app.config.get('REVERSE_GEOCODING_URI_TEMPLATE')
+    qps = app.config.get('REVERSE_GEOCODING_QUERIES_PER_SECOND')
+
+    if None in (url_template, qps):
+        log.info("REVERSE_GEOCODING_URI_TEMPLATE or " +
+            "REVERSE_GEOCODING_QUERIES_PER_SECOND unconfigured, places will " +
+            "not be labeled")
+        return
+
+    places = db.metadata.tables["places"]
+    labdist = func.ST_Distance(places.c.coordinate, places.c.label_coordinate)
+    t0 = time.time()
+    for p in db.engine.execute(select(
+            [   places.c.id,
+                func.ST_AsGeoJSON(places.c.coordinate).label("geojson")],
+            or_(labdist == None, labdist > DEST_RADIUS_MAX), # = clust dist / 2
+            order_by=nullsfirst(desc(labdist)))):
+        lon, lat = point_coordinates(p)
+        url = url_template.format(lat=lat, lon=lon)
+        response = json.loads(urllib2.urlopen(url, timeout=timeout).read())
+        names = []
+        for prop in ["street", "name"]:
+            for feat in response["features"]:
+                name = feat["properties"].get(prop)
+                if name and name not in names:
+                    names.append(name)
+
+        label = " / ".join(names[:2])
+        coordstr = "{:.4f}/{:.4f}".format(lat, lon)
+        label = label or coordstr # fallback
+
+        # Show progress due to rate limiting. Force encoding in case of pipe
+        print coordstr, label.encode("utf-8")
+
+        db.engine.execute(places.update(
+            places.c.id == p.id,
+            {"label": label, "label_coordinate": "POINT(%f %f)" % (lon, lat)}))
+
+        # Enforce configured API queries per second rate limit
+        time.sleep(1./qps)
+
+        if time.time() - t0 >= timeout:
+            break
 
 
 def filter_device_data(maxtime=None):

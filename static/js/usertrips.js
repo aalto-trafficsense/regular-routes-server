@@ -32,7 +32,7 @@ $(document).ready(function() {
                     td.addClass(classname);
                     tr.append(td);
                     td.attr("colspan", col[1]);
-                    if (!col[0]) {
+                    if (col[0] === null) {
                         td.addClass("gap");
                     } else if (classname == "time") {
                         td.text(col[0][0]);
@@ -73,44 +73,27 @@ $(document).ready(function() {
                         td.append(col[0][1]); // duration
 
                     } else if (classname == "place") {
-                        var lonlat = col[0]["coordinates"];
-                        if (lonlat === undefined) {
+                        var label = col[0];
+                        if (label === false) {
                             var div = $(document.createElement("div"));
                             td.append(div);
-                            $(td).addClass(col[0]);
                             $(td).addClass("move");
                             return; // uh
                         }
-	                $.getJSON(
-                            'http://api.digitransit.fi/geocoding/v1/reverse'
-                                + '?point.lat=' + lonlat[1]
-                                + '&point.lon=' + lonlat[0],
-                        function(response) {
-                            var names = [];
-                            ["street", "name"].forEach(function (prop) {
-                                response["features"].forEach(function (feat) {
-                                    var name = feat["properties"][prop];
-                                    if (name === undefined)
-                                        return;
-                                    name = name.split(",")[0];
-                                    name = name.split("/")[0];
-                                    name = name.split(/ *[0-9]/)[0];
-                                    if (-1 == $.inArray(name, names))
-                                        names.push(name);
-                                });
-                            });
-                            var text = names[0];
-                            if (names.length > 1) {
-                                // Disallow slash alone on a line, bind to
-                                // shorter word
-                                var lof = names[0].split(" ").slice(-1)[0];
-                                var fol = names[1].split(" ")[0];
-                                var sep = lof.length < fol.length
-                                    ? "\xa0/ " : " /\xa0";
-                                text += sep + names[1];
-                            }
-                            $(td).text(text);
-                        });
+
+                        // Disallow slash alone on a line, bind to shorter word
+                        var names = label.split(" / ");
+                        var text = names[0];
+                        if (names.length > 1) {
+                            var lof = names[0].split(" ").slice(-1)[0];
+                            var fol = names[1].split(" ")[0];
+                            var sep = lof.length < fol.length
+                                ? "\xa0/ " : " /\xa0";
+                            // Join tail just in case there were more slashes,
+                            // js has maxsplit would crop the tail
+                            text += sep + names.slice(1).join(" / ");
+                        }
+                        $(td).text(text);
                     }
                 });
             });

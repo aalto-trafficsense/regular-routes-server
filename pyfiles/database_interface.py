@@ -158,7 +158,9 @@ def init_db(app):
     places_table = Table('places', metadata,
         Column('id', Integer, primary_key=True),
         Column('coordinate', ga2.Geography('point', 4326, spatial_index=True)),
-        Column('label', String))
+        Column('label', String),
+        Column('label_coordinate', # coords when label was fetched
+            ga2.Geography('point', 4326, spatial_index=True)))
 
     # Clustered leg ends
     global leg_ends_table

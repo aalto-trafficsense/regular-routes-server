@@ -6,16 +6,17 @@ from datetime import timedelta
 from itertools import groupby
 import json
 import os
+import re
+import urllib2
 
 from flask import Flask, jsonify, request, render_template, Response, make_response
-from sqlalchemy.sql import and_, func, or_, select, text
+from sqlalchemy import and_, cast, func, or_, select, String, text
 
 from pyfiles.common_helpers import (
     datetime_range_str,
     dict_groups,
     get_distance_between_coordinates,
     simplify_geometry,
-    timedelta_str,
     trace_destinations,
     trace_discard_sidesteps,
     trace_linestrings)
@@ -234,6 +235,8 @@ def user_trips_json(user):
     legs = db.metadata.tables["leg_modes"]
     legends0 = db.metadata.tables["leg_ends"]
     legends1 = legends0.alias("leg_ends1")
+    places0 = db.metadata.tables["places"]
+    places1 = places0.alias("places1")
 
     s = select(
         [   legs.c.time_start,
@@ -242,13 +245,19 @@ def user_trips_json(user):
             legs.c.line_type,
             legs.c.line_name,
             func.ST_AsGeoJSON(legends0.c.coordinate.label("startcc")),
-            func.ST_AsGeoJSON(legends1.c.coordinate.label("endcc"))],
+            func.ST_AsGeoJSON(legends1.c.coordinate.label("endcc")),
+            func.coalesce(places0.c.label, cast(
+                places0.c.id, String)).label("startplace"),
+            func.coalesce(places1.c.label, cast(
+                places1.c.id, String)).label("endplace")],
         and_(
             legs.c.user_id == int(user),
             legs.c.time_end >= date_start,
             legs.c.time_start <= date_end),
         legs.outerjoin(legends0, legs.c.cluster_start == legends0.c.id) \
-            .outerjoin(legends1, legs.c.cluster_end == legends1.c.id),
+            .outerjoin(legends1, legs.c.cluster_end == legends1.c.id) \
+            .outerjoin(places0, legends0.c.place == places0.c.id) \
+            .outerjoin(places1, legends1.c.place == places1.c.id),
         order_by=legs.c.time_start)
 
     def fmt_duration(t0, t1):
@@ -278,9 +287,10 @@ def user_trips_json(user):
             str(t1)[11:16],
             ltype and " ".join([ltype, lname]) or activity,
             " ".join([fmt_duration(t0, t1), fmt_distance(cc0, cc1)]),
-            json.loads(cc0 or "null"),
-            json.loads(cc1 or cc0 or "null"))
-        for t0, t1, activity, ltype, lname, cc0, cc1 in db.engine.execute(s))
+            pi0,
+            pi1 or pi0)
+        for t0, t1, activity, ltype, lname, cc0, cc1, pi0, pi1
+        in db.engine.execute(s))
 
     pt1str = pactivity = pplace1 = None
     for t0str, t1str, activity, duration, place0, place1 in strings:
@@ -306,12 +316,12 @@ def user_trips_json(user):
         placecell = place0
         if (pactivity == "STILL" and activity != "STILL"
                 and pplace1 == place0 and pplace1 != place1):
-            placecell = actcell[0].split(" ")[0]
+            placecell = False
         step(time=timecell, activity=actcell, place=placecell)
 
         # Needed for move with internal place change and gap on both sides
         if place1 and place0 != place1:
-            step(place=actcell[0].split(" ")[0])
+            step(place=False)
 
         pt1str, pactivity, pplace1 = t1str, activity, place1
 
