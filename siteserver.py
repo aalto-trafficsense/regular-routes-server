@@ -17,7 +17,9 @@ from oauth2client.client import flow_from_clientsecrets, FlowExchangeError
 from pyfiles.database_interface import (
     get_filtered_device_data_points, get_svg, get_users_table_id, init_db,
     client_log_table_insert, get_max_devices_table_id_from_users_table_id)
+
 from pyfiles.authentication_helper import user_hash, verify_and_get_account_id
+from pyfiles.server_common import common_trips_json
 
 
 import logging
@@ -338,6 +340,33 @@ def energycertificate():
         RR_URL_PREFIX=app.config['RR_URL_PREFIX'],
         firstday=firstday,
         lastday=lastday)
+
+
+
+@app.route('/trips')
+def trips():
+    """Draw a day of trips of the user."""
+    user_id = session.get('rr_user_id')
+    if user_id == None:
+        # Not authenticated -> throw back to front page
+        return index()
+#    client_log_table_insert(get_max_devices_table_id_from_users_table_id(user_id), user_id, "WEB-PATH", "") XXX add me
+    return render_template(
+        'usertrips.html',
+        RR_URL_PREFIX=app.config['RR_URL_PREFIX'],
+        api_key=app.config['MAPS_API_KEY'])
+
+
+@app.route('/trips_json')
+def trips_json():
+    user_id = session.get('rr_user_id')
+    if user_id == None:
+        response = make_response(json.dumps(
+            'No user data in current session.'), 401)
+        response.headers['Content-Type'] = 'application/json'
+        return response
+
+    return common_trips_json(request, db, user_id)
 
 
 # App starting point:
