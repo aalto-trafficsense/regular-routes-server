@@ -6,14 +6,10 @@ $(document).ready(function() {
 	format: 'dd.mm.yyyy',
 	hiddenName: true,
 	onClose: function() {
-	    update(this.get('select', 'yyyy-mm-dd'));
-
-	    // don't pop up calendar when document refocused
-	    // https://github.com/amsul/pickadate.js/issues/160
-	    date.blur();
-	}
+	    location.hash = this.get('select', 'yyyy-mm-dd');
+	    date.blur(); // https://github.com/amsul/pickadate.js/issues/160
+	},
     });
-    date.pickadate('picker').open();
 
     var mapCanvas = $('#map-canvas');
     var mapOptions = {
@@ -120,6 +116,8 @@ $(document).ready(function() {
     var currentDate;
 
     function update(date) {
+        $("#date").pickadate("picker").set("select", Date.parse(date));
+
 	if (date === currentDate)
 	    return;
 	currentDate = date;
@@ -150,4 +148,12 @@ $(document).ready(function() {
 		}
 	});
     }
+
+    function hashchange() {
+        var date = location.hash.split("#").splice(-1)[0];
+        var today = (new Date()).toISOString().slice(0, 10);
+        update(date || today);
+    }
+    $(window).on("hashchange", hashchange);
+    hashchange();
 });

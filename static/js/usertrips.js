@@ -8,19 +8,14 @@ $(document).ready(function() {
 	format: 'dd.mm.yyyy',
 	hiddenName: true,
 	onClose: function() {
-	    update(this.get('select', 'yyyy-mm-dd'));
-	    date.blur();
+	    location.hash = this.get('select', 'yyyy-mm-dd');
+	    date.blur(); // https://github.com/amsul/pickadate.js/issues/160
 	},
-        onStart: function() {
-            var today = new Date;
-            this.set(
-                "select",
-                [today.getFullYear(), today.getMonth(), today.getDate()]);
-	    update(this.get('select', 'yyyy-mm-dd'));
-        }
     });
 
     function update(date) {
+        $("#date").pickadate("picker").set("select", Date.parse(date));
+
 	content.css('opacity', 0.1);
 	$.getJSON('trips_json?date=' + date, function(response) {
             var trip = $("#trip");
@@ -66,4 +61,12 @@ $(document).ready(function() {
 	    content.css('opacity', '');
 	});
     }
+
+    function hashchange() {
+        var date = location.hash.split("#").splice(-1)[0];
+        var today = (new Date()).toISOString().slice(0, 10);
+        update(date || today);
+    }
+    $(window).on("hashchange", hashchange);
+    hashchange();
 });
