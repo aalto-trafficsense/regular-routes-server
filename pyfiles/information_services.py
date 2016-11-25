@@ -1,6 +1,6 @@
 # -*- coding: UTF-8 -*-
 #
-# Retrieve information from external information sources to TrafficSense
+# Retrieve information from external information sources to the TrafficSense service
 #
 # Created by: mikko.rinne@aalto.fi 14.11.2016
 #

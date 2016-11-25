@@ -52,7 +52,6 @@ legs_table = None
 travelled_distances_table = None
 mass_transit_data_table = None
 global_statistics_table = None
-# hsl_alerts_table = None
 
 def init_db(app):
     global db
@@ -219,7 +218,7 @@ def init_db(app):
             DO INSTEAD NOTHING;
             '''))
 
-    # HSL mass transit vehicle locations.
+    # Public transport service alerts
     global hsl_alerts_table
     hsl_alerts_table = Table('hsl_alerts', metadata,
                               Column('id', Integer, primary_key=True),
@@ -238,6 +237,7 @@ def init_db(app):
     if not hsl_alerts_table.exists():
         hsl_alerts_table.create(checkfirst=True)
 
+    # Weather forecasts
     global weather_forecast_table
     weather_forecast_table = Table('weather_forecast', metadata,
         Column('id', Integer, primary_key=True),
@@ -254,6 +254,7 @@ def init_db(app):
         weather_forecast_table.create(checkfirst=True)
 
 
+    # Weather observations
     global weather_observations_table
     weather_observations_table = Table('weather_observations', metadata,
         Column('id', Integer, primary_key=True),
@@ -268,6 +269,8 @@ def init_db(app):
     if not weather_observations_table.exists():
         weather_observations_table.create(checkfirst=True)
 
+
+    # Traffic disorders
     global traffic_disorders_table
     traffic_disorders_table = Table('traffic_disorders', metadata,
         Column('id', Integer, primary_key=True),
@@ -667,6 +670,8 @@ def weather_observations_insert(weather):
         db.engine.execute(weather_observations_table.insert(weather))
 
 
+# Note: This one is currently unused, because the disorder record ID:s overlap.
+# Max record creation time (below) used instead
 def traffic_disorder_id_exists(disorder_id):
     """
     :return: boolean (True = the parameter exists in the traffic_disorder_table)
