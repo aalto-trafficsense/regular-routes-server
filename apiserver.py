@@ -359,7 +359,7 @@ def path(session_token):
             legs.c.activity,
             legs.c.line_type,
             legs.c.line_name,
-            legs.c.id,
+            legs.c.time_start,
             dd.c.time],
         and_(
             devices.c.token == session_token,
@@ -379,7 +379,7 @@ def path(session_token):
             dd.c.activity_1.label("activity"),
             literal(None).label("line_type"),
             literal(None).label("line_name"),
-            literal(None).label("id"),
+            literal(None).label("time_start"),
             dd.c.time],
         and_(
             devices.c.token == session_token,
@@ -388,11 +388,13 @@ def path(session_token):
             dd.c.time > legsend),
         dd.join(devices))
 
-    query = legsed.union_all(unlegsed).order_by("time")
+    # Sort also by leg start time so join point repeats adjacent to correct leg
+    query = legsed.union_all(unlegsed).order_by(text("time, time_start"))
     points = db.engine.execute(query)
 
     # re-split into legs, and the raw part
-    segments = (legpts for (legid, legpts) in dict_groups(points, ["id"]))
+    segments = (
+        legpts for (legid, legpts) in dict_groups(points, ["time_start"]))
 
     features = []
     for points in segments:

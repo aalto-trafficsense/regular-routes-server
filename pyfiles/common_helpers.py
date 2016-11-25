@@ -2,7 +2,7 @@ import json
 
 from datetime import timedelta
 from heapq import heapify, heappop, heappush
-from itertools import tee
+from itertools import izip, tee
 from math import cos, pi
 from pyfiles.constants import *
 
@@ -529,6 +529,14 @@ def datetime_range_str(dt0, dt1, resolution=2, formats=(
         s0 += [sep, p0]
         s1 += [sep, p1]
     return "".join(s0[1:]), "".join(s1[1:])
+
+
+# https://docs.python.org/2/library/itertools.html
+def pairwise(iterable):
+    "s -> (s0,s1), (s1,s2), (s2, s3), ..."
+    a, b = tee(iterable)
+    next(b, None)
+    return izip(a, b)
 
 
 def timedelta_str(td):

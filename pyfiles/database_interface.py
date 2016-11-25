@@ -8,7 +8,8 @@ from sqlalchemy import MetaData, Table, Column, ForeignKey, Enum, BigInteger, In
     Float
 from sqlalchemy.dialects.postgresql import DOUBLE_PRECISION, TIMESTAMP, UUID
 from sqlalchemy.exc import DataError
-from sqlalchemy.sql import and_, between, text, func, column, table, select
+from sqlalchemy.sql import (
+    and_, between, column, func, or_, select, table, text)
 import svg_generation
 from datetime import timedelta
 
@@ -398,6 +399,25 @@ def get_filtered_device_data_points(user_id, datetime_start, datetime_end):
     dd = db.metadata.tables["device_data"]
     legs = db.metadata.tables["legs"]
 
+    # Adjacent legs both cover their join point, but only if considered close
+    # enough, so retrieving each point only once for the filtered data flavor
+    # requires some finessing...
+    legs = select(
+        [   func.lag(legs.c.time_start) \
+                .over(partition_by=legs.c.user_id, order_by=legs.c.time_start)\
+                .label("prev_end"),
+            legs.c.device_id,
+            legs.c.time_start,
+            legs.c.time_end,
+            legs.c.activity,
+            legs.c.line_type,
+            legs.c.line_name],
+        and_(
+            legs.c.user_id == user_id,
+            legs.c.activity != None,
+            legs.c.time_start <= datetime_end,
+            legs.c.time_end >= datetime_start)).alias("lagged")
+
     return db.engine.execute(select(
         [   func.ST_AsGeoJSON(dd.c.coordinate).label("geojson"),
             dd.c.time,
@@ -405,13 +425,13 @@ def get_filtered_device_data_points(user_id, datetime_start, datetime_end):
             legs.c.line_type,
             legs.c.line_name],
         and_(
-            legs.c.user_id == user_id,
-            legs.c.activity != None,
             dd.c.time >= datetime_start,
             dd.c.time < datetime_end),
         legs.join(dd, and_(
             legs.c.device_id == dd.c.device_id,
-            between(dd.c.time, legs.c.time_start, legs.c.time_end)))))
+            between(dd.c.time, legs.c.time_start, legs.c.time_end),
+            or_(legs.c.prev_end == None, dd.c.time > legs.c.prev_end))),
+        order_by=dd.c.time))
 
 
 def get_filtered_device_data_points_OLD(user_id, datetime_start, datetime_end):

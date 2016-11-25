@@ -1,5 +1,6 @@
 import datetime
 from datetime import timedelta
+from itertools import chain
 
 import json
 import os
@@ -14,7 +15,7 @@ from pyfiles.database_interface import (
 from pyfiles.device_data_filterer import DeviceDataFilterer
 from pyfiles.energy_rating import EnergyRating
 from pyfiles.common_helpers import (
-    get_distance_between_coordinates, trace_discard_sidesteps,
+    get_distance_between_coordinates, pairwise, trace_discard_sidesteps,
     interpret_jore)
 from pyfiles.constants import *
 from pyfiles.information_services import (
@@ -101,38 +102,52 @@ def generate_legs(maxtime=None, repair=False):
         dd.c.time < maxtime,
         group_by=dd.c.device_id).alias("devmax")
 
-    # Find start of last move leg processed for each device.
-    lastmove = select(
-        [legs.c.device_id, func.max(legs.c.time_start).label("time_start")],
-        and_(legs.c.activity != None, legs.c.activity != "STILL"),
-        group_by=legs.c.device_id).alias("lastmove")
+    # The last recorded leg transition may be to phantom move that, given more
+    # future context, will be merged into a preceding stop. Go back two legs
+    # for the rewrite start point.
+
+    # Due to activity summing window context and stabilization, and stop
+    # entry/exit refinement, the first transition after starting the filter
+    # process is not necessarily yet in sync with the previous run. Go back
+    # another two legs to start the process.
+
+    # (The window bounds expression is not supported until sqlalchemy 1.1 so
+    # sneak it in in the order expression...)
+    order = text("""time_start DESC
+        ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING""")
+    rrlegs = select(
+        [   legs.c.device_id,
+            func.nth_value(legs.c.time_start, 4) \
+                .over(partition_by=legs.c.device_id, order_by=order) \
+                .label("rewind"),
+            func.nth_value(legs.c.time_start, 2) \
+                .over(partition_by=legs.c.device_id, order_by=order) \
+                .label("rewrite")],
+        and_(legs.c.activity != None),
+        distinct=True).alias("rrlegs")
 
     # Find end of processed legs, including terminator for each device.
     lastleg = select(
         [legs.c.device_id, func.max(legs.c.time_end).label("time_end")],
         group_by=legs.c.device_id).alias("lastleg")
 
-    # If trailing new points, resume at start of last move leg, or first point.
+    # If trailing points exist, start from rewind leg, or first point
     starts = select(
         [   devmax.c.device_id,
-            func.coalesce(lastmove.c.time_start, devmax.c.firstpoint)],
+            func.coalesce(rrlegs.c.rewind, devmax.c.firstpoint),
+            func.coalesce(rrlegs.c.rewrite, devmax.c.firstpoint)],
         or_(lastleg.c.time_end == None,
             devmax.c.lastpoint > lastleg.c.time_end),
         devmax \
-            .outerjoin(lastmove, devmax.c.device_id == lastmove.c.device_id) \
+            .outerjoin(rrlegs, devmax.c.device_id == rrlegs.c.device_id) \
             .outerjoin(lastleg, devmax.c.device_id == lastleg.c.device_id))
 
     # In repair mode, just start from the top.
     if repair:
-        starts = select([devmax.c.device_id, devmax.c.firstpoint])
+        starts = select([
+            devmax.c.device_id, devmax.c.firstpoint, devmax.c.firstpoint])
 
-    for device, start in db.engine.execute(starts):
-        # When the resumed leg is a stop, the stop condition is not necessarily
-        # valid anymore from the refined entry point, making the stop
-        # unresumable. Rewind by the minimum stop duration to make sure a
-        # resumed stop is redetected.
-        rewind = start - datetime.timedelta(seconds=DEST_DURATION_MIN)
-
+    for device, rewind, start in db.engine.execute(starts):
         query = select(
             [   func.ST_AsGeoJSON(dd.c.coordinate).label("geojson"),
                 dd.c.accuracy,
@@ -154,8 +169,9 @@ def generate_legs(maxtime=None, repair=False):
 
         filterer = DeviceDataFilterer() # not very objecty rly
         lastend = None
+        newlegs = filterer.generate_device_legs(points, start)
 
-        for leg in filterer.generate_device_legs(points, start):
+        for prevleg, leg in pairwise(chain([None], newlegs)):
             lastend = leg["time_end"]
 
             print " ".join(["d"+str(device), str(leg["time_start"])[:19],
@@ -187,11 +203,12 @@ def generate_legs(maxtime=None, repair=False):
                 print "-> unchanged"
                 continue
 
-            # Replace overlapping legs.
+            # Replace legs overlapping on more than a transition point
+            overlapstart = prevleg and prevleg["time_end"] or start
             rowcount = db.engine.execute(legs.delete(and_(
                 legs.c.device_id == leg["device_id"],
-                legs.c.time_start <= leg["time_end"],
-                legs.c.time_end >= leg["time_start"]))).rowcount
+                legs.c.time_start < leg["time_end"],
+                legs.c.time_end > overlapstart))).rowcount
             if rowcount:
                 print "-> delete %d" % rowcount,
             db.engine.execute(legs.insert(leg))
@@ -203,8 +220,8 @@ def generate_legs(maxtime=None, repair=False):
         if rejects:
             db.engine.execute(legs.delete(and_(
                 legs.c.device_id == device,
-                legs.c.time_start <= rejects[0]["time"],
-                legs.c.time_end >= rejects[-1]["time"])))
+                legs.c.time_start <= rejects[-1]["time"],
+                legs.c.time_end >= rejects[0]["time"])))
             db.engine.execute(legs.insert({
                 "device_id": device,
                 "time_start": rejects[0]["time"],
@@ -214,9 +231,12 @@ def generate_legs(maxtime=None, repair=False):
     # Attach device legs to users.
     devices = db.metadata.tables["devices"]
 
-    # Find end of last leg attached to each user.
+    # Find end of last leg attached to each user, also by id to find legs
+    # inserted into earlier time in a multiple device case.
     usermax = select(
-        [legs.c.user_id, func.max(legs.c.time_end).label("lastend")],
+        [   legs.c.user_id,
+            func.max(legs.c.id).label("id"),
+            func.max(legs.c.time_end).label("time_end")],
         legs.c.user_id != None,
         group_by=legs.c.user_id).alias("usermax")
 
@@ -227,8 +247,9 @@ def generate_legs(maxtime=None, repair=False):
             legs.c.user_id == None,
             legs.c.activity != None,
             legs.c.time_end < maxtime,
-            or_(usermax.c.lastend == None,
-                legs.c.time_start > usermax.c.lastend)),
+            or_(usermax.c.id == None, # case where no legs attached to user yet
+                legs.c.id > usermax.c.id,
+                legs.c.time_start >= usermax.c.time_end)),
         legs.join(devices, legs.c.device_id == devices.c.id) \
             .outerjoin(usermax, devices.c.user_id == usermax.c.user_id),
         group_by=[devices.c.user_id])
@@ -239,9 +260,13 @@ def generate_legs(maxtime=None, repair=False):
             [devices.c.user_id, func.min(legs.c.time_start)],
             legs.c.time_end < maxtime,
             legs.join(devices, legs.c.device_id == devices.c.id),
-            group_by=[devices.c.user_id, legs.c.device_id])
+            group_by=[devices.c.user_id])
 
     for user, start in db.engine.execute(starts):
+        # Ignore the special legacy user linking userless data
+        if user == 0:
+            continue
+
         print "u"+str(user), "start attach", start
 
         # Get unattached legs from user's devices in end time order, so shorter
@@ -259,7 +284,7 @@ def generate_legs(maxtime=None, repair=False):
         lastend = None
         for lid, lstart, lend, luser in db.engine.execute(unattached):
             print " ".join(["u"+str(user), str(lstart)[:19], str(lend)[:19]]),
-            if lastend and lstart <= lastend:
+            if lastend and lstart < lastend:
                 if luser is None:
                     print "-> detached"
                     continue
