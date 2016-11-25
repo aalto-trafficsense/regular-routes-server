@@ -100,7 +100,7 @@ def hsl_alert_request():
                 alert_end = toDateTime(act_p.end)
                 if max_alert_end:
                     if (alert_end <= max_alert_end) and duplicate_candidate:
-                        print 'Skipping alert: ', alert_id
+                        # print 'Skipping alert: ', alert_id
                         duplicate_alert = True
                 if not duplicate_alert:
                     fi_description = u"Ei viestiä"
