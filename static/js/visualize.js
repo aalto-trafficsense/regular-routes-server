@@ -35,33 +35,7 @@ $(document).ready(function() {
     map.data.setStyle(function(feature) {
 	var type = feature.getProperty('type');
 	var title = feature.getProperty('title');
-	var pointColor = 'magenta';
-	switch(feature.getProperty('activity')) {
-	    case 'ON_BICYCLE':
-		pointColor = '#008c58';
-		break;
-	    case 'WALKING':
-	    case 'ON_FOOT':
-		pointColor = '#20ac29';
-		break;
-	    case 'RUNNING':
-		pointColor = '#add500';
-		break;
-	    case 'IN_VEHICLE':
-		pointColor = '#dd0020';
-		break;
-	    case 'TILTING':
-		pointColor = 'blue';
-		break;
-	    case 'STILL':
-		pointColor = 'white';
-		break;
-	    case 'UNKNOWN':
-		pointColor = 'gray';
-		break;
-	    default:
-		pointColor = 'black';
-	} // end-of-switch
+	var pointColor = getActivityColor(feature.getProperty('activity'));
 	if (type === 'raw-point') {
 	    return {
 		icon: {
@@ -89,7 +63,7 @@ $(document).ready(function() {
 		strokeColor: pointColor,
 
 		// white is rather invisible at low opacity
-		strokeOpacity: (pointColor == 'white' && .8 || .2)
+		strokeOpacity: (pointColor == 'white' && .8 || .333)
 	    };
 	} else if (type === 'dest-line') {
 	    return {
