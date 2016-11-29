@@ -363,7 +363,7 @@ def label_places(timeout):
     Reverse geocoding api url and rate limit are read from configuration, for
     example:
 
-    REVERSE_GEOCODING_URI_TEMPLATE = 'https://search.mapzen.com/v1/reverse?api_key=API_KEY&layers=street&point.lat={lat}&point.lon={lon}'
+    REVERSE_GEOCODING_URI_TEMPLATE = 'https://search.mapzen.com/v1/reverse?api_key=API_KEY&sources=osm&point.lat={lat}&point.lon={lon}'
     REVERSE_GEOCODING_QUERIES_PER_SECOND = 6"""
 
     print "label_places up to %ds" % timeout
@@ -388,12 +388,14 @@ def label_places(timeout):
         lon, lat = point_coordinates(p)
         url = url_template.format(lat=lat, lon=lon)
         response = json.loads(urllib2.urlopen(url, timeout=timeout).read())
-        names = []
+        names, nameslower = [], set()
         for prop in ["street", "name"]:
             for feat in response["features"]:
                 name = feat["properties"].get(prop)
-                if name and name not in names:
+                name = name and re.split(",", name)[0]
+                if name and name.lower() not in nameslower:
                     names.append(name)
+                    nameslower.add(name.lower())
 
         label = " / ".join(names[:2])
         coordstr = "{:.4f}/{:.4f}".format(lat, lon)
