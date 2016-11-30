@@ -363,7 +363,7 @@ def label_places(timeout):
     Reverse geocoding api url and rate limit are read from configuration, for
     example:
 
-    REVERSE_GEOCODING_URI_TEMPLATE = 'https://search.mapzen.com/v1/reverse?api_key=API_KEY&sources=osm&point.lat={lat}&point.lon={lon}'
+    REVERSE_GEOCODING_URI_TEMPLATE = 'https://search.mapzen.com/v1/reverse?api_key=API_KEY&sources=osm&size=20&point.lat={lat}&point.lon={lon}'
     REVERSE_GEOCODING_QUERIES_PER_SECOND = 6"""
 
     print "label_places up to %ds" % timeout
