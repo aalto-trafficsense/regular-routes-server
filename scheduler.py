@@ -231,28 +231,35 @@ def generate_legs(maxtime=None, repair=False):
     # Attach device legs to users.
     devices = db.metadata.tables["devices"]
 
-    # Find end of last leg attached to each user, also by id to find legs
-    # inserted into earlier time in a multiple device case.
-    usermax = select(
-        [   legs.c.user_id,
-            func.max(legs.c.id).label("id"),
-            func.max(legs.c.time_end).label("time_end")],
-        legs.c.user_id != None,
-        group_by=legs.c.user_id).alias("usermax")
+    # Real legs from devices with the owner added in, also when unattached
+    owned = select(
+        [   devices.c.user_id.label("owner"),
+            legs.c.user_id,
+            legs.c.time_start,
+            legs.c.time_end],
+        and_(legs.c.activity != None, legs.c.time_end < maxtime),
+        devices.join(legs, devices.c.id == legs.c.device_id))
 
-    # Find later start of unattached legs for user's devices.
+    unattached = owned.where(legs.c.user_id == None).alias("unattached")
+    attached = owned.where(legs.c.user_id != None).alias("attached")
+
+    # Unattached legs without end of attached leg within, so eligible start.
+    # The having clause is any aggregate over a column that is not null, so as
+    # to find null only when no matches in the left join
+    eligible = select(
+        [unattached.c.owner, unattached.c.time_start],
+        from_obj=unattached.outerjoin(attached, and_(
+            unattached.c.owner == attached.c.owner,
+            attached.c.time_end > unattached.c.time_start,
+            attached.c.time_end <= unattached.c.time_end)),
+        group_by=[unattached.c.owner, unattached.c.time_start],
+        having=(func.min(attached.c.time_start) == None)).alias("eligible")
+
+    # Find start of first eligible leg
     starts = select(
-        [devices.c.user_id, func.min(legs.c.time_start)],
-        and_(
-            legs.c.user_id == None,
-            legs.c.activity != None,
-            legs.c.time_end < maxtime,
-            or_(usermax.c.id == None, # case where no legs attached to user yet
-                legs.c.id > usermax.c.id,
-                legs.c.time_start >= usermax.c.time_end)),
-        legs.join(devices, legs.c.device_id == devices.c.id) \
-            .outerjoin(usermax, devices.c.user_id == usermax.c.user_id),
-        group_by=[devices.c.user_id])
+        [eligible.c.owner, func.min(eligible.c.time_start)],
+        from_obj=eligible,
+        group_by=[eligible.c.owner])
 
     # In repair mode, just start from the top.
     if repair:
