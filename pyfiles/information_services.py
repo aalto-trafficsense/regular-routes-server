@@ -292,7 +292,7 @@ def graphql_request(urlstr, querystr):
 
 
 def traffic_disorder_request():
-    debug_input_filename = "pyfiles/TrafficAlertSample.xml"
+    debug_input_filename = "TrafficAlertSample.xml"
     ns = {'sju': 'http://tie.digitraffic.fi/sujuvuus/schemas',
           'soap': 'http://schemas.xmlsoap.org/soap/envelope/',
           'pp': 'http://datex2.eu/schema/2/2_0'}
@@ -362,12 +362,16 @@ def traffic_disorder_request():
             print "Traffic disorder row build exception: ", e
             return None
 
-    for disorder in list(xml_root.find('soap:Body', ns).find('sju:TrafficDisordersDatex2Response', ns)):
-        row = traffic_disorder_row(disorder.find('sju:d2LogicalModel', ns)
-                             .find('pp:payloadPublication', ns)
-                             .find('pp:situation', ns)
-                             .find('pp:situationRecord', ns))
-        if row: new_disorders.append(row)
+    try:
+        for disorder in list(xml_root.find('soap:Body', ns).find('sju:TrafficDisordersDatex2Response', ns)):
+            row = traffic_disorder_row(disorder.find('sju:d2LogicalModel', ns)
+                                       .find('pp:payloadPublication', ns)
+                                       .find('pp:situation', ns)
+                                       .find('pp:situationRecord', ns))
+            if row: new_disorders.append(row)
+    except Exception as e:
+        print "Traffic disorder loop exception: ", e
+        new_disorders = []
     return new_disorders
 
 
@@ -377,4 +381,4 @@ def toDateTime(hsl_sec):
 # hsl_alert_request()
 # print fmi_observations_request()
 # print fmi_forecast_request()
-# traffic_disorder_request()
+# print traffic_disorder_request()
