@@ -5,6 +5,7 @@ from itertools import chain
 from pyfiles.common_helpers import (
     get_distance_between_coordinates,
     pairwise,
+    point_distance,
     point_interval,
     trace_center,
     trace_discard_inaccurate,
@@ -163,12 +164,16 @@ class DeviceDataFilterer:
                 if start and legpts[0]["time"] < start:
                     continue
 
+                km = .001 * sum(
+                    point_distance(p0, p1) for p0, p1 in pairwise(legpts))
+
                 leg = {
                     "time_start": legpts[0]["time"],
                     "time_end": legpts[-1]["time"],
                     "geojson_start": legpts[0]["geojson"],
                     "geojson_end": legpts[-1]["geojson"],
-                    "activity": legact}
+                    "activity": legact,
+                    "km": km}
 
                 yield leg, self._match_mass_transit(legpts, legact, None)
 

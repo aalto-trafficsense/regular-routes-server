@@ -28,8 +28,7 @@ def common_trips_json(request, db, user):
             legs.c.activity,
             legs.c.line_type,
             legs.c.line_name,
-            func.ST_AsGeoJSON(legends0.c.coordinate.label("startcc")),
-            func.ST_AsGeoJSON(legends1.c.coordinate.label("endcc")),
+            legs.c.km,
             func.coalesce(places0.c.label, cast(
                 places0.c.id, String)).label("startplace"),
             func.coalesce(places1.c.label, cast(
@@ -48,16 +47,11 @@ def common_trips_json(request, db, user):
         h, m = divmod(int(round((t1 - t0).total_seconds() / 60)), 60)
         return h and "{}h{:02}".format(h, m) or "{}min".format(m)
 
-    def fmt_distance(cc0, cc1):
-        if not (cc0 and cc1):
-            return ""
-        cc0c = json.loads(cc0)["coordinates"]
-        cc1c = json.loads(cc1)["coordinates"]
-        dist = get_distance_between_coordinates(cc0c, cc1c)
-        if dist > 9999:
-            return str(int(round(dist / 1000))) + "km"
-        if dist >= 50:
-            return str(round(dist / 1000, 1)) + "km"
+    def fmt_distance(km):
+        if km >= 9.95:
+            return "%.0fkm" % km
+        if km >= 0.05:
+            return "%.1fkm" % km
         return ""
 
     State = namedtuple("State", ["time", "activity", "place"])
@@ -70,10 +64,10 @@ def common_trips_json(request, db, user):
         (   str(t0)[11:16],
             str(t1)[11:16],
             ltype and " ".join([ltype, lname]) or activity,
-            " ".join([fmt_duration(t0, t1), fmt_distance(cc0, cc1)]),
+            " ".join([fmt_duration(t0, t1), fmt_distance(km)]),
             pi0,
             pi1 or pi0)
-        for t0, t1, activity, ltype, lname, cc0, cc1, pi0, pi1
+        for t0, t1, activity, ltype, lname, km, pi0, pi1
         in db.engine.execute(s))
 
     pt1str = pactivity = pplace1 = None

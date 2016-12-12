@@ -191,6 +191,7 @@ def init_db(app):
         Column('activity', activity_type_enum),
         Column('cluster_start', Integer, ForeignKey('leg_ends.id'), index=True),
         Column('cluster_end', Integer, ForeignKey('leg_ends.id'), index=True),
+        Column('km', Float),
 
         # useful near beginning of time
         Index('idx_legs_user_id_time_start_time_end',
@@ -456,6 +457,7 @@ CREATE OR REPLACE VIEW leg_modes AS SELECT
     l.activity activity_device, -- rename in favor of user-corrected activity
     l.cluster_start,
     l.cluster_end,
+    l.km,
     mu.mode mode_user, mu.line line_user,
     ml.mode mode_live, ml.line line_live,
     mp.mode mode_planner, mp.line line_planner,
