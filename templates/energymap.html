@@ -4,7 +4,8 @@
     <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/meyer-reset/2.0/reset.css">
     <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/pickadate.js/3.5.3/compressed/themes/default.css">
     <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/pickadate.js/3.5.3/compressed/themes/default.date.css">
-    <link rel="stylesheet" href="..{{ RR_URL_PREFIX }}/static/css/visualize.css">
+    <link rel="stylesheet" href="..{{ RR_URL_PREFIX }}/static/css/usertrips.css">
+    <link rel="stylesheet" href="..{{ RR_URL_PREFIX }}/static/css/energymap.css">
     <link rel="icon" href="static/icon/favicon.ico">
     <script type="text/javascript"
       src="https://maps.googleapis.com/maps/api/js?key={{ api_key }}">
@@ -23,8 +24,10 @@
         <button id="menu" >Return to menu</button>
       </div>
     </div>
-    <div id="map-canvas"></div>
+    <div id="trip-wrap"><table id="trip"></table></div>
+    <div id="map-wrap"><div id="map-canvas"></div></div>
     <script src="..{{ RR_URL_PREFIX }}/static/js/common.js"></script>
     <script src="..{{ RR_URL_PREFIX }}/static/js/energy.js"></script>
+    <script src="..{{ RR_URL_PREFIX }}/static/js/usertrips.js"></script>
   </body>
 </html>

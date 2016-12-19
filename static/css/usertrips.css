@@ -1,8 +1,4 @@
-html, body, #map-canvas {
-  height: 100%;
-}
 #controls-wrap {
-/*  position: absolute;*/
   width: 100%;
   top: 0;
   z-index: 42;
