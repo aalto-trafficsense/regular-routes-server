@@ -1,4 +1,4 @@
-# -*- coding: UTF-8 -*-
+# -*- coding: utf-8 -*-
 #
 # Retrieve information from external information sources to the TrafficSense service
 #
@@ -341,9 +341,9 @@ def traffic_disorder_request():
             for language_variant in comments:
                 language = language_variant.get('lang')
                 description = language_variant.text
-                # Only take the ones under "tieliikennekeskus Helsinki"
-                if description.find("Helsinki") < 0: return None
                 if language == 'fi':
+                    # Only take the ones under "tieliikennekeskus Helsinki"
+                    if description.find("Helsinki") < 0: return None
                     fi_description = description
                 elif language == 'en':
                     en_description = description
