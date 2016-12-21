@@ -360,6 +360,7 @@ def path(session_token):
             legs.c.line_type,
             legs.c.line_name,
             legs.c.time_start,
+            legs.c.id,
             dd.c.time],
         and_(
             devices.c.token == session_token,
@@ -380,6 +381,7 @@ def path(session_token):
             literal(None).label("line_type"),
             literal(None).label("line_name"),
             literal(None).label("time_start"),
+            literal(None).label("id"),
             dd.c.time],
         and_(
             devices.c.token == session_token,
@@ -412,7 +414,7 @@ def path(session_token):
                 p["activity"] = p["line_type"]
                 del p["line_type"]
 
-        features += trace_linestrings(points, ('activity', 'line_name'))
+        features += trace_linestrings(points, ('id', 'activity', 'line_name'))
 
     devices_table_id = get_device_table_id_for_session(session_token)
     client_log_table_insert(devices_table_id, get_user_id_from_device_id(devices_table_id), "MOBILE-PATH", "")
