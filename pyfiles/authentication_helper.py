@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import hashlib
+import httplib2
 
 from flask import abort, jsonify
 from flask import make_response

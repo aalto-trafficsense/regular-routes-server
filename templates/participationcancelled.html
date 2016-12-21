@@ -1,0 +1,52 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+        "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+    <link href="//www.aalto.fi/style2015/css/style.min.css" rel=stylesheet type="text/css"/>
+    <link rel="icon" href="static/icon/favicon.ico">
+    <title>TrafficSense Participation Cancelled</title>
+    <script src="//ajax.googleapis.com/ajax/libs/jquery/1.8.2/jquery.min.js" ></script>
+</head>
+<body>
+<div class=container>
+    <h2>Your cancellation of participation has been sent to TrafficSense administrators.</h2>
+    <p>The removal of your data will be handled manually. It will therefore take some time, before the account is deleted. Thank you for participating the project.</p>
+    <p>If your cancellation request was in error, please contact <a href="mailto:trafficsense.aalto@gmail.com?Subject=Cancellation%20cancel"
+                                                target="_top">TrafficSense</a> immediately</p>
+    <p>As of now, you are still logged onto the service.</p>
+    <button id="menu" >Back to Menu</button>
+    <br><br>
+    <button id="signout" >Log Out</button>
+    <br><br>
+
+</div>
+</body>
+<script type="text/javascript">
+
+    $(document).ready(function() {
+    });
+
+    $(document).ready(function() {
+        $('#menu').click(function() { window.location='menu' } );
+        $('#signout').click(disconnectServer);
+    });
+
+	function disconnectServer() {
+      // Revoke the server tokens
+      $.ajax({
+        type: 'POST',
+        url: $(location).attr('origin') + '{{ RR_URL_PREFIX }}/disconnect',
+        async: false,
+        success: function(result) {
+			window.location='signedout';
+        },
+        error: function(e) {
+          console.log(e);
+        }
+      });
+	}
+
+
+</script>
+
+</html>

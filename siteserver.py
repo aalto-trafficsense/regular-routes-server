@@ -3,6 +3,7 @@
 import random
 import string
 from datetime import timedelta
+import httplib2
 import json
 
 from flask import Flask, jsonify, request, render_template
@@ -194,6 +195,40 @@ def regularroutes_menu():
 def no_data():
     """No data was found for this user account."""
     return render_template('nodata.html')
+
+
+@app.route('/cancelparticipation', methods=['POST'])
+def cancel_participation():
+  """Cancel the current user's participation to the study."""
+
+  user_id = session.get('rr_user_id')
+  if user_id == None:
+      response = make_response(json.dumps('Current user not connected.'), 401)
+      response.headers['Content-Type'] = 'application/json'
+      return response
+
+  # Send email to the maintainers about the cancellation
+  try:
+      import yagmail
+      yag = yagmail.SMTP(app.config['GMAIL_FROM'], app.config['GMAIL_PWD'])
+      msgBody = ['User id: ' + str(user_id)]
+      print 'Trying to send participation cancellation email with message body: ' + msgBody[0]
+      yag.send(app.config['EMAIL_TO'], 'CANCEL request from user', msgBody)
+      response = make_response(json.dumps('TrafficSense project informed of participation cancellation.'), 200)
+      response.headers['Content-Type'] = 'application/json'
+      return response
+  except Exception as e:
+      print 'Exception' + e.message
+      response = make_response(json.dumps('Error in informing the TrafficSense project: ' + e.message), 500)
+      response.headers['Content-Type'] = 'application/json'
+      return response
+
+
+@app.route('/participationcancelled')
+def participation_cancelled():
+    """Participation cancellation message has been sent."""
+    return render_template('participationcancelled.html')
+
 
 @app.route('/energymap')
 def energymap():

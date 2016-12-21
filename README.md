@@ -34,6 +34,9 @@ This is the procedure to set up an environment for developing server software on
           FMI_API_KEY = 'INSERT_key_allocated_by_Finnish_Meteorology_Institute'
           RR_URL_PREFIX = ''
           AUTH_REDIRECT_URI = 'urn:ietf:wg:oauth:2.0:oob'
+          GMAIL_FROM = 'gmail-from-username@gmail.com'
+          GMAIL_PWD = 'password-for-the-above'
+          EMAIL_TO = 'email-to-recipient@somewhere.com'
 
     Some explanations:
     * `SQLALCHEMY_DATABASE_URI`: `qwerty` is the password for the `regularroutes` role created [here](https://github.com/aalto-trafficsense/regular-routes-server/blob/master/sql_admin/init_rr.sql).
@@ -41,6 +44,7 @@ This is the procedure to set up an environment for developing server software on
     * Still on the Console, create the `Browser API key` also according to [devops readme](https://github.com/aalto-trafficsense/regular-routes-devops). Under `Accept requests from these HTTP referrers (web sites)` enter `http://localhost:5000`. Press `Save`
     * From the generated `Browser API key`, copy the `API key` value into `MAPS_API_KEY` in your `regularroutes.cfg` file shown above.
     * `FMI_API_KEY` is the key to access open weather data from the services of the [Finnish Meteorology Institute](https://en.ilmatieteenlaitos.fi/open-data). The current version is once per day fetching hourly observation and forecast data for Helsinki. If useful, apply for a key from FMI. If you do not need it, please comment out `scheduler.add_job(retrieve_weather_info, "cron", hour="6")` from `scheduler.py` initialisation.
+    * The current participation cancellation function (in siteserver.py) sends an email with the user_id to the configured EMAIL_TO address. The 'yagmail' library uses the gmail server, so a gmail account is needed (GMAIL_FROM and GMAIL_PWD) for sending.
 
 1. Save the `client_secrets.json` file for your project to the root of your repo. Instructions for generating it are in the [devops readme](https://github.com/aalto-trafficsense/regular-routes-devops). This file is required in server startup and used in mobile client authentication, but to access this local dev environment from a mobile client also a web server and a routable IP address for the local machine are needed, not covered by these setup instructions.
 1. Optional?: Install [virtualenv](http://docs.python-guide.org/en/latest/dev/virtualenvs/), which in addition to `pip` should be the only global python packages. Can be installed e.g. via pip, easy_install, apt-get. E.g. `pip install virtualenv`. (_MJR Note: May not be necessary, if using PyCharm built-in virtualenv-support._)
