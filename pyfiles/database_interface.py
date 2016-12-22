@@ -314,6 +314,7 @@ def init_db(app):
                  "MOBILE-DESTINATIONS", "MOBILE-DEST-HISTORY", "MOBILE-CERTIFICATE",
                  "MOBILE-SHARE-CERTIFICATE", "MOBILE-PATH-EDIT",
                  "WEB-CONNECT", "WEB-PATH", "WEB-CERTIFICATE", "WEB-TRIP-COMPARISON", "WEB-DEST-HISTORY",
+                 "CANCEL-PARTICIPATION",
                  name="client_function_enum")),
         Column('info', String),
         Index('idx_client_log_time', 'time'))

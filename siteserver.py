@@ -207,6 +207,8 @@ def cancel_participation():
       response.headers['Content-Type'] = 'application/json'
       return response
 
+  client_log_table_insert(get_max_devices_table_id_from_users_table_id(user_id), user_id, "CANCEL-PARTICIPATION", "")
+
   # Send email to the maintainers about the cancellation
   try:
       import yagmail
