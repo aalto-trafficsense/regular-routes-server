@@ -11,7 +11,7 @@ import urllib2
 from pyfiles.database_interface import (
     init_db, data_points_by_user_id_after, get_filtered_device_data_points,
     hsl_alerts_insert, weather_forecast_insert, weather_observations_insert,
-    traffic_disorder_insert)
+    traffic_disorder_insert, match_pubtrans_alert)
 from pyfiles.device_data_filterer import DeviceDataFilterer
 from pyfiles.energy_rating import EnergyRating
 from pyfiles.common_helpers import (
@@ -68,7 +68,6 @@ def initialize():
     scheduler.add_job(run_daily_tasks, "cron", hour="3")
     scheduler.add_job(retrieve_transport_alerts, "cron", minute="*/10")
     scheduler.add_job(retrieve_weather_info, "cron", hour="6")
-    # traffic_disorder_insert(traffic_disorder_request())
     print "scheduler init done"
 
 
@@ -579,7 +578,11 @@ def get_max_time_from_table(time_column_name, table_name, id_field_name, id):
 
 
 def retrieve_transport_alerts():
-    hsl_alerts_insert(hsl_alert_request())
+    hsl_new = hsl_alert_request()
+    if hsl_new:
+        hsl_alerts_insert(hsl_new)
+        for alert in hsl_new:
+            match_pubtrans_alert(alert)
     traffic_disorder_insert(traffic_disorder_request())
 
 

@@ -290,6 +290,39 @@ def init_db(app):
         traffic_disorders_table.create(checkfirst=True)
 
 
+    # Alerts matching to specific trip legs
+    global pubtrans_legs_alerts_table
+    pubtrans_legs_alerts_table = Table('pubtrans_legs_alerts', metadata,
+                                Column('id', Integer, primary_key=True),
+                                Column('time', TIMESTAMP(timezone=True), nullable=False,
+                                     default=func.current_timestamp(),
+                                     server_default=func.current_timestamp()),
+                                Column('legs_table_id', Integer, ForeignKey('legs.id'), nullable=False),
+                                Column('alert_table_id', Integer, ForeignKey('hsl_alerts.id'), nullable=False))
+
+    if not pubtrans_legs_alerts_table.exists():
+        pubtrans_legs_alerts_table.create(checkfirst=True)
+
+
+    # Alerts (to be) delivered
+    global device_alerts_table
+    device_alerts_table = Table('device_alerts', metadata,
+        Column('id', Integer, primary_key=True),
+        Column('time', TIMESTAMP(timezone=True), nullable=False,
+                       default=func.current_timestamp(),
+                       server_default=func.current_timestamp()),
+        Column('device_id', Integer, ForeignKey('devices.id'), nullable=False),
+        Column('firebase_id', UUID),
+        Column('fi_text', String),
+        Column('fi_uri', String),
+        Column('en_text', String),
+        Column('en_uri', String),
+        Column('info', String))
+
+    if not device_alerts_table.exists():
+        device_alerts_table.create(checkfirst=True)
+
+
     global global_statistics_table
     global_statistics_table = Table('global_statistics', metadata,
                               Column('id', Integer, primary_key=True),
@@ -679,6 +712,60 @@ def hsl_alerts_get_max():
     except DataError as e:
         print 'Exception in hsl_alerts_get_max: ' + e.message
     return -1, -1
+
+
+def match_pubtrans_alert(alert):
+    try:
+        # Find matching legs
+        query = '''
+          SELECT id
+          FROM legs
+          WHERE
+            time_start >= now()-(interval '1 month') AND
+            ("time"(time_start) BETWEEN ('{0}' - interval '2 hours') AND ('{0}' + interval '2 hours')) AND
+            line_type = '{1}' AND
+            line_name = '{2}' ;'''.format(alert["trip_start"][11:], alert["line_type"], alert["line_name"])
+        legs_ids = db.engine.execute(text(query)).fetchall()
+        if len(legs_ids) > 0:
+            for matched_leg in legs_ids:
+                # Find the corresponding hsl_alerts table id
+                hsl_alerts_query = select([hsl_alerts_table.c.id]) \
+                    .where(hsl_alerts_table.c.alert_id==alert["alert_id"]) \
+                    .where(hsl_alerts_table.c.line_name == alert["line_name"]) \
+                    .where(hsl_alerts_table.c.direction == alert["direction"])
+                hsl_alerts_response = db.engine.execute(hsl_alerts_query).first()
+                # Save the legs - alerts pairs to pubtrans_user_alerts
+                stmt = pubtrans_legs_alerts_table.insert({'legs_table_id': matched_leg["id"],
+                                   'alert_table_id': hsl_alerts_response["id"]})
+                db.engine.execute(stmt)
+
+            # Search again to find the distinct users to inform
+            query = '''
+              SELECT DISTINCT user_id
+              FROM legs
+              WHERE
+                time_start >= now()-(interval '1 month') AND
+                ("time"(time_start) BETWEEN ('{0}' - interval '2 hours') AND ('{0}' + interval '2 hours')) AND
+                line_type = '{1}' AND
+                line_name = '{2}' ;'''.format(alert["trip_start"][11:], alert["line_type"], alert["line_name"])
+            user_ids = db.engine.execute(text(query)).fetchall()
+            if len(user_ids) > 0:
+                for user in user_ids:
+                    # TODO: Find the max device_id of the user with a *registered firebase id*
+                    alert_devices_query = select([func.max(devices_table.c.id)]) \
+                        .where(devices_table.c.user_id == user["user_id"])
+                    alert_device_response = db.engine.execute(alert_devices_query).first()
+                    # TODO: Push the alerts to terminals
+                    # Save the new alerts to device_alerts
+                    stmt = device_alerts_table.insert({'device_id': alert_device_response[0],
+                                        'fi_text': alert["fi_description"],
+                                        'fi_uri': "https://www.reittiopas.fi/disruptions.php",
+                                        'en_text': alert["en_description"],
+                                        'en_uri': "https://www.reittiopas.fi/en/disruptions.php",
+                                        'info': alert["line_type"]+": "+alert["line_name"]})
+                    db.engine.execute(stmt)
+    except Exception as e:
+        print "match_pubtrans_alert exception: ", e
 
 
 def weather_forecast_insert(weather):
