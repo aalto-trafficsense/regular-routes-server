@@ -313,6 +313,10 @@ def init_db(app):
                        server_default=func.current_timestamp()),
         Column('device_id', Integer, ForeignKey('devices.id'), nullable=False),
         Column('firebase_id', UUID),
+        Column('alert_end', TIMESTAMP, nullable=False),
+        Column('alert_type', String),
+        Column('coordinate',
+            ga2.Geography('point', 4326, spatial_index=False)),
         Column('fi_text', String),
         Column('fi_uri', String),
         Column('en_text', String),
@@ -714,18 +718,25 @@ def hsl_alerts_get_max():
     return -1, -1
 
 
-def match_pubtrans_alert(alert):
+def match_legs_alert(selection, alert):
     try:
-        # Find matching legs
         query = '''
-          SELECT id
+          SELECT {0}
           FROM legs
           WHERE
             time_start >= now()-(interval '1 month') AND
-            ("time"(time_start) BETWEEN ('{0}' - interval '2 hours') AND ('{0}' + interval '2 hours')) AND
-            line_type = '{1}' AND
-            line_name = '{2}' ;'''.format(alert["trip_start"][11:], alert["line_type"], alert["line_name"])
-        legs_ids = db.engine.execute(text(query)).fetchall()
+            ("time"(time_start) BETWEEN ('{1}' - interval '2 hours') AND ('{1}' + interval '2 hours')) AND
+            line_type = '{2}' AND
+            line_name = '{3}' ;'''.format(selection, alert["trip_start"][11:], alert["line_type"], alert["line_name"])
+        return db.engine.execute(text(query)).fetchall()
+    except Exception as e:
+        print "match_legs_alert exception: ", e
+
+
+def match_pubtrans_alert(alert):
+    try:
+        # Find matching legs
+        legs_ids = match_legs_alert("ID", alert)
         if len(legs_ids) > 0:
             for matched_leg in legs_ids:
                 # Find the corresponding hsl_alerts table id
@@ -734,21 +745,13 @@ def match_pubtrans_alert(alert):
                     .where(hsl_alerts_table.c.line_name == alert["line_name"]) \
                     .where(hsl_alerts_table.c.direction == alert["direction"])
                 hsl_alerts_response = db.engine.execute(hsl_alerts_query).first()
-                # Save the legs - alerts pairs to pubtrans_user_alerts
+                # Save the legs - alerts pairs to pubtrans_legs_alerts
                 stmt = pubtrans_legs_alerts_table.insert({'legs_table_id': matched_leg["id"],
                                    'alert_table_id': hsl_alerts_response["id"]})
                 db.engine.execute(stmt)
 
             # Search again to find the distinct users to inform
-            query = '''
-              SELECT DISTINCT user_id
-              FROM legs
-              WHERE
-                time_start >= now()-(interval '1 month') AND
-                ("time"(time_start) BETWEEN ('{0}' - interval '2 hours') AND ('{0}' + interval '2 hours')) AND
-                line_type = '{1}' AND
-                line_name = '{2}' ;'''.format(alert["trip_start"][11:], alert["line_type"], alert["line_name"])
-            user_ids = db.engine.execute(text(query)).fetchall()
+            user_ids = match_legs_alert("DISTINCT user_id", alert)
             if len(user_ids) > 0:
                 for user in user_ids:
                     # TODO: Find the max device_id of the user with a *registered firebase id*
@@ -758,6 +761,8 @@ def match_pubtrans_alert(alert):
                     # TODO: Push the alerts to terminals
                     # Save the new alerts to device_alerts
                     stmt = device_alerts_table.insert({'device_id': alert_device_response[0],
+                                        'alert_end': alert["alert_end"],
+                                        'alert_type': alert["line_type"],
                                         'fi_text': alert["fi_description"],
                                         'fi_uri': "https://www.reittiopas.fi/disruptions.php",
                                         'en_text': alert["en_description"],

@@ -102,7 +102,7 @@ def hsl_alert_request():
                     if (alert_end <= max_alert_end) and duplicate_candidate:
                         # print 'Skipping alert: ', alert_id
                         duplicate_alert = True
-                # duplicate_alert = False  # TODO: Remove debugging entry!!
+                # duplicate_alert = False  # TODO: Comment out this line - it is for debugging purposes!!
                 if not duplicate_alert:
                     fi_description = u"Ei viestiä"
                     sv_description = "Ingen meddelande"
