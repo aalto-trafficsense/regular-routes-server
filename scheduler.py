@@ -148,7 +148,9 @@ def generate_legs(maxtime=None, repair=False):
     # In repair mode, just start from the top.
     if repair:
         starts = select([
-            devmax.c.device_id, devmax.c.firstpoint, devmax.c.firstpoint])
+            devmax.c.device_id,
+            devmax.c.firstpoint.label("rewind"),
+            devmax.c.firstpoint.label("start")])
 
     for device, rewind, start in db.engine.execute(starts):
         query = select(
@@ -174,12 +176,18 @@ def generate_legs(maxtime=None, repair=False):
         lastend = None
         newlegs = filterer.generate_device_legs(points, start)
 
-        for prevleg, leg in pairwise(chain([None], newlegs)):
+        for (prevleg, prevmodes), (leg, legmodes) in pairwise(
+                chain([(None, None)], newlegs)):
+
+          with db.engine.begin() as t:
+
             lastend = leg["time_end"]
 
-            print " ".join(["d"+str(device), str(leg["time_start"])[:19],
-                str(leg["time_end"])[:19]] + [repr(leg.get(x)) for x in [
-                "activity", "line_type", "line_name", "line_source"]]),
+            print " ".join([
+                "d"+str(device),
+                str(leg["time_start"])[:19],
+                str(leg["time_end"])[:19],
+                leg["activity"]]),
 
             # Adjust leg for db entry
             gj0 = leg.pop("geojson_start", None)
@@ -189,33 +197,45 @@ def generate_legs(maxtime=None, repair=False):
                 "coordinate_start": gj0 and func.ST_GeomFromGeoJSON(gj0),
                 "coordinate_end": gj1 and func.ST_GeomFromGeoJSON(gj1)})
 
-            # Don't touch if same leg already recorded. Ignore id, user_id,
-            # cluster_start/end, handled elsewhere.
-            existing = db.engine.execute(legs.select(and_(
-                legs.c.device_id == leg["device_id"],
-                legs.c.time_start == leg["time_start"],
-                legs.c.time_end == leg["time_end"],
-                legs.c.coordinate_start == leg["coordinate_start"],
-                legs.c.coordinate_end == leg["coordinate_end"],
-                legs.c.activity == leg["activity"],
-                legs.c.line_type == leg.get("line_type"),
-                legs.c.line_name == leg.get("line_name"),
-                legs.c.line_source == leg.get("line_source")))).first()
-
+            # Don't touch if same leg already recorded.
+            existing = t.execute(legs.select(and_(*(
+                legs.c[c] == leg[c] for c in leg.keys())))).first()
             if existing:
-                print "-> unchanged"
-                continue
+                print "-> unchanged",
+                legid = existing.id
+            else:
+                # Replace legs overlapping on more than a transition point
+                overlapstart = prevleg and prevleg["time_end"] or start
+                rowcount = t.execute(legs.delete(and_(
+                    legs.c.device_id == leg["device_id"],
+                    legs.c.time_start < leg["time_end"],
+                    legs.c.time_end > overlapstart))).rowcount
+                if rowcount:
+                    print "-> delete %d" % rowcount,
+                ins = legs.insert(leg).returning(legs.c.id)
+                legid = t.execute(ins).scalar()
+                print "-> insert",
 
-            # Replace legs overlapping on more than a transition point
-            overlapstart = prevleg and prevleg["time_end"] or start
-            rowcount = db.engine.execute(legs.delete(and_(
-                legs.c.device_id == leg["device_id"],
-                legs.c.time_start < leg["time_end"],
-                legs.c.time_end > overlapstart))).rowcount
-            if rowcount:
-                print "-> delete %d" % rowcount,
-            db.engine.execute(legs.insert(leg))
-            print "-> insert"
+            # Delete mismatching modes, add new modes
+            modes = db.metadata.tables["modes"]
+            exmodes = {x[0]: x[1:] for x in t.execute(select(
+                [modes.c.source, modes.c.mode, modes.c.line],
+                legs.c.id == legid,
+                legs.join(modes)))}
+            for src in set(exmodes).union(legmodes):
+                ex, nu = exmodes.get(src), legmodes.get(src)
+                if nu == ex:
+                    continue
+                if ex is not None:
+                    print "-> del", src, ex,
+                    t.execute(modes.delete(and_(
+                        modes.c.leg == legid, modes.c.source == src)))
+                if nu is not None:
+                    print "-> ins", src, nu,
+                    t.execute(modes.insert().values(
+                        leg=legid, source=src, mode=nu[0], line=nu[1]))
+
+            print
 
         # Emit null activity terminator leg to mark trailing undecided points,
         # if any, to avoid unnecessary reprocessing on resume.

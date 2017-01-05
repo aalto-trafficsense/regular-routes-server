@@ -8,8 +8,10 @@ from sqlalchemy import MetaData, Table, Column, ForeignKey, Enum, BigInteger, In
     Float
 from sqlalchemy.dialects.postgresql import DOUBLE_PRECISION, TIMESTAMP, UUID
 from sqlalchemy.exc import DataError
+
 from sqlalchemy.sql import (
-    and_, between, column, func, or_, select, table, text)
+    and_, between, column, exists, func, or_, select, text)
+
 import svg_generation
 from datetime import timedelta
 
@@ -52,6 +54,8 @@ devices_table = None
 device_data_table = None
 device_data_filtered_table = None
 legs_table = None
+modes_table = None
+leg_modes_view = None
 travelled_distances_table = None
 mass_transit_data_table = None
 global_statistics_table = None
@@ -146,6 +150,12 @@ def init_db(app):
 
     device_data_filtered_table.create(checkfirst=True)
 
+    # Combined activity including mass transit submodes
+    mode_enum = Enum(
+        *(activity_types + mass_transit_types),
+        name="mode_enum",
+        metadata=metadata)
+
     # decided activity and detected mass transit line in trace time ranges
     global legs_table
     legs_table = Table('legs', metadata,
@@ -158,18 +168,32 @@ def init_db(app):
             ga2.Geography('point', 4326, spatial_index=False)),
         Column('coordinate_end',
             ga2.Geography('point', 4326, spatial_index=False)),
-        Column('activity', activity_type_enum),
-        Column('line_type', mass_transit_type_enum),
-        Column('line_name', String),
-        Column('line_source',
-            Enum("FILTERED", "LIVE", "PLANNER", name="line_source_enum")))
-    # useful near beginning of time
-    Index('idx_legs_user_id_time_start_time_end',
-        'user_id', 'time_start', 'time_end')
-    # useful near end of time
-    Index('idx_legs_user_id_time_end_time_start',
-        'user_id', 'time_end', 'time_start')
-    # for something useful in the middle, query and gist index on tsrange
+        Column('activity', mode_enum),
+
+        # useful near beginning of time
+        Index('idx_legs_user_id_time_start_time_end',
+            'user_id', 'time_start', 'time_end'),
+        # useful near end of time
+        Index('idx_legs_user_id_time_end_time_start',
+            'user_id', 'time_end', 'time_start'))
+        # for something useful in the middle, query and gist index on tsrange
+
+    # Transit mode and line names migrated from FILTERED data, detected from
+    # LIVE vehicle locations or journey PLANNER, or provided by USER
+    global modes_table
+    modes_table = Table('modes', metadata,
+        Column('id', Integer, primary_key=True),
+        Column('leg',
+            Integer,
+            ForeignKey(legs_table.c.id, ondelete="CASCADE"),
+            nullable=False),
+        Column('source',
+            Enum("FILTERED", "LIVE", "PLANNER", "USER",
+                name="mode_source_enum"),
+            nullable=False),
+        Column('mode', mode_enum, nullable=False),
+        Column('line', String),
+        UniqueConstraint('leg', 'source'))
 
     # travelled distances per day per device
     global travelled_distances_table
@@ -396,6 +420,62 @@ def init_db(app):
 
     metadata.create_all(checkfirst=True)
 
+    # Combined view of legs with migrated/detected/user modes and lines
+    with db.engine.begin() as t:
+        t.execute(text("""
+
+CREATE OR REPLACE VIEW leg_modes AS SELECT
+    l.id,
+    l.device_id,
+    l.user_id,
+    l.time_start,
+    l.time_end,
+    l.coordinate_start,
+    l.coordinate_end,
+    l.activity activity_device, -- rename in favor of user-corrected activity
+    mu.mode mode_user, mu.line line_user,
+    ml.mode mode_live, ml.line line_live,
+    mp.mode mode_planner, mp.line line_planner,
+    mf.mode mode_filtered, mf.line line_filtered,
+
+    -- combined transit mode
+    coalesce(mu.mode, ml.mode, mp.mode, mf.mode, activity::text::mode_enum)
+        AS mode,
+
+    -- strict activity including user correction, no mass transit
+    CASE WHEN mu.mode IN :activity_types THEN mu.mode::text::activity_type_enum
+        ELSE activity
+        END activity,
+
+    -- strict mass transit line_type, no activity
+    coalesce(
+        CASE WHEN mu.mode IN :mass_transit_types THEN mu.mode END,
+        ml.mode,
+        mp.mode,
+        mf.mode) line_type,
+
+    -- collateral coalesce of line on mode
+    CASE WHEN mu.mode IS NOT NULL THEN mu.line
+        WHEN ml.mode IS NOT NULL THEN ml.line
+        WHEN mp.mode IS NOT NULL THEN mp.line
+        WHEN mf.mode IS NOT NULL THEN mf.line END line_name
+
+    FROM legs l
+        LEFT JOIN modes mu ON mu.leg = l.id AND mu.source = 'USER'
+        LEFT JOIN modes ml ON ml.leg = l.id AND ml.source = 'LIVE'
+        LEFT JOIN modes mp ON mp.leg = l.id AND mp.source = 'PLANNER'
+        LEFT JOIN modes mf ON mf.leg = l.id AND mf.source = 'FILTERED'
+        """),
+
+        activity_types=activity_types,
+        mass_transit_types=mass_transit_types)
+
+    global leg_modes_view
+    leg_modes_view = Table("leg_modes", metadata,
+        Column("device_id", ForeignKey(devices_table.c.id)),
+        Column("user_id", ForeignKey(users_table.c.id)),
+        autoload=True)
+
     return db, store
 
 
@@ -491,7 +571,7 @@ def get_filtered_device_data_points(user_id, datetime_start, datetime_end):
     legs and raw device data."""
 
     dd = db.metadata.tables["device_data"]
-    legs = db.metadata.tables["legs"]
+    legs = db.metadata.tables["leg_modes"]
 
     # Adjacent legs both cover their join point, but only if considered close
     # enough, so retrieving each point only once for the filtered data flavor
@@ -623,20 +703,27 @@ def get_waypoint_id_from_coordinate(coordinate):
         print 'Exception in get_waypoint_id_from_coordinate: ' + e.message
     return None
 
+
 def match_mass_transit_legs(device, tstart, tend, activity):
-    """Find mass transit match already recorded in an existing leg. Returns
-    None if no exact start/end/activity match found, otherwise (line_type,
-    line_name, line_source) triple."""
+    """Find mass transit matches already recorded in an existing leg, or None
+    if leg matching start/end/activity."""
+
+    legs = db.metadata.tables["legs"]
+    modes = db.metadata.tables["modes"]
+
+    where = and_(
+        legs.c.device_id == device,
+        legs.c.time_start == tstart,
+        legs.c.time_end == tend,
+        legs.c.activity == activity)
+
+    if not db.engine.execute(select([exists().where(where)])).scalar():
+        return None
 
     return db.engine.execute(select(
-        [   legs_table.c.line_type,
-            legs_table.c.line_name,
-            legs_table.c.line_source],
-        and_(
-            legs_table.c.device_id == device,
-            legs_table.c.time_start == tstart,
-            legs_table.c.time_end == tend,
-            legs_table.c.activity == activity))).first()
+        [modes.c.source, modes.c.mode, modes.c.line],
+        where,
+        legs.join(modes))).fetchall()
 
 
 def match_mass_transit_filtered(device, tstart, tend):

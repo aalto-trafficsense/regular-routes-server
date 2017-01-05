@@ -4,9 +4,9 @@ from uuid import uuid4
 
 from flask import Flask, abort, jsonify, request, make_response
 from oauth2client.client import *
-from sqlalchemy.sql import and_, between, func, literal, select, text
+from sqlalchemy.sql import and_, between, cast, func, literal, select, text
+from sqlalchemy.types import String
 import json
-
 from pyfiles.common_helpers import (
     dict_groups,
     simplify_geometry,
@@ -361,7 +361,7 @@ def path(session_token):
 
     dd = db.metadata.tables["device_data"]
     devices = db.metadata.tables["devices"]
-    legs = db.metadata.tables["legs"]
+    legs = db.metadata.tables["leg_modes"]
     users = db.metadata.tables["users"]
 
     # find end of user legs
@@ -373,8 +373,7 @@ def path(session_token):
     # use user legs if available
     legsed = select(
         [   func.ST_AsGeoJSON(dd.c.coordinate).label("geojson"),
-            legs.c.activity,
-            legs.c.line_type,
+            cast(legs.c.mode, String).label("activity"),
             legs.c.line_name,
             legs.c.time_start,
             legs.c.id,
@@ -394,8 +393,7 @@ def path(session_token):
     # fall back on raw trace beyond end of user legs
     unlegsed = select(
         [   func.ST_AsGeoJSON(dd.c.coordinate).label("geojson"),
-            dd.c.activity_1.label("activity"),
-            literal(None).label("line_type"),
+            cast(dd.c.activity_1, String).label("activity"),
             literal(None).label("line_name"),
             literal(None).label("time_start"),
             literal(None).label("id"),
@@ -423,13 +421,6 @@ def path(session_token):
         # simplify the path geometry by dropping redundant points
         points = simplify_geometry(
             points, maxpts=maxpts, mindist=mindist, keep_activity=True)
-
-        # merge line_type into activity
-        points = [dict(p) for p in points] # rowproxies are not so mutable
-        for p in points:
-            if p.get("line_type"):
-                p["activity"] = p["line_type"]
-                del p["line_type"]
 
         features += trace_linestrings(points, ('id', 'activity', 'line_name'))
 

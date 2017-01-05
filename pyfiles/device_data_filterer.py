@@ -64,42 +64,33 @@ class DeviceDataFilterer:
                 device_data_queue, DEST_RADIUS_MAX / 2))
 
         if len(device_data_queue) < 2 or activity != "IN_VEHICLE":
-            return None, None, None
-
-        line_source = None
+            return {}
 
         # Reuse previously recorded matches in unchanged legs, useful when
         # reconstructing legs with changed algorithm or parameters.
-        match = self._match_mass_transit_legs(activity, device_data_queue)
-        if match is not None: # matched same start/end/activity
-            print "reuselegmatch",
-            return match # line_type, line_name, line_source
+        matches = self._match_mass_transit_legs(activity, device_data_queue)
+        if matches is not None: # matched same start/end/activity
+            print "reuselegmatch", matches,
+            return {x[0]: x[1:] for x in matches}
 
-        # If legacy filtered data exists, just copy matches from there.
-        # Filtered data should be generated after legs so this copying won't
-        # happen for new data.
-        match = self._match_mass_transit_filtered(activity, device_data_queue)
-        if match is not None: # filtered data exists
-            line_type, line_name = match
-            if line_type:
-                line_source = "FILTERED"
-            return line_type, line_name, line_source
+        matches = {}
 
-        line_type, line_name = self._match_mass_transit_live(
-            activity, device_data_queue)
-        if line_type:
-            line_source = "LIVE"
+        # If legacy filtered data exists, record a migrated match
+        match = self._match_mass_transit_filtered(device_data_queue)
+        if match not in (None, (None, None)):
+            matches["FILTERED"] = match
 
-        # This looks a bit backwards, but reflects that the planner call is a
-        # printing and csv dumping no-op if given type/name are not None.
-        if not line_type:
-            line_source = "PLANNER"
-        line_type, line_name = self._match_mass_transit_planner(
-            activity, device_data_queue, user_id, line_type, line_name)
-        if not line_type:
-            line_source = None
+        match = self._match_mass_transit_live(device_data_queue)
+        if match not in (None, (None, None)):
+            matches["LIVE"] = match
 
-        return line_type, line_name, line_source
+        # Needs user_id and prior match for csv/out spew
+        match = self._match_mass_transit_planner(
+            activity, device_data_queue, user_id, *(match or (None, None)))
+        if match not in (None, (None, None)):
+            matches["PLANNER"] = match
+
+        return matches
 
 
     def generate_device_legs(self, points, start=None):
@@ -141,7 +132,7 @@ class DeviceDataFilterer:
                         "type": "Point",
                         "coordinates": trace_center(trace_discard_inaccurate(
                             seg, DEST_RADIUS_MAX / 2))}),
-                    "activity": "STILL"}
+                    "activity": "STILL"}, {}
                 continue
 
             # Join move segment to subsequent stop if it comes soon enough
@@ -171,25 +162,23 @@ class DeviceDataFilterer:
                 if start and legpts[0]["time"] < start:
                     continue
 
-                legtype, legname, legsource = \
-                    self._match_mass_transit(legpts, legact, None)
-
-                yield {
+                leg = {
                     "time_start": legpts[0]["time"],
                     "time_end": legpts[-1]["time"],
                     "geojson_start": legpts[0]["geojson"],
                     "geojson_end": legpts[-1]["geojson"],
-                    "activity": legact,
-                    "line_type": legtype,
-                    "line_name": legname,
-                    "line_source": legsource}
+                    "activity": legact}
+
+                yield leg, self._match_mass_transit(legpts, legact, None)
 
 
     def generate_filtered_data(self, device_data_rows, user_id):
         for legpts, legact in \
                 self._analyse_unfiltered_data(device_data_rows, user_id):
-            legtype, legname, legsource = \
-                self._match_mass_transit(legpts, legact, user_id)
+            matches = self._match_mass_transit(legpts, legact, user_id)
+            legtype, legname = matches.get("LIVE", (None, None))
+            if not legtype:
+                legtype, legname = matches.get("PLANNER", (None, None))
             self._write_filtered_data(
                 legpts, legact, user_id, legtype, legname)
 
@@ -315,14 +304,14 @@ class DeviceDataFilterer:
             activity)
 
 
-    def _match_mass_transit_filtered(self, activity, device_data_queue):
+    def _match_mass_transit_filtered(self, device_data_queue):
         return match_mass_transit_filtered(
             device_data_queue[0]["device_id"],
             device_data_queue[0]["time"],
             device_data_queue[-1]["time"])
 
 
-    def _match_mass_transit_live(self, activity, device_data_queue):
+    def _match_mass_transit_live(self, device_data_queue):
         device = device_data_queue[0]["device_id"]
         tstart = device_data_queue[0]["time"]
         tend = device_data_queue[-1]["time"]
@@ -335,7 +324,7 @@ class DeviceDataFilterer:
 
         if matches is None:
             print "no vehicle data available"
-            return None, None
+            return None
 
         matches = matches.fetchall()
 
