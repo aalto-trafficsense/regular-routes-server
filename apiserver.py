@@ -430,6 +430,50 @@ def path(session_token):
     return jsonify({'type': 'FeatureCollection', 'features': features})
 
 
+@app.route('/setlegmode', methods=['POST'])
+def setlegmode_post():
+    """Allow user to correct detected transit modes and line names."""
+
+    data = request.json
+    session_token = data["sessionToken"]
+    legid = data["id"]
+    legact = data["activity"]
+    legline = data.get("line_name")
+
+    devices = db.metadata.tables["devices"]
+    users = db.metadata.tables["users"]
+    legs = db.metadata.tables["legs"]
+    modes = db.metadata.tables["modes"]
+
+    # Get existing leg, while verifying that the token matches approapriately
+    leg = db.engine.execute(select(
+        [legs.c.device_id, legs.c.user_id],
+        and_(devices.c.token == session_token, legs.c.id == legid),
+        from_obj=devices.join(users).join(legs))).first()
+    if not leg:
+        abort(403)
+
+    values = {"leg": legid, "source": "USER", "mode": legact, "line": legline}
+    existing = db.engine.execute(modes.select().where(and_(
+        modes.c.leg == legid, modes.c.source == "USER"))).first()
+    if existing:
+        where = modes.c.id == existing.id
+        if legact is None:
+            db.engine.execute(modes.delete().where(where))
+        else:
+            db.engine.execute(modes.update().where(where).values(values))
+    else:
+        db.engine.execute(modes.insert().values(values))
+
+    client_log_table_insert(
+        leg.device_id,
+        leg.user_id,
+        "MOBILE-PATH-EDIT",
+        "%d %s %s" % (legid, legact, legline))
+
+    return jsonify({})
+
+
 @app.route('/svg/<session_token>')
 def svg(session_token):
     device_id = get_device_table_id_for_session(session_token)
