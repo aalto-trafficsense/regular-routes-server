@@ -136,7 +136,7 @@ def authenticate_post():
     installation_id = json['installationId']
     # Get optionally - old clients do not send this
     client_version = "ClientVersion:" + json.get('clientVersion', '')
-    messaging_token = json.get('messaging_token', '')
+    messaging_token = json.get('messagingToken', '')
 
     # 1. check that user exists or abort
     verify_user_id(user_id)
