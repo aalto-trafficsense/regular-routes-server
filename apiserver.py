@@ -2,7 +2,7 @@
 
 from uuid import uuid4
 
-from flask import Flask, abort, jsonify, request
+from flask import Flask, abort, jsonify, request, make_response
 from oauth2client.client import *
 from sqlalchemy.sql import and_, between, func, literal, select, text
 import json
@@ -17,7 +17,7 @@ from pyfiles.common_helpers import (
 from pyfiles.constants import BAD_LOCATION_RADIUS, DEST_RADIUS_MAX
 
 from pyfiles.database_interface import (init_db, db_engine_execute, users_table_insert, users_table_update, devices_table_insert, device_data_table_insert,
-                                        verify_user_id, update_last_activity, get_users_table_id_for_device, get_device_table_id,
+                                        verify_user_id, update_last_activity, update_messaging_token, get_users_table_id_for_device, get_device_table_id,
                                         get_device_table_id_for_session, get_users_table_id, get_session_token_for_device, get_user_id_from_device_id,
                                         activity_types,
                                         get_svg,
@@ -153,6 +153,23 @@ def authenticate_post():
     return jsonify({
         'sessionToken': session_token
     })
+
+
+@app.route('/msgtokenrefresh/<session_token>')
+def fbrefresh(session_token):
+    device_id = get_device_table_id_for_session(session_token)
+    if device_id < 0:
+        return ""
+    # get the token
+    messaging_token = request.args.get("messaging_token")
+    if len(messaging_token) > 1:
+        update_messaging_token(device_id, messaging_token)
+
+    user_id = get_user_id_from_device_id(device_id)
+    if user_id < 0:
+        return ""
+    client_log_table_insert(device_id, user_id, "MOBILE-FCM-TOKEN", "")
+    return make_response(json.dumps('Ack'), 200)
 
 
 @app.route('/data', methods=['POST'])
@@ -432,6 +449,9 @@ def svg(session_token):
         return ""
     client_log_table_insert(device_id, user_id, "MOBILE-CERTIFICATE", "")
     return get_svg(user_id)
+
+
+
 
 # App starting point:
 if __name__ == '__main__':

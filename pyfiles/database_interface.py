@@ -97,10 +97,14 @@ def init_db(app):
                           Column('token', UUID, unique=True, nullable=False),
                           Column('created', TIMESTAMP, nullable=False, default=func.current_timestamp(),
                                  server_default=func.current_timestamp()),
+                          Column('messaging_token', UUID, unique=True),
                           Column('last_activity', TIMESTAMP, nullable=False, default=func.current_timestamp(),
                                  server_default=func.current_timestamp()),
                           UniqueConstraint('device_id', 'installation_id', name='uix_device_id_installation_id'),
                           Index('idx_devices_device_id_inst_id', 'device_id', 'installation_id'))
+
+    # Sample psql command to add the new 'messaging token' to an existing devices table:
+    # ALTER TABLE devices ADD COLUMN messaging_token uuid UNIQUE ;
 
     global device_data_table
     device_data_table = Table('device_data', metadata,
@@ -349,12 +353,15 @@ def init_db(app):
         Column('function',
             Enum("MOBILE-REGISTER", "MOBILE-AUTHENTICATE", "MOBILE-PATH",
                  "MOBILE-DESTINATIONS", "MOBILE-DEST-HISTORY", "MOBILE-CERTIFICATE",
-                 "MOBILE-SHARE-CERTIFICATE", "MOBILE-PATH-EDIT",
+                 "MOBILE-SHARE-CERTIFICATE", "MOBILE-PATH-EDIT", "MOBILE-FCM-TOKEN",
                  "WEB-CONNECT", "WEB-PATH", "WEB-CERTIFICATE", "WEB-TRIP-COMPARISON", "WEB-DEST-HISTORY",
                  "CANCEL-PARTICIPATION",
                  name="client_function_enum")),
         Column('info', String),
         Index('idx_client_log_time', 'time'))
+
+    # Sample line to add new enum values to client_function_enum:
+    # ALTER TYPE client_function_enum ADD VALUE 'MOBILE-FCM-TOKEN' ;
 
     if not client_log_table.exists():
         client_log_table.create(checkfirst=True)
@@ -881,6 +888,14 @@ def verify_device_token(token):
 def update_last_activity(devices_table_id):
     update = devices_table.update() \
         .values({'last_activity': datetime.datetime.now()}) \
+        .where(devices_table.c.id == devices_table_id)
+    db.engine.execute(update)
+
+
+def update_messaging_token(devices_table_id, new_msg_token):
+    update = devices_table.update() \
+        .values({'last_activity': datetime.datetime.now()}) \
+        .values({'messaging_token': new_msg_token}) \
         .where(devices_table.c.id == devices_table_id)
     db.engine.execute(update)
 
