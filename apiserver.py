@@ -136,6 +136,7 @@ def authenticate_post():
     installation_id = json['installationId']
     # Get optionally - old clients do not send this
     client_version = "ClientVersion:" + json.get('clientVersion', '')
+    messaging_token = json.get('messaging_token', '')
 
     # 1. check that user exists or abort
     verify_user_id(user_id)
@@ -146,8 +147,13 @@ def authenticate_post():
         print 'User is not registered. userId=' + user_id
         abort(403)
 
-    # 2. Update logs
-    update_last_activity(devices_table_id)
+    # 2. Update messaging token, if included
+    if len(messaging_token) > 1:
+        update_messaging_token(devices_table_id, messaging_token)
+    else:
+        update_last_activity(devices_table_id)
+
+    # 3. Update log
     client_log_table_insert(devices_table_id, get_user_id_from_device_id(devices_table_id), "MOBILE-AUTHENTICATE", client_version)
 
     return jsonify({
