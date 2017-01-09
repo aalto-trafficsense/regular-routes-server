@@ -97,14 +97,14 @@ def init_db(app):
                           Column('token', UUID, unique=True, nullable=False),
                           Column('created', TIMESTAMP, nullable=False, default=func.current_timestamp(),
                                  server_default=func.current_timestamp()),
-                          Column('messaging_token', UUID, unique=True),
+                          Column('messaging_token', String, unique=True),
                           Column('last_activity', TIMESTAMP, nullable=False, default=func.current_timestamp(),
                                  server_default=func.current_timestamp()),
                           UniqueConstraint('device_id', 'installation_id', name='uix_device_id_installation_id'),
                           Index('idx_devices_device_id_inst_id', 'device_id', 'installation_id'))
 
     # Sample psql command to add the new 'messaging token' to an existing devices table:
-    # ALTER TABLE devices ADD COLUMN messaging_token uuid UNIQUE ;
+    # ALTER TABLE devices ADD COLUMN messaging_token varchar UNIQUE ;
 
     global device_data_table
     device_data_table = Table('device_data', metadata,
