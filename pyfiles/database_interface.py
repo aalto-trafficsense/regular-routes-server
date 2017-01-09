@@ -736,7 +736,7 @@ def match_legs_alert(selection, alert):
 def match_pubtrans_alert(alert):
     try:
         # Find matching legs
-        legs_ids = match_legs_alert("ID", alert)
+        legs_ids = match_legs_alert("id", alert)
         if len(legs_ids) > 0:
             for matched_leg in legs_ids:
                 # Find the corresponding hsl_alerts table id
@@ -754,23 +754,47 @@ def match_pubtrans_alert(alert):
             user_ids = match_legs_alert("DISTINCT user_id", alert)
             if len(user_ids) > 0:
                 for user in user_ids:
-                    # TODO: Find the max device_id of the user with a *registered firebase id*
-                    alert_devices_query = select([func.max(devices_table.c.id)]) \
-                        .where(devices_table.c.user_id == user["user_id"])
-                    alert_device_response = db.engine.execute(alert_devices_query).first()
-                    # TODO: Push the alerts to terminals
-                    # Save the new alerts to device_alerts
-                    stmt = device_alerts_table.insert({'device_id': alert_device_response[0],
-                                        'alert_end': alert["alert_end"],
-                                        'alert_type': alert["line_type"],
-                                        'fi_text': alert["fi_description"],
-                                        'fi_uri': "https://www.reittiopas.fi/disruptions.php",
-                                        'en_text': alert["en_description"],
-                                        'en_uri': "https://www.reittiopas.fi/en/disruptions.php",
-                                        'info': alert["line_type"]+": "+alert["line_name"]})
-                    db.engine.execute(stmt)
+                    # TODO: Find the latest active device_id of the user with a *registered firebase id*
+                    device_id = get_active_devices_table_id_from_users_table_id(user["user_id"])
+                    if device_id:  # This user has an eligible device
+                        # Did we already send the same alert text to the same device today?
+                        if len(todays_alert_text_matches(device_id, alert["fi_description"])) < 1:
+                            # No identical alert text found
+                            # TODO: Push the alert to terminals
+                            # Save the new alert to device_alerts
+                            stmt = device_alerts_table.insert({'device_id': device_id,
+                                                               'alert_end': alert["alert_end"],
+                                                               'alert_type': alert["line_type"],
+                                                               'fi_text': alert["fi_description"],
+                                                               'fi_uri': "https://www.reittiopas.fi/disruptions.php",
+                                                               'en_text': alert["en_description"],
+                                                               'en_uri': "https://www.reittiopas.fi/en/disruptions.php",
+                                                               'info': alert["line_type"] + ": " + alert["line_name"]})
+                            db.engine.execute(stmt)
+
+
     except Exception as e:
         print "match_pubtrans_alert exception: ", e
+
+
+def todays_alert_text_matches(devices_table_id, fi_text):
+    """
+    Find potential duplicates to
+    :param devices_table_id, fi_text (integer, string)
+    :return: devices_alerts.ids
+    """
+    try:
+        return db.engine.execute(text("""
+          SELECT id
+          FROM device_alerts
+          WHERE
+            device_id = :devices_table_id AND
+            time > date_trunc('day', now()) AND
+            fi_text = :fi_text ;"""), devices_table_id=devices_table_id, fi_text=fi_text).fetchall()
+    except DataError as e:
+        print 'Exception in todays_alert_text_matches: ' + e.message
+    return -1
+
 
 
 def weather_forecast_insert(weather):
@@ -919,9 +943,10 @@ def get_user_id_from_device_id(device_id):
         print 'Exception in get_user_id_from_device_id: ' + e.message
     return -1
 
+
 def get_max_devices_table_id_from_users_table_id(users_table_id):
     """
-    :param users.id (devices.user_id, integer)
+    :param users_table_id (devices.user_id, integer)
     :return: devices.id (max, integer)
     """
     try:
@@ -933,6 +958,31 @@ def get_max_devices_table_id_from_users_table_id(users_table_id):
         return int(row[0])
     except DataError as e:
         print 'Exception in get_max_devices_table_id_from_users_table_id: ' + e.message
+    return -1
+
+
+def get_active_devices_table_id_from_users_table_id(users_table_id):
+    """
+    Get the devices_table_id of a known user, which has last uploaded data (at least within a week)
+    Firebase support TBA
+    :param users_table_id (devices.user_id, integer)
+    :return: devices.id (integer)
+    """
+    try:
+        row = db.engine.execute(text("""
+          SELECT devices.id
+          FROM devices, device_data
+          WHERE
+            device_data.time > now()-(interval '1 week') AND
+            devices.user_id = :users_table_id AND
+            device_data.device_id = devices.id
+          ORDER BY device_data.time DESC
+          LIMIT 1 ;"""), users_table_id=users_table_id).first()
+        if not row:
+            return None
+        return int(row[0])
+    except DataError as e:
+        print 'Exception in get_active_devices_table_id_from_users_table_id: ' + e.message
     return -1
 
 
