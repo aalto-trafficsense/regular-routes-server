@@ -17,6 +17,7 @@ from pyfiles.database_interface import (
     client_log_table_insert, get_max_devices_table_id_from_users_table_id)
 from pyfiles.authentication_helper import user_hash, verify_and_get_account_id
 
+
 import logging
 logging.basicConfig()
 

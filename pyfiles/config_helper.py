@@ -7,6 +7,7 @@
 import os
 from flask import Flask
 
+APPLICATION_NAME = 'TrafficSense'
 SETTINGS_FILE_ENV_VAR = 'REGULARROUTES_SETTINGS'
 
 app = Flask(__name__)

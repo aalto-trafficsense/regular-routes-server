@@ -14,6 +14,7 @@ import svg_generation
 from datetime import timedelta
 
 from pyfiles.energy_rating import EnergyRating
+from pyfiles.push_messaging import push_ptp_pubtrans
 import json
 
 from constants import *
@@ -316,7 +317,7 @@ def init_db(app):
                        default=func.current_timestamp(),
                        server_default=func.current_timestamp()),
         Column('device_id', Integer, ForeignKey('devices.id'), nullable=False),
-        Column('firebase_id', UUID),
+        Column('messaging_token', String),
         Column('alert_end', TIMESTAMP, nullable=False),
         Column('alert_type', String),
         Column('coordinate',
@@ -329,6 +330,10 @@ def init_db(app):
 
     if not device_alerts_table.exists():
         device_alerts_table.create(checkfirst=True)
+
+    # Commands to convert device_alerts table from the earlier version
+    # ALTER TABLE device_alerts DROP COLUMN firebase_id ;
+    # ALTER TABLE device_alerts ADD COLUMN messaging_token VARCHAR ;
 
 
     global global_statistics_table
@@ -742,6 +747,7 @@ def match_legs_alert(selection, alert):
 
 def match_pubtrans_alert(alert):
     try:
+        device_alert = None
         # Find matching legs
         legs_ids = match_legs_alert("id", alert)
         if len(legs_ids) > 0:
@@ -761,24 +767,30 @@ def match_pubtrans_alert(alert):
             user_ids = match_legs_alert("DISTINCT user_id", alert)
             if len(user_ids) > 0:
                 for user in user_ids:
-                    # TODO: Find the latest active device_id of the user with a *registered firebase id*
-                    device_id = get_active_devices_table_id_from_users_table_id(user["user_id"])
-                    if device_id:  # This user has an eligible device
+                    # Find the latest active device_id of the user with a *registered firebase id*
+                    response = get_active_device_info_from_users_table_id(user["user_id"])
+                    if response:    # This user has an eligible device
+                        device_id = response["id"]
+                        messaging_token = response["messaging_token"]
                         # Did we already send the same alert text to the same device today?
                         if len(todays_alert_text_matches(device_id, alert["fi_description"])) < 1:
                             # No identical alert text found
-                            # TODO: Push the alert to terminals
+                            # Create an alert
+                            device_alert = {'device_id': device_id,
+                                         'messaging_token': messaging_token,
+                                         'alert_end': alert["alert_end"],
+                                         'alert_type': alert["line_type"],
+                                         'fi_text': alert["fi_description"],
+                                         'fi_uri': "https://www.reittiopas.fi/disruptions.php",
+                                         'en_text': alert["en_description"],
+                                         'en_uri': "https://www.reittiopas.fi/en/disruptions.php",
+                                         'info': alert["line_type"] + ": " + alert["line_name"]}
+                            # Push the alert to the device
+                            push_ptp_pubtrans(device_alert)
                             # Save the new alert to device_alerts
-                            stmt = device_alerts_table.insert({'device_id': device_id,
-                                                               'alert_end': alert["alert_end"],
-                                                               'alert_type': alert["line_type"],
-                                                               'fi_text': alert["fi_description"],
-                                                               'fi_uri': "https://www.reittiopas.fi/disruptions.php",
-                                                               'en_text': alert["en_description"],
-                                                               'en_uri': "https://www.reittiopas.fi/en/disruptions.php",
-                                                               'info': alert["line_type"] + ": " + alert["line_name"]})
+                            stmt = device_alerts_table.insert(device_alert)
                             db.engine.execute(stmt)
-
+        return device_alert
 
     except Exception as e:
         print "match_pubtrans_alert exception: ", e
@@ -976,26 +988,27 @@ def get_max_devices_table_id_from_users_table_id(users_table_id):
     return -1
 
 
-def get_active_devices_table_id_from_users_table_id(users_table_id):
+def get_active_device_info_from_users_table_id(users_table_id):
     """
-    Get the devices_table_id of a known user, which has last uploaded data (at least within a week)
-    Firebase support TBA
+    Get a known user's devices_table_id, which has last uploaded data (at least within a week)
+    and carries a messaging token
     :param users_table_id (devices.user_id, integer)
     :return: devices.id (integer)
     """
     try:
         row = db.engine.execute(text("""
-          SELECT devices.id
+          SELECT devices.id, devices.messaging_token
           FROM devices, device_data
           WHERE
             device_data.time > now()-(interval '1 week') AND
             devices.user_id = :users_table_id AND
-            device_data.device_id = devices.id
+            device_data.device_id = devices.id AND
+            devices.messaging_token != ''
           ORDER BY device_data.time DESC
           LIMIT 1 ;"""), users_table_id=users_table_id).first()
         if not row:
             return None
-        return int(row[0])
+        return row
     except DataError as e:
         print 'Exception in get_active_devices_table_id_from_users_table_id: ' + e.message
     return -1
@@ -1034,6 +1047,7 @@ def get_session_token_for_device(devices_table_id):
         print 'Exception: ' + e.message
 
     return None
+
 
 def users_table_insert(user_id, refresh_token, access_token):
     stmt = users_table.insert({'google_refresh_token': refresh_token,
@@ -1077,4 +1091,5 @@ def client_log_table_insert(device_id, user_id, client_function, info):
 
 def db_engine_execute(query):
     return db.engine.execute(query)
+
 
