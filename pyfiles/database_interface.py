@@ -894,7 +894,7 @@ def match_legs_traffic_disorder(selection, disorder):
     try:
         query = '''
           SELECT {0}
-          FROM device_data, legs
+          FROM device_data, leg_modes legs
           WHERE
             device_data.time >= now()-(interval '1 month') AND
             ("time"(:start AT TIME ZONE 'Europe/Helsinki') - "time"(time)
@@ -978,7 +978,7 @@ def match_legs_pubtrans_alert(selection, alert):
     try:
         query = '''
           SELECT {0}
-          FROM legs
+          FROM leg_modes
           WHERE
             time_start >= now()-(interval '1 month') AND
             ("time"(time_start) - "time"(:trip_start)

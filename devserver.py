@@ -229,13 +229,12 @@ def user_trips_json(user):
     date_start = date_start.replace(hour=0, minute=0, second=0, microsecond=0)
     date_end = date_start + timedelta(hours=24)
 
-    legs = db.metadata.tables["legs"]
+    legs = db.metadata.tables["leg_modes"]
 
     s = select(
         [   legs.c.time_start,
             legs.c.time_end,
-            legs.c.activity,
-            legs.c.line_type,
+            legs.c.mode,
             legs.c.line_name],
         and_(
             legs.c.user_id == int(user),
@@ -245,9 +244,8 @@ def user_trips_json(user):
 
     steps = []
     state = (None, None) # (timestamp/duration, activity) updates
-    for tstart, tend, activity, ltype, lname in db.engine.execute(s):
-        state = (
-            str(tstart)[11:16], ltype and " ".join([ltype, lname]) or activity)
+    for tstart, tend, mode, lname in db.engine.execute(s):
+        state = (str(tstart)[11:16], lname and " ".join([mode, lname]) or mode)
         steps.append(state)
         state = (timedelta_str(tend - tstart), state[1])
         steps.append(state)
