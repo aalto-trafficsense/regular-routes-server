@@ -3,15 +3,14 @@
 import random
 import string
 from datetime import timedelta
-import httplib2
 import json
+import httplib2
 
-from flask import Flask, jsonify, request, render_template
-from flask import make_response, session
+from flask import (
+    Flask, Response, jsonify, make_response, render_template, request, session)
+
 from oauth2client.client import *
-from sqlalchemy.sql import text
 
-from pyfiles import svg_generation
 from pyfiles.database_interface import (
     get_filtered_device_data_points, get_svg, get_users_table_id, init_db,
     client_log_table_insert, get_max_devices_table_id_from_users_table_id)
@@ -294,9 +293,9 @@ def energymap_device_geojson():
     }
     return jsonify(geojson)
 
-@app.route("/energycertificate")
-def energycertificate():
 
+@app.route("/energycertificate_svg")
+def energycertificate_svg():
     user_id = session.get('rr_user_id')
     if user_id == None:
         # Not authenticated -> throw back to front page
@@ -307,8 +306,35 @@ def energycertificate():
             request.args[d], '%Y-%m-%d') or None
         for d in ["firstday", "lastday"]]
 
-    client_log_table_insert(get_max_devices_table_id_from_users_table_id(user_id), user_id, "WEB-CERTIFICATE", "")
-    return get_svg(user_id, *firstlastday)
+    client_log_table_insert(
+        get_max_devices_table_id_from_users_table_id(user_id),
+        user_id,
+        "WEB-CERTIFICATE",
+        "/".join(str(x)[:10] for x in firstlastday))
+
+    return Response(get_svg(user_id, *firstlastday), mimetype="image/svg+xml")
+
+
+@app.route("/energycertificate")
+def energycertificate():
+    user_id = session.get('rr_user_id')
+    if user_id == None:
+        # Not authenticated -> throw back to front page
+        return index()
+
+    firstday, lastday = [
+        d in request.args and datetime.datetime.strptime(
+            request.args[d], '%Y-%m-%d') or None
+        for d in ["firstday", "lastday"]]
+
+    # client_log through energycertificate_svg
+
+    return render_template(
+        'energycertificate.html',
+        RR_URL_PREFIX=app.config['RR_URL_PREFIX'],
+        firstday=firstday,
+        lastday=lastday)
+
 
 # App starting point:
 if __name__ == '__main__':
