@@ -298,12 +298,17 @@ def energymap_device_geojson():
 def energycertificate():
 
     user_id = session.get('rr_user_id')
-    #user_id = 7
     if user_id == None:
         # Not authenticated -> throw back to front page
         return index()
+
+    firstlastday = [
+        d in request.args and datetime.datetime.strptime(
+            request.args[d], '%Y-%m-%d') or None
+        for d in ["firstday", "lastday"]]
+
     client_log_table_insert(get_max_devices_table_id_from_users_table_id(user_id), user_id, "WEB-CERTIFICATE", "")
-    return get_svg(user_id)
+    return get_svg(user_id, *firstlastday)
 
 # App starting point:
 if __name__ == '__main__':

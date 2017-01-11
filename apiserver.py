@@ -430,8 +430,14 @@ def svg(session_token):
     user_id = get_user_id_from_device_id(device_id)
     if user_id < 0:
         return ""
+
+    firstlastday = [
+        d in request.args and datetime.datetime.strptime(
+            request.args[d], '%Y-%m-%d') or None
+        for d in ["firstday", "lastday"]]
+
     client_log_table_insert(device_id, user_id, "MOBILE-CERTIFICATE", "")
-    return get_svg(user_id)
+    return get_svg(user_id, *firstlastday)
 
 # App starting point:
 if __name__ == '__main__':
