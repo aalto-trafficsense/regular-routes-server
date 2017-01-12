@@ -453,8 +453,19 @@ def svg(session_token):
     user_id = get_user_id_from_device_id(device_id)
     if user_id < 0:
         return ""
-    client_log_table_insert(device_id, user_id, "MOBILE-CERTIFICATE", "")
-    return get_svg(user_id)
+
+    firstlastday = [
+        d in request.args and datetime.datetime.strptime(
+            request.args[d], '%Y-%m-%d') or None
+        for d in ["firstday", "lastday"]]
+
+    client_log_table_insert(
+        device_id,
+        user_id,
+        "MOBILE-CERTIFICATE",
+        "/".join(str(x)[:10] for x in firstlastday))
+
+    return get_svg(user_id, *firstlastday)
 
 
 

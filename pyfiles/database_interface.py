@@ -402,22 +402,43 @@ def get_rating(user_id, start_date, end_date):
     return rating, ranking
 
 
-def get_svg(user_id):
-    query = text('SELECT max(time) FROM travelled_distances')
-    max_time = db.engine.execute(query).scalar()
-    if max_time is None:
-        max_time = datetime.datetime.now().replace(
-            hour=0, minute=0, second=0, microsecond=0) - timedelta(days=1)
+def get_svg(user_id, firstday=None, lastday=None):
+    if lastday is None:
+        if firstday is None:
+            # No params, end on last summarized user day, typically yesterday
+            query = text('SELECT max(time) FROM travelled_distances')
+            lastday = db.engine.execute(query).scalar()
+        else:
+            # Only start specified, show seven day window
+            lastday = firstday + timedelta(days=6)
+    if lastday is None:
+        # No data or params, show seven day window up through yesterday
+        lastday = datetime.datetime.now().replace(
+            hour=0, minute=0, second=0, microsecond=0) - timedelta(days=2)
+    if firstday is None:
+        # Default seven day window back
+        firstday = lastday - timedelta(days=6)
 
-    end_time = max_time + timedelta(days=1)
-    start_time = end_time - timedelta(days=7)
-    rating, ranking = get_rating(user_id, start_time, end_time)
+    end_time = lastday + timedelta(days=1)
+    rating, ranking = get_rating(user_id, firstday, end_time)
 
-    query = text('''
-        SELECT max(ranking) FROM travelled_distances WHERE time = :max_time''')
-    max_ranking = db.engine.execute(query, max_time=max_time).scalar() or 0
+    # get_rating returns stored 7 day rating regardless of window length;
+    # calculate true rating in window
+    query = text("""
+        WITH totals AS (SELECT
+                user_id,
+                sum(total_distance * average_co2) / sum(total_distance) co2
+            FROM travelled_distances
+            WHERE time >= :firstday AND time <= :lastday
+            GROUP BY user_id ORDER BY co2),
+        ranked AS (SELECT *, rank() OVER (order by co2) FROM totals),
+        maxed AS (SELECT *, last_value(rank) OVER () FROM ranked)
+        SELECT rank, last_value FROM maxed WHERE user_id = :user""")
+    ranks = db.engine.execute(
+        query, firstday=firstday, lastday=lastday, user=user_id).first()
+    ranking, max_ranking = ranks or (0, 0)
 
-    return svg_generation.generate_energy_rating_svg(rating, start_time, end_time, ranking, max_ranking)
+    return svg_generation.generate_energy_rating_svg(rating, firstday, end_time, ranking, max_ranking)
 
 
 def generate_csv(rows):
