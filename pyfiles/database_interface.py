@@ -15,6 +15,8 @@ from datetime import timedelta
 
 from pyfiles.energy_rating import EnergyRating
 from pyfiles.push_messaging import push_ptp_pubtrans
+from pyfiles.config_helper import get_config
+
 import json
 
 from constants import *
@@ -790,10 +792,32 @@ def match_pubtrans_alert(alert):
                             # Save the new alert to device_alerts
                             stmt = device_alerts_table.insert(device_alert)
                             db.engine.execute(stmt)
-        return device_alert
-
     except Exception as e:
         print "match_pubtrans_alert exception: ", e
+
+
+# A test procedure to push all incoming alerts to a hardcoded client
+def match_pubtrans_alert_test(alert):
+    try:
+        device_id = 192
+        messaging_token = get_config('TEST_MSG_TOKEN')
+        # Did we already send the same alert text to the same device today?
+        if len(todays_alert_text_matches(device_id, alert["fi_description"])) < 1:
+            # No identical alert text found
+            # Create an alert
+            device_alert = {'device_id': device_id,
+                            'messaging_token': messaging_token,
+                            'alert_end': alert["alert_end"],
+                            'alert_type': alert["line_type"],
+                            'fi_text': alert["fi_description"],
+                            'fi_uri': "https://www.reittiopas.fi/disruptions.php",
+                            'en_text': alert["en_description"],
+                            'en_uri': "https://www.reittiopas.fi/en/disruptions.php",
+                            'info': alert["line_type"] + ": " + alert["line_name"]}
+            # Push the alert to the device
+            push_ptp_pubtrans(device_alert)
+    except Exception as e:
+        print "match_pubtrans_alert_test exception: ", e
 
 
 def todays_alert_text_matches(devices_table_id, fi_text):

@@ -51,12 +51,12 @@ def firebase_request(fire_msg):
 
 # Test data - comment out for releases
 
-sample_dev_alert = {'messaging_token': "fChL0mBOshw:APA91bFKUSmgAX9A_dm-Jt6MXfm1hYWmF4wgK1Da4JNoF-rbTUxkvVOjmkAv4fg2HhSBdMt8FCBoSmGFZ3x_KuRz_mfLThRreCBhHbtBgdJZeJL0556ENNKlucv6fTI53ELNg34f0ofy",
-                    'alert_end': datetime.datetime.strptime("2017-01-10 20:45:00", "%Y-%m-%d %H:%M:%S"),
-                    'alert_type': "SUBWAY",
-                    'fi_text': "Seutuliikenteen linjat: 510 Martinlaaksosta ja 550 Itäkeskuksesta, myöhästyy. Syy: ruuhka. Paikka: Kehä I Leppävaara. Arvioitu kesto: 08:16 - 08:55.",
-                    'fi_uri': "https://www.reittiopas.fi/disruptions.php",
-                    'en_text': "Regional traffic, lines: 510 from Martinlaakso and 550 from Itäkeskus, will be delayed. Cause: traffic jam. Location: Kehä I Leppävaara. Estimated time: 08:16 - 08:55.",
-                    'en_uri': "https://www.reittiopas.fi/en/disruptions.php"}
-
-push_ptp_pubtrans(sample_dev_alert)
+# sample_dev_alert = {'messaging_token': get_config('TEST_MSG_TOKEN'),
+#                     'alert_end': datetime.datetime.strptime("2017-01-11 15:01:00", "%Y-%m-%d %H:%M:%S"),
+#                     'alert_type': "FERRY",
+#                     'fi_text': "Seutuliikenteen linjat: 510 Martinlaaksosta ja 550 Itäkeskuksesta, myöhästyy. Syy: ruuhka. Paikka: Kehä I Leppävaara. Arvioitu kesto: 08:16 - 08:55.",
+#                     'fi_uri': "https://www.reittiopas.fi/disruptions.php",
+#                     'en_text': "Regional traffic, lines: 510 from Martinlaakso and 550 from Itäkeskus, will be delayed. Cause: traffic jam. Location: Kehä I Leppävaara. Estimated time: 08:16 - 08:55.",
+#                     'en_uri': "https://www.reittiopas.fi/en/disruptions.php"}
+#
+# push_ptp_pubtrans(sample_dev_alert)
