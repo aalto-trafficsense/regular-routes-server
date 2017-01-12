@@ -583,7 +583,7 @@ def retrieve_transport_alerts():
         hsl_alerts_insert(hsl_new)
         for alert in hsl_new:
             match_pubtrans_alert(alert)
-            match_pubtrans_alert_test(alert)  # For testing ptp_push - COMMENT OUT!
+            # match_pubtrans_alert_test(alert)  # For testing ptp_push - COMMENT OUT!
     traffic_disorder_insert(traffic_disorder_request())
 
 
