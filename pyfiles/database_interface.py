@@ -797,6 +797,7 @@ def match_pubtrans_alert(alert):
 
 
 # A test procedure to push all incoming alerts to a hardcoded client
+# Check the device_id and TEST_MSG_TOKEN (in regularroutes.cfg) before running a test!
 def match_pubtrans_alert_test(alert):
     try:
         device_id = 192
