@@ -131,9 +131,10 @@ def authenticate_post():
     client_version = "ClientVersion:" + json.get('clientVersion', '')
 
     # 1. check that user exists or abort
-    verify_user_id(user_id)
+    users_table_id = verify_user_id(user_id)
 
-    devices_table_id = get_device_table_id(device_id, installation_id)
+    devices_table_id = get_device_table_id(
+        users_table_id, device_id, installation_id)
     session_token = get_session_token_for_device(devices_table_id)
     if session_token is None:
         print 'User is not registered. userId=' + user_id
