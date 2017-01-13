@@ -16,10 +16,10 @@ header = {'Content-Type': 'application/json',
 
 def push_ptp_pubtrans(device_alert):
     try:
-        device_alert_msg = {'NOTIFICATION_TITLE': 'Public Transport Disruption Info from TrafficSense',
+        device_alert_msg = {'NOTIFICATION_TITLE': 'Public Transport Disruption Info from HRT via TrafficSense',
                             'NOTIFICATION_MESSAGE': device_alert["en_text"],
                             'NOTIFICATION_URI': device_alert["en_uri"],
-                            'NOTIFICATION_TITLE_FI': 'Joukkoliikenteen häiriötiedote TrafficSenselta',
+                            'NOTIFICATION_TITLE_FI': 'HSL joukkoliikenteen häiriötiedote TrafficSenselta',
                             'NOTIFICATION_MESSAGE_FI': device_alert["fi_text"],
                             'NOTIFICATION_URI_FI': device_alert["fi_uri"],
                             'PTP_ALERT_PUBTRANS': '1',
