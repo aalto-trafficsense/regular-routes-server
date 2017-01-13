@@ -13,8 +13,8 @@ BAR_GAP = 10
 
 bottom_bar_amounts = (0, 25, 50, 75, 100, 125, 150)
 
-BAR_MIN = 100
-BAR_MAX = 800
+BAR_MIN = 125
+BAR_MAX = 825
 BAR_Y = 700
 BAR_TICK_SIZE = 20
 ARROW_WIDTH = 20
@@ -95,7 +95,7 @@ def generate_energy_rating_svg(energy_rating, start_time, end_time, ranking, ran
                                      font_family="Helvetica"))
     #Vertical km label
     svg_drawing.add(svg_drawing.text("km",
-                                     insert=(30, 65),
+                                     insert=(BAR_MIN - 80, 65),
                                      fill=svgwrite.rgb(0,0,0),
                                      stroke=svgwrite.rgb(0,0,0),
                                      stroke_width=1,
@@ -164,7 +164,7 @@ def generate_energy_rating_svg(energy_rating, start_time, end_time, ranking, ran
                                  text_anchor="middle"))
     #Bottom bar average text
     svg_drawing.add(svg_drawing.text("Average:",
-                                 insert=(10, BAR_Y - 30),
+                                 insert=(BAR_MIN - 105, BAR_Y - 20),
                                  fill=svgwrite.rgb(0,0,0),
                                  stroke=svgwrite.rgb(0,0,0),
                                  stroke_width=1,
