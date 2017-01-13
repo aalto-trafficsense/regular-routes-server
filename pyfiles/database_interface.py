@@ -819,27 +819,27 @@ def match_pubtrans_alert(alert):
 
 # A test procedure to push all incoming alerts to a hardcoded client
 # Check the device_id and TEST_MSG_TOKEN (in regularroutes.cfg) before running a test!
-def match_pubtrans_alert_test(alert):
-    try:
-        device_id = 192
-        messaging_token = get_config('TEST_MSG_TOKEN')
-        # Did we already send the same alert text to the same device today?
-        if len(todays_alert_text_matches(device_id, alert["fi_description"])) < 1:
-            # No identical alert text found
-            # Create an alert
-            device_alert = {'device_id': device_id,
-                            'messaging_token': messaging_token,
-                            'alert_end': alert["alert_end"],
-                            'alert_type': alert["line_type"],
-                            'fi_text': alert["fi_description"],
-                            'fi_uri': "https://www.reittiopas.fi/disruptions.php",
-                            'en_text': alert["en_description"],
-                            'en_uri': "https://www.reittiopas.fi/en/disruptions.php",
-                            'info': alert["line_type"] + ": " + alert["line_name"]}
-            # Push the alert to the device
-            push_ptp_pubtrans(device_alert)
-    except Exception as e:
-        print "match_pubtrans_alert_test exception: ", e
+# def match_pubtrans_alert_test(alert):
+#     try:
+#         device_id = 192
+#         messaging_token = get_config('TEST_MSG_TOKEN')
+#         # Did we already send the same alert text to the same device today?
+#         if len(todays_alert_text_matches(device_id, alert["fi_description"])) < 1:
+#             # No identical alert text found
+#             # Create an alert
+#             device_alert = {'device_id': device_id,
+#                             'messaging_token': messaging_token,
+#                             'alert_end': alert["alert_end"],
+#                             'alert_type': alert["line_type"],
+#                             'fi_text': alert["fi_description"],
+#                             'fi_uri': "https://www.reittiopas.fi/disruptions.php",
+#                             'en_text': alert["en_description"],
+#                             'en_uri': "https://www.reittiopas.fi/en/disruptions.php",
+#                             'info': alert["line_type"] + ": " + alert["line_name"]}
+#             # Push the alert to the device
+#             push_ptp_pubtrans(device_alert)
+#     except Exception as e:
+#         print "match_pubtrans_alert_test exception: ", e
 
 
 def todays_alert_text_matches(devices_table_id, fi_text):
