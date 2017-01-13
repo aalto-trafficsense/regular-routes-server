@@ -101,7 +101,7 @@ def init_db(app):
                                  server_default=func.current_timestamp()),
                           UniqueConstraint(
                               'user_id', 'device_id', 'installation_id',
-                              name='uix_device_id_installation_id'))
+                              name='uix_user_id_device_id_installation_id'))
 
     global device_data_table
     device_data_table = Table('device_data', metadata,
