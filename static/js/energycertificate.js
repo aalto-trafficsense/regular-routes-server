@@ -28,14 +28,21 @@ $(document).ready(function() {
 	},
     });
 
-    function update(firstday, lastday) {
+    function hashchange() {
+        var hash = location.hash.split("#").splice(-1)[0];
+        var dates = hash.split("/");
+        var firstday = dates[0];
+        var lastday = dates[1];
+
         if (firstday)
-            $("#firstday").pickadate("picker").set("select", Date.parse(firstday));
+            $("#firstday").pickadate("picker").set(
+                "select", Date.parse(firstday));
         else
             $("#firstday").pickadate("picker").clear();
 
-        if(lastday)
-            $("#lastday").pickadate("picker").set("select", Date.parse(lastday));
+        if (lastday)
+            $("#lastday").pickadate("picker").set(
+                "select", Date.parse(lastday));
         else
             $("#lastday").pickadate("picker").clear();
 
@@ -49,12 +56,35 @@ $(document).ready(function() {
         if (args)
             url += "?" + args;
         $("#svg").attr("src", url);
+
+        var yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        yesterday = yesterday.toISOString().slice(0, 10);
+
+        var rweek = new Date();
+        rweek.setDate(rweek.getDate() - 7);
+        rweek = rweek.toISOString().slice(0, 10) + "/" + yesterday;
+
+        var rmonth = new Date();
+        rmonth.setMonth(rmonth.getMonth() - 1);
+        rmonth = rmonth.toISOString().slice(0, 10) + "/" + yesterday;
+
+        var ryear = new Date();
+        ryear.setFullYear(ryear.getFullYear() - 1);
+        ryear = ryear.toISOString().slice(0, 10) + "/" + yesterday;
+
+        var presets = [
+            {id: "#weeklink", href: rweek},
+            {id: "#monthlink", href: rmonth},
+            {id: "#yearlink", href: ryear}];
+
+        for (var i = 0; i < presets.length; ++i)
+            if (hash == presets[i].href)
+                $(presets[i].id).removeAttr("href")
+            else
+                $(presets[i].id).attr("href", "#" + presets[i].href);
     }
 
-    function hashchange() {
-        var dates = location.hash.split("#").splice(-1)[0].split("/");
-        update(dates[0], dates[1]);
-    }
     $(window).on("hashchange", hashchange);
     hashchange();
 
