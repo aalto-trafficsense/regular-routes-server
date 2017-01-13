@@ -87,7 +87,6 @@ def register_post():
     # The following hash value is also generated in client and used in authentication
     user_id = user_hash(account_google_id)
 
-    devices_table_id = None
     users_table_id = None
 
     # 2. Check if user has registered previously
@@ -95,19 +94,12 @@ def register_post():
     if ext_users_table_id >= 0:
         users_table_id = ext_users_table_id
 
-        # 3. Check if same device has registered with same user
-        ext_user_id_for_device = get_users_table_id_for_device(device_id, installation_id)
-        if ext_user_id_for_device >= 0:
-            if ext_user_id_for_device != ext_users_table_id:
-                # same device+installation is registered to other user
-                print 'Re-registration attempt for different user'
-                abort(403)
-
-            print 'device re-registration detected -> using same device'
-            devices_table_id = get_device_table_id(device_id, installation_id)
+    # 3. Check if same device has registered with same user
+    devices_table_id = get_device_table_id(
+        users_table_id, device_id, installation_id)
 
     # 4. create/update user to db
-    if users_table_id < 0:
+    if users_table_id is None:
         users_table_id = users_table_insert(str(user_id), str(validation_data['refresh_token']), str(validation_data['access_token']))
     else:
         print 're-registration for same user detected -> using existing user account'
@@ -118,6 +110,7 @@ def register_post():
         session_token = uuid4().hex
         devices_table_id = devices_table_insert(users_table_id, device_id, installation_id, device_model, session_token)
     else:
+        print 'device re-registration detected -> using same device'
         update_last_activity(devices_table_id)
         session_token = get_session_token_for_device(devices_table_id)
 
