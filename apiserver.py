@@ -17,7 +17,7 @@ from pyfiles.common_helpers import (
 from pyfiles.constants import BAD_LOCATION_RADIUS, DEST_RADIUS_MAX
 
 from pyfiles.database_interface import (init_db, db_engine_execute, users_table_insert, users_table_update, devices_table_insert, device_data_table_insert,
-                                        verify_user_id, update_last_activity, get_users_table_id_for_device, get_device_table_id,
+                                        verify_user_id, update_last_activity, get_device_table_id,
                                         get_device_table_id_for_session, get_users_table_id, get_session_token_for_device, get_user_id_from_device_id,
                                         activity_types,
                                         get_svg,

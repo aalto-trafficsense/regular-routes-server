@@ -883,21 +883,6 @@ def update_last_activity(devices_table_id):
     db.engine.execute(update)
 
 
-def get_users_table_id_for_device(device_id, installation_id):
-    try:
-        query = select([devices_table.c.user_id]) \
-            .where(devices_table.c.device_id==device_id) \
-            .where(devices_table.c.installation_id==installation_id)
-        row = db.engine.execute(query).first()
-        if not row:
-            return -1
-        return int(row[0])
-    except DataError as e:
-        print 'Exception: ' + e.message
-
-    return -1
-
-
 def get_device_table_id(user_id, device_id, installation_id):
     query = select([devices_table.c.id]) \
         .where(devices_table.c.user_id==user_id) \
