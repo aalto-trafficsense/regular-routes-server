@@ -355,28 +355,39 @@ def traffic_disorder_request():
                     sv_description = description
             # Try to get some coordinates
             try:
-                alert_c_linear = record.find('pp:groupOfLocations', ns).find('pp:alertCLinear', ns)
-                if alert_c_linear is not None:
-                    # Method currently not checked
-                    # alert_c_method = alert_c_linear.get('{http://www.w3.org/2001/XMLSchema-instance}type')
-                    table_version = alert_c_linear.find('pp:alertCLocationTableVersion', ns).text
-                    point = alert_c_linear.find('pp:alertCMethod4PrimaryPointLocation', ns)
-                    if point is not None:
-                        loc = point.find('pp:alertCLocation', ns).find('pp:specificLocation', ns).text
-                        lat, lng = getAlertC(table_version, loc)
-                        if lat is not None:
-                            coordinate = 'POINT(%f %f)' % (float(lng), float(lat))
-                            waypoint = get_waypoint_id_from_coordinate(coordinate)
+                group_of_locations = record.find('pp:groupOfLocations', ns)
+                if group_of_locations is not None:
+                    alert_c_sub = group_of_locations.find('pp:alertCLinear', ns)
+                    if alert_c_sub is None:
+                        alert_c_sub = group_of_locations.find('pp:alertCPoint', ns)
+                    if alert_c_sub is not None:
+                        # Method currently not checked
+                        # alert_c_method = alert_c_sub.get('{http://www.w3.org/2001/XMLSchema-instance}type')
+                        table_version = alert_c_sub.find('pp:alertCLocationTableVersion', ns).text
+                        point = alert_c_sub.find('pp:alertCMethod4PrimaryPointLocation', ns)
+                        if point is None:
+                            point = alert_c_sub.find('pp:alertCMethod2PrimaryPointLocation', ns)
+                        if point is None:
+                            point = alert_c_sub.find('pp:alertCMethod3PrimaryPointLocation', ns)
+                        if point is None:
+                            point = alert_c_sub.find('pp:alertCMethod1PrimaryPointLocation', ns)
+                        if point is not None:
+                            loc = point.find('pp:alertCLocation', ns).find('pp:specificLocation', ns).text
+                            lat, lng = getAlertC(table_version, loc)
+                            if lat is not None:
+                                coordinate = 'POINT(%f %f)' % (float(lng), float(lat))
+                                waypoint = get_waypoint_id_from_coordinate(coordinate)
 
-                # Note: Calculating based on multiple points seems to displace the final point from the
+
+                                # Note: Calculating based on multiple points seems to displace the final point from the
                 # main road, where the disorder took place. For matching with waypoints, it appears
                 # better to just take the primary point independent of what other points were given.
                 # Therefore commenting out the stuff below...
                 # if alert_c_method == 'AlertCMethod4Linear':
-                #     point1 = alert_c_linear.find('pp:alertCMethod4PrimaryPointLocation', ns)
+                #     point1 = alert_c_sub.find('pp:alertCMethod4PrimaryPointLocation', ns)
                 #     loc1, offset1 = getAlertCLoc(point1)
                 #     lat1, lng1 = getAlertC(table_version, loc1)
-                #     point2 = alert_c_linear.find('pp:alertCMethod4SecondaryPointLocation', ns)
+                #     point2 = alert_c_sub.find('pp:alertCMethod4SecondaryPointLocation', ns)
                 #     loc2, offset2 = getAlertCLoc(point2)
                 #     lat2, lng2 = getAlertC(table_version, loc2)
                 #     ratio = (offset1 + 0.0) / (offset1 + offset2)
@@ -384,10 +395,10 @@ def traffic_disorder_request():
                 #     lng = lng1 + (lng2 - lng1) * ratio
                 # elif alert_c_method == 'AlertCMethod2Linear':
                 #     # Haven't seen any spec for this --> averaging the two points
-                #     point1 = alert_c_linear.find('pp:alertCMethod4PrimaryPointLocation', ns)
+                #     point1 = alert_c_sub.find('pp:alertCMethod4PrimaryPointLocation', ns)
                 #     loc1 = point1.find('pp:alertCLocation', ns).find('pp:specificLocation', ns).text
                 #     lat1, lng1 = getAlertC(table_version, loc1)
-                #     point2 = alert_c_linear.find('pp:alertCMethod4SecondaryPointLocation', ns)
+                #     point2 = alert_c_sub.find('pp:alertCMethod4SecondaryPointLocation', ns)
                 #     loc2 = point2.find('pp:alertCLocation', ns).find('pp:specificLocation', ns).text
                 #     lat2, lng2 = getAlertC(table_version, loc2)
                 #     lat = (lat1 + lat2) / 2
