@@ -11,7 +11,8 @@ import urllib2
 from pyfiles.database_interface import (
     init_db, data_points_by_user_id_after, get_filtered_device_data_points,
     hsl_alerts_insert, weather_forecast_insert, weather_observations_insert,
-    traffic_disorder_insert, match_pubtrans_alert, match_pubtrans_alert_test)
+    traffic_disorder_insert, match_pubtrans_alert, match_pubtrans_alert_test,
+    match_traffic_disorder)
 from pyfiles.device_data_filterer import DeviceDataFilterer
 from pyfiles.energy_rating import EnergyRating
 from pyfiles.common_helpers import (
@@ -584,7 +585,11 @@ def retrieve_transport_alerts():
         for alert in hsl_new:
             match_pubtrans_alert(alert)
             # match_pubtrans_alert_test(alert)  # For testing ptp_push - COMMENT OUT!
-    traffic_disorder_insert(traffic_disorder_request())
+    traffic_disorder_new = traffic_disorder_request()
+    if traffic_disorder_new:
+        traffic_disorder_insert(traffic_disorder_new)
+        for disorder in traffic_disorder_new:
+            match_traffic_disorder(disorder)
 
 
 def retrieve_weather_info():
