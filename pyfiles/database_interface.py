@@ -104,8 +104,9 @@ def init_db(app):
                           Column('messaging_token', String, unique=True),
                           Column('last_activity', TIMESTAMP, nullable=False, default=func.current_timestamp(),
                                  server_default=func.current_timestamp()),
-                          UniqueConstraint('device_id', 'installation_id', name='uix_device_id_installation_id'),
-                          Index('idx_devices_device_id_inst_id', 'device_id', 'installation_id'))
+                          UniqueConstraint(
+                              'user_id', 'device_id', 'installation_id',
+                              name='uix_user_id_device_id_installation_id'))
 
     # Sample psql command to add the new 'messaging token' to an existing devices table:
     # ALTER TABLE devices ADD COLUMN messaging_token varchar UNIQUE ;
@@ -1049,6 +1050,14 @@ def update_last_activity(devices_table_id):
     db.engine.execute(update)
 
 
+def get_device_table_id(user_id, device_id, installation_id):
+    query = select([devices_table.c.id]) \
+        .where(devices_table.c.user_id==user_id) \
+        .where(devices_table.c.device_id==device_id) \
+        .where(devices_table.c.installation_id==installation_id)
+    return db.engine.execute(query).scalar()
+
+
 def update_messaging_token(devices_table_id, new_msg_token):
     update = devices_table.update() \
         .values({'last_activity': datetime.datetime.now()}) \
@@ -1218,9 +1227,10 @@ def devices_table_insert(users_table_id, device_id, installation_id, device_mode
              'device_id': device_id,
              'installation_id': installation_id,
              'device_model': device_model,
-             'token': session_token})
-    db.engine.execute(device_insertion)
-    return get_device_table_id(device_id, installation_id)
+             'token': session_token}) \
+        .returning(devices_table.c.id)
+    return db.engine.execute(device_insertion).scalar()
+
 
 def device_data_table_insert(batch):
     db.engine.execute(device_data_table.insert(batch))
