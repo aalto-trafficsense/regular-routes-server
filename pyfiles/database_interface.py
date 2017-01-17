@@ -12,9 +12,10 @@ from sqlalchemy.sql import (
     and_, between, column, func, or_, select, table, text)
 import svg_generation
 from datetime import timedelta
+from dateutil.parser import parse
 
 from pyfiles.energy_rating import EnergyRating
-from pyfiles.push_messaging import push_ptp_pubtrans
+from pyfiles.push_messaging import push_ptp_pubtrans, push_ptp_traffic
 from pyfiles.config_helper import get_config
 
 import json
@@ -288,6 +289,8 @@ def init_db(app):
         Column('disorder_id', String, nullable=False),
         Column('start_time', TIMESTAMP(timezone=True), nullable=True),
         Column('end_time', TIMESTAMP(timezone=True), nullable=True),
+        Column('coordinate', ga2.Geography('point', 4326, spatial_index=False)),
+        Column('waypoint_id', BigInteger),
         Column('fi_description', String, nullable=True),
         Column('sv_description', String, nullable=True),
         Column('en_description', String, nullable=True))
@@ -296,8 +299,13 @@ def init_db(app):
     if not traffic_disorders_table.exists():
         traffic_disorders_table.create(checkfirst=True)
 
+    # Sample psql command to add the new 'coordinate' and 'waypoint_id' columns to an existing traffic_disorders table:
+    # ALTER TABLE traffic_disorders ADD COLUMN coordinate geography(Point,4326) ;
+    # ALTER TABLE traffic_disorders ADD COLUMN waypoint_id bigint ;
 
-    # Alerts matching to specific trip legs
+
+
+    # Public transport alerts matching to specific trip legs
     global pubtrans_legs_alerts_table
     pubtrans_legs_alerts_table = Table('pubtrans_legs_alerts', metadata,
                                 Column('id', Integer, primary_key=True),
@@ -311,7 +319,21 @@ def init_db(app):
         pubtrans_legs_alerts_table.create(checkfirst=True)
 
 
-    # Alerts (to be) delivered
+    # Traffic disorders matching to specific device_data points
+    global traffic_data_disorders_table
+    traffic_data_disorders_table = Table('traffic_data_disorders', metadata,
+                                         Column('id', Integer, primary_key=True),
+                                         Column('time', TIMESTAMP(timezone=True), nullable=False,
+                                            default=func.current_timestamp(),
+                                            server_default=func.current_timestamp()),
+                                         Column('device_data_table_id', Integer, ForeignKey('device_data.id'), nullable=False),
+                                         Column('disorders_table_id', Integer, ForeignKey('traffic_disorders.id'), nullable=False))
+
+    if not traffic_data_disorders_table.exists():
+        traffic_data_disorders_table.create(checkfirst=True)
+
+
+    # Alerts delivered
     global device_alerts_table
     device_alerts_table = Table('device_alerts', metadata,
         Column('id', Integer, primary_key=True),
@@ -574,6 +596,34 @@ def data_points_snapping(device_id, datetime_start, datetime_end):
     return points
 
 
+def get_waypoint_id_from_coordinate(coordinate):
+    """Return the identifier of the waypoint closest to a given coordinate.
+    :param: coordinate (geography(Point,4326))
+    :return: waypoint_id (bigint)
+    """
+    try:
+        row = db.engine.execute(text("""
+          SELECT id
+          FROM roads_waypoints
+          JOIN waypoints
+          ON waypoint_id = waypoints.id
+          LEFT JOIN LATERAL (
+            SELECT osm_id
+            FROM roads
+            WHERE ST_DWithin(roads.geo, :coordinate, 100)
+            ORDER BY ST_Distance(roads.geo, :coordinate) ASC
+            LIMIT 1
+          ) AS road ON true
+          WHERE road_id = road.osm_id
+          ORDER BY ST_Distance(waypoints.geo, :coordinate) ASC
+          LIMIT 1 ;"""), coordinate=coordinate).first()
+        if not row:
+            return None
+        return int(row[0])
+    except DataError as e:
+        print 'Exception in get_waypoint_id_from_coordinate: ' + e.message
+    return None
+
 def match_mass_transit_legs(device, tstart, tend, activity):
     """Find mass transit match already recorded in an existing leg. Returns
     None if no exact start/end/activity match found, otherwise (line_type,
@@ -753,6 +803,73 @@ def hsl_alerts_get_max():
     return -1, -1
 
 
+def match_device_disorder(selection, disorder):
+    try:
+        query = '''
+          SELECT {0}
+          FROM device_data, devices
+          WHERE
+            time >= now()-(interval '1 month') AND
+            ("time"(time AT TIME ZONE 'EET') BETWEEN ("time"'{1}' - interval '2 hours') AND ("time"'{1}' + interval '2 hours')) AND
+            waypoint_id = {2} AND
+            devices.id = device_data.device_id ;'''.format(selection, disorder["start_time"][11:])
+        return db.engine.execute(text(query)).fetchall()
+    except Exception as e:
+        print "match_device_disorder exception: ", e
+        return None
+
+
+def match_traffic_disorder(disorder):
+    try:
+        # Find matching datapoints
+        device_data_ids = match_device_disorder("device_data.id", disorder)
+        if len(device_data_ids) > 0:
+            # Find the corresponding traffic_disorders table id
+            traffic_disorders_query = select([traffic_disorders_table.c.id]) \
+                .where(traffic_disorders_table.c.disorder_id == disorder["disorder_id"])
+            traffic_disorders_response = db.engine.execute(traffic_disorders_query).first()
+            for matched_point in device_data_ids:
+                # Save the legs - alerts pairs to pubtrans_legs_alerts
+                stmt = traffic_data_disorders_table.insert({'device_data_table_id': matched_point["id"],
+                                   'disorders_table_id': traffic_disorders_response["id"]})
+                db.engine.execute(stmt)
+
+            # Search again to find the distinct users to inform
+            user_ids = match_device_disorder("DISTINCT devices.user_id", disorder)
+            if len(user_ids) > 0:
+                for user in user_ids:
+                    # Find the latest eligible device id for this user
+                    response = get_active_device_info_from_users_table_id(user["user_id"])
+                    if response:    # This user has an eligible device
+                        device_id = response["id"]
+                        messaging_token = response["messaging_token"]
+                        # Did we already send the same alert text to the same device today?
+                        if len(todays_alert_text_matches(device_id, disorder["fi_description"])) < 1:
+                            # No identical alert text found
+                            # Parse digitraffic ISO8601 timestamp into a datetime without timezone
+                            ae_with_tz = parse(disorder["end_time"])
+                            alert_end = ae_with_tz.replace(tzinfo=None) + ae_with_tz.tzinfo._offset
+                            # Create an alert
+                            device_alert = {'device_id': device_id,
+                                         'messaging_token': messaging_token,
+                                         'alert_end': alert_end,
+                                         'alert_type': "DIGITRAFFIC",
+                                         'fi_text': disorder["fi_description"],
+                                         'fi_uri': None,
+                                         'en_text': disorder["fi_description"],
+                                         'en_uri': None,
+                                         'info': disorder["disorder_id"]}
+                            # Push the alert to the device
+                            push_ptp_traffic(device_alert)
+                            # Save the new alert to device_alerts
+                            stmt = device_alerts_table.insert(device_alert)
+                            db.engine.execute(stmt)
+    except Exception as e:
+        print "match_pubtrans_alert exception: ", e
+
+
+
+
 def match_legs_alert(selection, alert):
     try:
         query = '''
@@ -766,11 +883,11 @@ def match_legs_alert(selection, alert):
         return db.engine.execute(text(query)).fetchall()
     except Exception as e:
         print "match_legs_alert exception: ", e
+        return None
 
 
 def match_pubtrans_alert(alert):
     try:
-        device_alert = None
         # Find matching legs
         legs_ids = match_legs_alert("id", alert)
         if len(legs_ids) > 0:
@@ -870,24 +987,6 @@ def weather_forecast_insert(weather):
 def weather_observations_insert(weather):
     if weather:
         db.engine.execute(weather_observations_table.insert(weather))
-
-
-# Note: This one is currently unused, because the disorder record ID:s overlap.
-# Max record creation time (below) used instead
-def traffic_disorder_id_exists(disorder_id):
-    """
-    :return: boolean (True = the parameter exists in the traffic_disorder_table)
-    """
-    try:
-        query = select([traffic_disorders_table.c.id]) \
-            .where(traffic_disorders_table.c.disorder_id==disorder_id)
-        row = db.engine.execute(query).first()
-        if not row:
-            return False
-        return True
-    except DataError as e:
-        print 'Traffic disorder id query exception: ' + e.message
-        abort(403)
 
 
 def traffic_disorder_max_creation():

@@ -15,7 +15,7 @@ from owslib.wfs import WebFeatureService
 import xml.etree.ElementTree as ET
 
 from pyfiles.common_helpers import interpret_jore
-from pyfiles.database_interface import hsl_alerts_get_max, traffic_disorder_id_exists, traffic_disorder_max_creation
+from pyfiles.database_interface import hsl_alerts_get_max, traffic_disorder_max_creation, get_waypoint_id_from_coordinate
 from pyfiles.constants import gtfs_route_types, gtfs_effects
 from pyfiles.config_helper import get_config
 
@@ -292,11 +292,14 @@ def graphql_request(urlstr, querystr):
     return json_data
 
 
+ns = {'sju': 'http://tie.digitraffic.fi/sujuvuus/schemas',
+      'soap': 'http://schemas.xmlsoap.org/soap/envelope/',
+      'pp': 'http://datex2.eu/schema/2/2_0',
+      'xsi': 'http://www.w3.org/2001/XMLSchema-instance'}
+
+
 def traffic_disorder_request():
     debug_input_filename = "TrafficAlertSample.xml"
-    ns = {'sju': 'http://tie.digitraffic.fi/sujuvuus/schemas',
-          'soap': 'http://schemas.xmlsoap.org/soap/envelope/',
-          'pp': 'http://datex2.eu/schema/2/2_0'}
     xml_root = ""
     if debug_input:
         xml_root = ET.parse(debug_input_filename).getroot()
@@ -316,15 +319,14 @@ def traffic_disorder_request():
     # print "Max creation time: ", max_creation_time
 
     def traffic_disorder_row(record):
-        # disorder_id = "Missing"
-        # start_time = None
         end_time = None
         fi_description = None
         sv_description = None
         en_description = None
+        coordinate = None
+        waypoint = None
         try:
             disorder_id = record.get('id')
-            # if traffic_disorder_id_exists(disorder_id): return None
             record_creation_time = dateutil.parser.parse(record.find('pp:situationRecordCreationTime', ns).text)
             # print "Record creation time: ", record_creation_time
             if max_creation_time:
@@ -345,16 +347,61 @@ def traffic_disorder_request():
                 if language == 'fi':
                     # Only take the ones under "tieliikennekeskus Helsinki"
                     if description.find("Helsinki") < 0: return None
-                    fi_description = description
+                    # Strip the constant contact information
+                    fi_description = description.replace(u"Liikenne- ja kelitiedot verkossa: http://liikennetilanne.liikennevirasto.fi/ Liikenneviraston tieliikennekeskus HelsinkiPuh: 0206373328Faksi: 0206373713Sähköposti: helsinki.liikennekeskus@liikennevirasto.fi", "")
                 elif language == 'en':
                     en_description = description
                 elif language == 'sv':
                     sv_description = description
+            # Try to get some coordinates
+            try:
+                alert_c_linear = record.find('pp:groupOfLocations', ns).find('pp:alertCLinear', ns)
+                if alert_c_linear is not None:
+                    # Method currently not checked
+                    # alert_c_method = alert_c_linear.get('{http://www.w3.org/2001/XMLSchema-instance}type')
+                    table_version = alert_c_linear.find('pp:alertCLocationTableVersion', ns).text
+                    point = alert_c_linear.find('pp:alertCMethod4PrimaryPointLocation', ns)
+                    if point is not None:
+                        loc = point.find('pp:alertCLocation', ns).find('pp:specificLocation', ns).text
+                        lat, lng = getAlertC(table_version, loc)
+                        if lat is not None:
+                            coordinate = 'POINT(%f %f)' % (float(lng), float(lat))
+                            waypoint = get_waypoint_id_from_coordinate(coordinate)
+
+                # Note: Calculating based on multiple points seems to displace the final point from the
+                # main road, where the disorder took place. For matching with waypoints, it appears
+                # better to just take the primary point independent of what other points were given.
+                # Therefore commenting out the stuff below...
+                # if alert_c_method == 'AlertCMethod4Linear':
+                #     point1 = alert_c_linear.find('pp:alertCMethod4PrimaryPointLocation', ns)
+                #     loc1, offset1 = getAlertCLoc(point1)
+                #     lat1, lng1 = getAlertC(table_version, loc1)
+                #     point2 = alert_c_linear.find('pp:alertCMethod4SecondaryPointLocation', ns)
+                #     loc2, offset2 = getAlertCLoc(point2)
+                #     lat2, lng2 = getAlertC(table_version, loc2)
+                #     ratio = (offset1 + 0.0) / (offset1 + offset2)
+                #     lat = lat1 + (lat2 - lat1) * ratio
+                #     lng = lng1 + (lng2 - lng1) * ratio
+                # elif alert_c_method == 'AlertCMethod2Linear':
+                #     # Haven't seen any spec for this --> averaging the two points
+                #     point1 = alert_c_linear.find('pp:alertCMethod4PrimaryPointLocation', ns)
+                #     loc1 = point1.find('pp:alertCLocation', ns).find('pp:specificLocation', ns).text
+                #     lat1, lng1 = getAlertC(table_version, loc1)
+                #     point2 = alert_c_linear.find('pp:alertCMethod4SecondaryPointLocation', ns)
+                #     loc2 = point2.find('pp:alertCLocation', ns).find('pp:specificLocation', ns).text
+                #     lat2, lng2 = getAlertC(table_version, loc2)
+                #     lat = (lat1 + lat2) / 2
+                #     lng = (lng1 + lng2) / 2
+
+            except:
+                "Common issue - no coordinates in traffic alert."
             return {
                 'record_creation_time': record_creation_time,
                 'disorder_id': disorder_id,
                 'start_time': start_time,
                 'end_time': end_time,
+                'coordinate': coordinate,
+                'waypoint_id': waypoint,
                 'fi_description': fi_description,
                 'sv_description': sv_description,
                 'en_description': en_description
@@ -376,10 +423,39 @@ def traffic_disorder_request():
     return new_disorders
 
 
+def getAlertCLoc(point):
+    loc = point.find('pp:alertCLocation', ns).find('pp:specificLocation', ns).text
+    offset = point.find('pp:offsetDistance', ns).find('pp:offsetDistance', ns).text
+    return loc, int(offset)
+
+
 def toDateTime(hsl_sec):
     return datetime.datetime.fromtimestamp(hsl_sec)
 
-# hsl_alert_request()
+
+def getAlertC(version, location):
+    # https://tie-test.digitraffic.fi/api/v1/metadata/locations/1596?version=1.11.30
+    try:
+        coords = None
+        response = requests.get('http://tie-test.digitraffic.fi/api/v1/metadata/locations/' + location + '?version=' + version)
+        json_response = json.loads(response.text)
+        response.close()
+        features = json_response.get('features')
+        if features:
+            # for feature in features:
+            geom = features[0].get('geometry')
+            if geom:
+                coords = geom.get('coordinates')
+        return coords[1], coords[0]
+    except Exception as e:
+        print "getAlertC was unable to fetch coordinates: ", e
+        return None, None
+
+        # hsl_alert_request()
 # print fmi_observations_request()
 # print fmi_forecast_request()
 # print traffic_disorder_request()
+
+# coordinates = getAlertC("1.11.30", "1596")
+# if coordinates:
+#     print "Lng: " + str(coordinates[0]) + " Lat: " + str(coordinates[1])

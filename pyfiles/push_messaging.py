@@ -16,10 +16,10 @@ header = {'Content-Type': 'application/json',
 
 def push_ptp_pubtrans(device_alert):
     try:
-        device_alert_msg = {'NOTIFICATION_TITLE': 'Public Transport Disruption Info from HRT via TrafficSense',
+        device_alert_msg = {'NOTIFICATION_TITLE': 'HRT / TrafficSense Public Transport Disruption Info',
                             'NOTIFICATION_MESSAGE': device_alert["en_text"],
                             'NOTIFICATION_URI': device_alert["en_uri"],
-                            'NOTIFICATION_TITLE_FI': 'HSL joukkoliikenteen häiriötiedote TrafficSenselta',
+                            'NOTIFICATION_TITLE_FI': 'HSL / TrafficSense joukkoliikenteen häiriötieto',
                             'NOTIFICATION_MESSAGE_FI': device_alert["fi_text"],
                             'NOTIFICATION_URI_FI': device_alert["fi_uri"],
                             'PTP_ALERT_PUBTRANS': '1',
@@ -33,6 +33,25 @@ def push_ptp_pubtrans(device_alert):
         firebase_request(fire_msg)
     except Exception as e:
         print "push_ptp_pubtrans / exception: ", e
+
+
+def push_ptp_traffic(device_alert):
+    try:
+        device_alert_msg = {'NOTIFICATION_TITLE': 'DigiTraffic / TrafficSense Disruption Info',
+                            'NOTIFICATION_MESSAGE': device_alert["en_text"],
+                            'NOTIFICATION_TITLE_FI': 'DigiTraffic / TrafficSense liikenteen häiriötieto',
+                            'NOTIFICATION_MESSAGE_FI': device_alert["fi_text"],
+                            'PTP_ALERT_TRAFFIC': '1',
+                            'PTP_ALERT_END': device_alert["alert_end"].strftime("%Y-%m-%d %H:%M:%S"),
+                            'PTP_ALERT_TYPE': device_alert["alert_type"]}
+        delta = device_alert["alert_end"] - datetime.datetime.now()
+        ttl = int(delta.total_seconds())
+        fire_msg = json.dumps({'to': device_alert["messaging_token"],
+                               'data': device_alert_msg,
+                               'time_to_live': ttl})
+        firebase_request(fire_msg)
+    except Exception as e:
+        print "push_ptp_traffic / exception: ", e
 
 
 def firebase_request(fire_msg):
