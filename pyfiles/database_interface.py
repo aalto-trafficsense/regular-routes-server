@@ -942,7 +942,6 @@ def match_pubtrans_alert_test(alert):
         if len(todays_alert_text_matches(device_id, alert["fi_description"])) < 1:
             # No identical alert text found
             # Create an alert
-            new_alerts = []
             device_alert = {'device_id': device_id,
                             'messaging_token': messaging_token,
                             'alert_end': alert["alert_end"],
@@ -952,9 +951,7 @@ def match_pubtrans_alert_test(alert):
                             'en_text': alert["en_description"],
                             'en_uri': "https://www.reittiopas.fi/en/disruptions.php",
                             'info': alert["line_type"] + ": " + alert["line_name"]}
-            # Push the alert to the device
-            new_alerts.append(device_alert)
-            return new_alerts
+            yield device_alert
     except Exception as e:
         print "match_pubtrans_alert_test exception: ", e
 
@@ -1063,36 +1060,6 @@ def update_messaging_token(devices_table_id, new_msg_token):
         .values({'messaging_token': new_msg_token}) \
         .where(devices_table.c.id == devices_table_id)
     db.engine.execute(update)
-
-
-# def get_users_table_id_for_device(device_id, installation_id):
-#     try:
-#         query = select([devices_table.c.user_id]) \
-#             .where(devices_table.c.device_id==device_id) \
-#             .where(devices_table.c.installation_id==installation_id)
-#         row = db.engine.execute(query).first()
-#         if not row:
-#             return -1
-#         return int(row[0])
-#     except DataError as e:
-#         print 'Exception: ' + e.message
-#
-#     return -1
-
-
-# def get_device_table_id(device_id, installation_id):
-#     try:
-#         query = select([devices_table.c.id]) \
-#             .where(devices_table.c.device_id==device_id) \
-#             .where(devices_table.c.installation_id==installation_id)
-#         row = db.engine.execute(query).first()
-#         if not row:
-#             return -1
-#         return int(row[0])
-#     except DataError as e:
-#         print 'Exception: ' + e.message
-#
-#     return -1
 
 
 def get_device_table_id_for_session(session_token):
