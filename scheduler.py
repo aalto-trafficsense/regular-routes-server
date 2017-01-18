@@ -13,6 +13,7 @@ from pyfiles.database_interface import (
     hsl_alerts_insert, weather_forecast_insert, weather_observations_insert,
     traffic_disorder_insert, match_pubtrans_alert, match_pubtrans_alert_test,
     match_traffic_disorder)
+from pyfiles.push_messaging import push_ptp_pubtrans, push_ptp_traffic
 from pyfiles.device_data_filterer import DeviceDataFilterer
 from pyfiles.energy_rating import EnergyRating
 from pyfiles.common_helpers import (
@@ -58,6 +59,7 @@ device_data_filtered_table = db.metadata.tables['device_data_filtered']
 travelled_distances_table = db.metadata.tables['travelled_distances']
 mass_transit_data_table = db.metadata.tables['mass_transit_data']
 global_statistics_table = db.metadata.tables['global_statistics']
+
 
 def initialize():
     print "initialising scheduler"
@@ -582,14 +584,15 @@ def retrieve_transport_alerts():
     hsl_new = hsl_alert_request()
     if hsl_new:
         hsl_alerts_insert(hsl_new)
-        for alert in hsl_new:
-            match_pubtrans_alert(alert)
-            # match_pubtrans_alert_test(alert)  # For testing ptp_push - COMMENT OUT!
+        for hsl_alert in hsl_new:
+            for device_alert in match_pubtrans_alert(hsl_alert):  # match_pubtrans_alert_test(alert)  # For testing ptp_push - COMMENT OUT!
+                push_ptp_pubtrans(device_alert)
     traffic_disorder_new = traffic_disorder_request()
     if traffic_disorder_new:
         traffic_disorder_insert(traffic_disorder_new)
         for disorder in traffic_disorder_new:
-            match_traffic_disorder(disorder)
+            for device_alert in match_traffic_disorder(disorder):
+                push_ptp_traffic(device_alert)
 
 
 def retrieve_weather_info():

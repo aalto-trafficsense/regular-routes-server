@@ -19,7 +19,6 @@ from pyfiles.common_helpers import (
 from pyfiles.constants import (
     BAD_LOCATION_RADIUS, DEST_DURATION_MIN, DEST_RADIUS_MAX)
 from pyfiles.database_interface import init_db, db_engine_execute, data_points_snapping
-
 from pyfiles.prediction.run_prediction import predict
 
 import json
@@ -432,3 +431,4 @@ if __name__ == '__main__':
         app.run(host='0.0.0.0')
     else:
         app.run()
+

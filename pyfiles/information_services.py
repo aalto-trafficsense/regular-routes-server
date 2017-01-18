@@ -121,7 +121,8 @@ def hsl_alert_request():
 
                     for informed_entity in alert.informed_entity:
                         new_row = hsl_alert_row(informed_entity)
-                        if new_row: new_alerts.append(new_row)
+                        if new_row:
+                            new_alerts.append(new_row)
 
         except Exception as e:
             log.exception("Failed to handle alert: %s" % alert)
@@ -470,3 +471,4 @@ def getAlertC(version, location):
 # coordinates = getAlertC("1.11.30", "1596")
 # if coordinates:
 #     print "Lng: " + str(coordinates[0]) + " Lat: " + str(coordinates[1])
+

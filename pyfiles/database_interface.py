@@ -15,7 +15,6 @@ from datetime import timedelta
 from dateutil.parser import parse
 
 from pyfiles.energy_rating import EnergyRating
-from pyfiles.push_messaging import push_ptp_pubtrans, push_ptp_traffic
 from pyfiles.config_helper import get_config
 
 import json
@@ -808,12 +807,14 @@ def match_device_disorder(selection, disorder):
     try:
         query = '''
           SELECT {0}
-          FROM device_data, devices
+          FROM device_data, legs
           WHERE
-            time >= now()-(interval '1 month') AND
-            ("time"(time AT TIME ZONE 'EET') BETWEEN ("time"'{1}' - interval '2 hours') AND ("time"'{1}' + interval '2 hours')) AND
-            waypoint_id = {2} AND
-            devices.id = device_data.device_id ;'''.format(selection, disorder["start_time"][11:])
+            device_data.time >= now()-(interval '1 month') AND
+            ("time"(device_data.time AT TIME ZONE 'Europe/Helsinki') BETWEEN ("time"'{1}' - interval '2 hours') AND ("time"'{1}' + interval '2 hours')) AND
+            legs.activity = 'IN_VEHICLE' AND
+            legs.device_id = device_data.device_id AND
+            device_data.time BETWEEN time_start AND time_end AND
+            ST_Distance(device_data.coordinate, '{2}') < 300 ;'''.format(selection, disorder["start_time"][11:], disorder["coordinate"])
         return db.engine.execute(text(query)).fetchall()
     except Exception as e:
         print "match_device_disorder exception: ", e
@@ -836,7 +837,7 @@ def match_traffic_disorder(disorder):
                 db.engine.execute(stmt)
 
             # Search again to find the distinct users to inform
-            user_ids = match_device_disorder("DISTINCT devices.user_id", disorder)
+            user_ids = match_device_disorder("DISTINCT user_id", disorder)
             if len(user_ids) > 0:
                 for user in user_ids:
                     # Find the latest eligible device id for this user
@@ -852,23 +853,20 @@ def match_traffic_disorder(disorder):
                             alert_end = ae_with_tz.replace(tzinfo=None) + ae_with_tz.tzinfo._offset
                             # Create an alert
                             device_alert = {'device_id': device_id,
-                                         'messaging_token': messaging_token,
-                                         'alert_end': alert_end,
-                                         'alert_type': "DIGITRAFFIC",
-                                         'fi_text': disorder["fi_description"],
-                                         'fi_uri': None,
-                                         'en_text': disorder["fi_description"],
-                                         'en_uri': None,
-                                         'info': disorder["disorder_id"]}
-                            # Push the alert to the device
-                            push_ptp_traffic(device_alert)
+                                            'messaging_token': messaging_token,
+                                            'alert_end': alert_end,
+                                            'alert_type': "DIGITRAFFIC",
+                                            'fi_text': disorder["fi_description"],
+                                            'fi_uri': None,
+                                            'en_text': disorder["fi_description"],
+                                            'en_uri': None,
+                                            'info': disorder["disorder_id"]}
                             # Save the new alert to device_alerts
                             stmt = device_alerts_table.insert(device_alert)
                             db.engine.execute(stmt)
+                            yield device_alert
     except Exception as e:
         print "match_pubtrans_alert exception: ", e
-
-
 
 
 def match_legs_alert(selection, alert):
@@ -926,11 +924,10 @@ def match_pubtrans_alert(alert):
                                          'en_text': alert["en_description"],
                                          'en_uri': "https://www.reittiopas.fi/en/disruptions.php",
                                          'info': alert["line_type"] + ": " + alert["line_name"]}
-                            # Push the alert to the device
-                            push_ptp_pubtrans(device_alert)
                             # Save the new alert to device_alerts
                             stmt = device_alerts_table.insert(device_alert)
                             db.engine.execute(stmt)
+                            yield device_alert
     except Exception as e:
         print "match_pubtrans_alert exception: ", e
 
@@ -945,6 +942,7 @@ def match_pubtrans_alert_test(alert):
         if len(todays_alert_text_matches(device_id, alert["fi_description"])) < 1:
             # No identical alert text found
             # Create an alert
+            new_alerts = []
             device_alert = {'device_id': device_id,
                             'messaging_token': messaging_token,
                             'alert_end': alert["alert_end"],
@@ -955,7 +953,8 @@ def match_pubtrans_alert_test(alert):
                             'en_uri': "https://www.reittiopas.fi/en/disruptions.php",
                             'info': alert["line_type"] + ": " + alert["line_name"]}
             # Push the alert to the device
-            push_ptp_pubtrans(device_alert)
+            new_alerts.append(device_alert)
+            return new_alerts
     except Exception as e:
         print "match_pubtrans_alert_test exception: ", e
 
