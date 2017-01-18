@@ -320,17 +320,17 @@ def init_db(app):
 
 
     # Traffic disorders matching to specific device_data points
-    global traffic_data_disorders_table
-    traffic_data_disorders_table = Table('traffic_data_disorders', metadata,
+    global traffic_legs_disorders_table
+    traffic_legs_disorders_table = Table('traffic_legs_disorders', metadata,
                                          Column('id', Integer, primary_key=True),
                                          Column('time', TIMESTAMP(timezone=True), nullable=False,
                                             default=func.current_timestamp(),
                                             server_default=func.current_timestamp()),
-                                         Column('device_data_table_id', Integer, ForeignKey('device_data.id'), nullable=False),
+                                         Column('legs_table_id', Integer, ForeignKey('legs.id'), nullable=False),
                                          Column('disorders_table_id', Integer, ForeignKey('traffic_disorders.id'), nullable=False))
 
-    if not traffic_data_disorders_table.exists():
-        traffic_data_disorders_table.create(checkfirst=True)
+    if not traffic_legs_disorders_table.exists():
+        traffic_legs_disorders_table.create(checkfirst=True)
 
 
     # Alerts delivered
@@ -823,16 +823,16 @@ def match_device_disorder(selection, disorder):
 
 def match_traffic_disorder(disorder):
     try:
-        # Find matching datapoints
-        device_data_ids = match_device_disorder("device_data.id", disorder)
-        if len(device_data_ids) > 0:
+        # Find matching legs
+        legs_ids = match_device_disorder("DISTINCT legs.id", disorder)
+        if len(legs_ids) > 0:
             # Find the corresponding traffic_disorders table id
             traffic_disorders_query = select([traffic_disorders_table.c.id]) \
                 .where(traffic_disorders_table.c.disorder_id == disorder["disorder_id"])
             traffic_disorders_response = db.engine.execute(traffic_disorders_query).first()
-            for matched_point in device_data_ids:
-                # Save the legs - alerts pairs to pubtrans_legs_alerts
-                stmt = traffic_data_disorders_table.insert({'device_data_table_id': matched_point["id"],
+            for matched_leg in legs_ids:
+                # Save the legs - alerts pairs to traffic_legs_disorders
+                stmt = traffic_legs_disorders_table.insert({'legs_table_id': matched_leg["id"],
                                    'disorders_table_id': traffic_disorders_response["id"]})
                 db.engine.execute(stmt)
 
