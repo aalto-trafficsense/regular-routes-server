@@ -828,7 +828,8 @@ def match_traffic_disorder(disorder):
         if len(legs_ids) > 0:
             # Find the corresponding traffic_disorders table id
             traffic_disorders_query = select([traffic_disorders_table.c.id]) \
-                .where(traffic_disorders_table.c.disorder_id == disorder["disorder_id"])
+                .where(traffic_disorders_table.c.disorder_id == disorder["disorder_id"]) \
+                .where(traffic_disorders_table.c.record_creation_time == disorder["record_creation_time"])
             traffic_disorders_response = db.engine.execute(traffic_disorders_query).first()
             for matched_leg in legs_ids:
                 # Save the legs - alerts pairs to traffic_legs_disorders
