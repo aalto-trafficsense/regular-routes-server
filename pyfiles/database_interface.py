@@ -810,12 +810,20 @@ def match_device_disorder(selection, disorder):
           FROM device_data, legs
           WHERE
             device_data.time >= now()-(interval '1 month') AND
-            ("time"(device_data.time AT TIME ZONE 'Europe/Helsinki') BETWEEN ("time"'{1}' - interval '2 hours') AND ("time"'{1}' + interval '2 hours')) AND
+            ("time"(:start AT TIME ZONE 'Europe/Helsinki') - "time"(time)
+                NOT BETWEEN interval '-24h' + :margin AND
+                             interval '24h' - :margin OR
+             "time"(:start AT TIME ZONE 'Europe/Helsinki') - "time"(time)
+                BETWEEN - interval :margin AND interval :margin) AND
             legs.activity = 'IN_VEHICLE' AND
             legs.device_id = device_data.device_id AND
             device_data.time BETWEEN time_start AND time_end AND
-            ST_Distance(device_data.coordinate, '{2}') < 300 ;'''.format(selection, disorder["start_time"][11:], disorder["coordinate"])
-        return db.engine.execute(text(query)).fetchall()
+            ST_Distance(device_data.coordinate, :coordinate) < 300;'''
+        return db.engine.execute(
+            text(query.format(selection)),
+            margin="2 hours",
+            start=disorder["start_time"],
+            coordinate=disorder["coordinate"]).fetchall()
     except Exception as e:
         print "match_device_disorder exception: ", e
         return None
@@ -877,10 +885,19 @@ def match_legs_alert(selection, alert):
           FROM legs
           WHERE
             time_start >= now()-(interval '1 month') AND
-            ("time"(time_start) BETWEEN ('{1}' - interval '2 hours') AND ('{1}' + interval '2 hours')) AND
-            line_type = '{2}' AND
-            line_name = '{3}' ;'''.format(selection, alert["trip_start"][11:], alert["line_type"], alert["line_name"])
-        return db.engine.execute(text(query)).fetchall()
+            ("time"(time_start) - "time"(:trip_start)
+                NOT BETWEEN interval '-24h' + :margin AND
+                             interval '24h' - :margin OR
+             "time"(time_start) - "time"(:trip_start)
+                BETWEEN - interval :margin and interval :margin) AND
+            line_type = :line_type AND
+            line_name = :line_name;'''
+        return db.engine.execute(
+            text(query.format(selection)),
+            margin="2 hours",
+            trip_start=alert["trip_start"],
+            line_type=alert["line_type"],
+            line_name=alert["line_name"]).fetchall()
     except Exception as e:
         print "match_legs_alert exception: ", e
         return None
