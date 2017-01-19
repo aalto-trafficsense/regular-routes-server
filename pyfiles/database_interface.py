@@ -13,6 +13,7 @@ from sqlalchemy.sql import (
 import svg_generation
 from datetime import timedelta
 from dateutil.parser import parse
+from tzlocal import get_localzone
 
 from pyfiles.energy_rating import EnergyRating
 from pyfiles.config_helper import get_config
@@ -810,12 +811,12 @@ def match_device_disorder(selection, disorder):
           FROM device_data, legs
           WHERE
             device_data.time >= now()-(interval '1 month') AND
-            ("time"(device_data.time AT TIME ZONE 'Europe/Helsinki') BETWEEN ("time"'{1}' - interval '2 hours') AND ("time"'{1}' + interval '2 hours')) AND
+            ("timetz"(device_data.time AT TIME ZONE 'Europe/Helsinki') BETWEEN ("time":start_time - interval '2 hours') AND ("time":start_time + interval '2 hours')) AND
             legs.activity = 'IN_VEHICLE' AND
             legs.device_id = device_data.device_id AND
             device_data.time BETWEEN time_start AND time_end AND
-            ST_Distance(device_data.coordinate, '{2}') < 300 ;'''.format(selection, disorder["start_time"][11:], disorder["coordinate"])
-        return db.engine.execute(text(query)).fetchall()
+            ST_Distance(device_data.coordinate, :coordinate) < 300 ;'''.format(selection)
+        return db.engine.execute(text(query), start_time=disorder["start_time"][11:], coordinate=disorder["coordinate"]).fetchall()
     except Exception as e:
         print "match_device_disorder exception: ", e
         return None
@@ -850,8 +851,8 @@ def match_traffic_disorder(disorder):
                         if len(todays_alert_text_matches(device_id, disorder["fi_description"])) < 1:
                             # No identical alert text found
                             # Parse digitraffic ISO8601 timestamp into a datetime without timezone
-                            ae_with_tz = parse(disorder["end_time"])
-                            alert_end = ae_with_tz.replace(tzinfo=None) + ae_with_tz.tzinfo._offset
+                            alert_end = parse(disorder["end_time"]).astimezone(get_localzone())
+                            # This didn't have the expected effect: .replace(tzinfo=None) + ae_with_tz.tzinfo._offset
                             # Create an alert
                             device_alert = {'device_id': device_id,
                                             'messaging_token': messaging_token,

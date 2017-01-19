@@ -591,8 +591,9 @@ def retrieve_transport_alerts():
     if traffic_disorder_new:
         traffic_disorder_insert(traffic_disorder_new)
         for disorder in traffic_disorder_new:
-            for device_alert in match_traffic_disorder(disorder):
-                push_ptp_traffic(device_alert)
+            if disorder["coordinate"] is not None:
+                for device_alert in match_traffic_disorder(disorder):
+                    push_ptp_traffic(device_alert)
 
 
 def retrieve_weather_info():
@@ -611,3 +612,18 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print >> sys.stderr, '\nExiting by user request.\n'
         sys.exit(0)
+
+
+# test_disorder = {
+#                 'record_creation_time': '2017-01-18 16:08:37.598+00',
+#                 'disorder_id': 'GUID5000826501',
+#                 'start_time': '2017-01-18 14:40:03.981+00',
+#                 'end_time': '2017-01-18 16:08:37.598+00',
+#                 'coordinate': '0101000020E61000002922C32ADED03840D8F50B76C31A4E40',
+#                 'waypoint_id': 248252602092,
+#                 'fi_description': '',
+#                 'sv_description': '',
+#                 'en_description': ''
+#             }
+#
+# match_device_disorder("DISTINCT legs.id", disorder)
