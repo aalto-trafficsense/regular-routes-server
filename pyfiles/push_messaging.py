@@ -9,6 +9,8 @@ import requests
 import datetime
 
 from pyfiles.config_helper import get_config
+from tzlocal import get_localzone
+
 
 header = {'Content-Type': 'application/json',
           'Authorization': 'key=' + get_config('FIREBASE_KEY')}
@@ -25,8 +27,10 @@ def push_ptp_pubtrans(device_alert):
                             'PTP_ALERT_PUBTRANS': '1',
                             'PTP_ALERT_END': device_alert["alert_end"].strftime("%Y-%m-%d %H:%M:%S"),
                             'PTP_ALERT_TYPE': device_alert["alert_type"]}
-        delta = device_alert["alert_end"] - datetime.datetime.now()
-        ttl = int(delta.total_seconds())
+        delta_sec = int((device_alert["alert_end"] - datetime.datetime.now()).total_seconds())
+        ttl = 3600  # seconds = 1 hour default
+        if (delta_sec > 0) and (delta_sec < 43200):  # Between positive and 12 hours
+            ttl = delta_sec
         fire_msg = json.dumps({'to': device_alert["messaging_token"],
                                'data': device_alert_msg,
                                'time_to_live': ttl})
@@ -44,8 +48,10 @@ def push_ptp_traffic(device_alert):
                             'PTP_ALERT_TRAFFIC': '1',
                             'PTP_ALERT_END': device_alert["alert_end"].strftime("%Y-%m-%d %H:%M:%S"),
                             'PTP_ALERT_TYPE': device_alert["alert_type"]}
-        delta = device_alert["alert_end"] - datetime.datetime.now()
-        ttl = int(delta.total_seconds())
+        delta_sec = int((device_alert["alert_end"] - datetime.datetime.now(get_localzone())).total_seconds())
+        ttl = 3600  # seconds = 1 hour default
+        if (delta_sec > 0) and (delta_sec < 43200):  # Between positive and 12 hours
+            ttl = delta_sec
         fire_msg = json.dumps({'to': device_alert["messaging_token"],
                                'data': device_alert_msg,
                                'time_to_live': ttl})
