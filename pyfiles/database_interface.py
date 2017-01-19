@@ -804,7 +804,7 @@ def hsl_alerts_get_max():
     return -1, -1
 
 
-def match_device_disorder(selection, disorder):
+def match_legs_traffic_disorder(selection, disorder):
     try:
         query = '''
           SELECT {0}
@@ -833,7 +833,7 @@ def match_device_disorder(selection, disorder):
 def match_traffic_disorder(disorder):
     try:
         # Find matching legs
-        legs_ids = match_device_disorder("DISTINCT legs.id", disorder)
+        legs_ids = match_legs_traffic_disorder("DISTINCT legs.id", disorder)
         if len(legs_ids) > 0:
             # Find the corresponding traffic_disorders table id
             traffic_disorders_query = select([traffic_disorders_table.c.id]) \
@@ -847,7 +847,7 @@ def match_traffic_disorder(disorder):
                 db.engine.execute(stmt)
 
             # Search again to find the distinct users to inform
-            user_ids = match_device_disorder("DISTINCT user_id", disorder)
+            user_ids = match_legs_traffic_disorder("DISTINCT user_id", disorder)
             if len(user_ids) > 0:
                 for user in user_ids:
                     # Find the latest eligible device id for this user
@@ -879,7 +879,7 @@ def match_traffic_disorder(disorder):
         print "match_pubtrans_alert exception: ", e
 
 
-def match_legs_alert(selection, alert):
+def match_legs_pubtrans_alert(selection, alert):
     try:
         query = '''
           SELECT {0}
@@ -907,7 +907,7 @@ def match_legs_alert(selection, alert):
 def match_pubtrans_alert(alert):
     try:
         # Find matching legs
-        legs_ids = match_legs_alert("id", alert)
+        legs_ids = match_legs_pubtrans_alert("id", alert)
         if len(legs_ids) > 0:
             for matched_leg in legs_ids:
                 # Find the corresponding hsl_alerts table id
@@ -922,7 +922,7 @@ def match_pubtrans_alert(alert):
                 db.engine.execute(stmt)
 
             # Search again to find the distinct users to inform
-            user_ids = match_legs_alert("DISTINCT user_id", alert)
+            user_ids = match_legs_pubtrans_alert("DISTINCT user_id", alert)
             if len(user_ids) > 0:
                 for user in user_ids:
                     # Find the latest eligible device id for this user
