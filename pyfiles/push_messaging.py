@@ -9,24 +9,79 @@ import requests
 import datetime
 
 from pyfiles.config_helper import get_config
-from tzlocal import get_localzone
 
 
 header = {'Content-Type': 'application/json',
           'Authorization': 'key=' + get_config('FIREBASE_KEY')}
 
 
-def push_ptp_pubtrans(device_alert):
+# def push_ptp_pubtrans(device_alert):
+#     try:
+#         device_alert_msg = {'NOTIFICATION_TITLE': 'HRT / TrafficSense Public Transport Disruption Info',
+#                             'NOTIFICATION_MESSAGE': device_alert["en_text"],
+#                             'NOTIFICATION_URI': device_alert["en_uri"],
+#                             'NOTIFICATION_TITLE_FI': 'HSL / TrafficSense joukkoliikenteen häiriötieto',
+#                             'NOTIFICATION_MESSAGE_FI': device_alert["fi_text"],
+#                             'NOTIFICATION_URI_FI': device_alert["fi_uri"],
+#                             'PTP_ALERT_PUBTRANS': '1',
+#                             'PTP_ALERT_END': device_alert["alert_end"].strftime("%Y-%m-%d %H:%M:%S"),
+#                             'PTP_ALERT_TYPE': device_alert["alert_type"]}
+#         delta_sec = int((device_alert["alert_end"] - datetime.datetime.now()).total_seconds())
+#         ttl = 3600  # seconds = 1 hour default
+#         if (delta_sec > 0) and (delta_sec < 43200):  # Between positive and 12 hours
+#             ttl = delta_sec
+#         fire_msg = json.dumps({'to': device_alert["messaging_token"],
+#                                'data': device_alert_msg,
+#                                'time_to_live': ttl})
+#         firebase_request(fire_msg)
+#     except Exception as e:
+#         print "push_ptp_pubtrans / exception: ", e
+#
+#
+# def push_ptp_traffic(device_alert):
+#     try:
+#         device_alert_msg = {'NOTIFICATION_TITLE': 'DigiTraffic / TrafficSense Disruption Info',
+#                             'NOTIFICATION_MESSAGE': device_alert["en_text"],
+#                             'NOTIFICATION_TITLE_FI': 'DigiTraffic / TrafficSense liikenteen häiriötieto',
+#                             'NOTIFICATION_MESSAGE_FI': device_alert["fi_text"],
+#                             'PTP_ALERT_TRAFFIC': '1',
+#                             'PTP_ALERT_END': device_alert["alert_end"].strftime("%Y-%m-%d %H:%M:%S"),
+#                             'PTP_ALERT_TYPE': device_alert["alert_type"]}
+#         delta_sec = int((device_alert["alert_end"] - datetime.datetime.now()).total_seconds())
+#         ttl = 3600  # seconds = 1 hour default
+#         if (delta_sec > 0) and (delta_sec < 43200):  # Between positive and 12 hours
+#             ttl = delta_sec
+#         fire_msg = json.dumps({'to': device_alert["messaging_token"],
+#                                'data': device_alert_msg,
+#                                'time_to_live': ttl})
+#         firebase_request(fire_msg)
+#     except Exception as e:
+#         print "push_ptp_traffic / exception: ", e
+
+PTP_TYPE_PUBTRANS = 0
+PTP_TYPE_DIGITRAFFIC = 1
+
+
+def push_ptp_alert(alert_type, device_alert):
     try:
-        device_alert_msg = {'NOTIFICATION_TITLE': 'HRT / TrafficSense Public Transport Disruption Info',
-                            'NOTIFICATION_MESSAGE': device_alert["en_text"],
-                            'NOTIFICATION_URI': device_alert["en_uri"],
-                            'NOTIFICATION_TITLE_FI': 'HSL / TrafficSense joukkoliikenteen häiriötieto',
-                            'NOTIFICATION_MESSAGE_FI': device_alert["fi_text"],
-                            'NOTIFICATION_URI_FI': device_alert["fi_uri"],
-                            'PTP_ALERT_PUBTRANS': '1',
-                            'PTP_ALERT_END': device_alert["alert_end"].strftime("%Y-%m-%d %H:%M:%S"),
-                            'PTP_ALERT_TYPE': device_alert["alert_type"]}
+        if alert_type == PTP_TYPE_PUBTRANS:
+            device_alert_msg = {'NOTIFICATION_TITLE': 'HRT / TrafficSense Public Transport Disruption Info',
+                                'NOTIFICATION_MESSAGE': device_alert["en_text"],
+                                'NOTIFICATION_URI': device_alert["en_uri"],
+                                'NOTIFICATION_TITLE_FI': 'HSL / TrafficSense joukkoliikenteen häiriötieto',
+                                'NOTIFICATION_MESSAGE_FI': device_alert["fi_text"],
+                                'NOTIFICATION_URI_FI': device_alert["fi_uri"],
+                                'PTP_ALERT_PUBTRANS': '1',
+                                'PTP_ALERT_END': device_alert["alert_end"].strftime("%Y-%m-%d %H:%M:%S"),
+                                'PTP_ALERT_TYPE': device_alert["alert_type"]}
+        elif alert_type == PTP_TYPE_DIGITRAFFIC:
+            device_alert_msg = {'NOTIFICATION_TITLE': 'DigiTraffic / TrafficSense Disruption Info',
+                                'NOTIFICATION_MESSAGE': device_alert["en_text"],
+                                'NOTIFICATION_TITLE_FI': 'DigiTraffic / TrafficSense liikenteen häiriötieto',
+                                'NOTIFICATION_MESSAGE_FI': device_alert["fi_text"],
+                                'PTP_ALERT_TRAFFIC': '1',
+                                'PTP_ALERT_END': device_alert["alert_end"].strftime("%Y-%m-%d %H:%M:%S"),
+                                'PTP_ALERT_TYPE': device_alert["alert_type"]}
         delta_sec = int((device_alert["alert_end"] - datetime.datetime.now()).total_seconds())
         ttl = 3600  # seconds = 1 hour default
         if (delta_sec > 0) and (delta_sec < 43200):  # Between positive and 12 hours
@@ -37,27 +92,6 @@ def push_ptp_pubtrans(device_alert):
         firebase_request(fire_msg)
     except Exception as e:
         print "push_ptp_pubtrans / exception: ", e
-
-
-def push_ptp_traffic(device_alert):
-    try:
-        device_alert_msg = {'NOTIFICATION_TITLE': 'DigiTraffic / TrafficSense Disruption Info',
-                            'NOTIFICATION_MESSAGE': device_alert["en_text"],
-                            'NOTIFICATION_TITLE_FI': 'DigiTraffic / TrafficSense liikenteen häiriötieto',
-                            'NOTIFICATION_MESSAGE_FI': device_alert["fi_text"],
-                            'PTP_ALERT_TRAFFIC': '1',
-                            'PTP_ALERT_END': device_alert["alert_end"].strftime("%Y-%m-%d %H:%M:%S"),
-                            'PTP_ALERT_TYPE': device_alert["alert_type"]}
-        delta_sec = int((device_alert["alert_end"] - datetime.datetime.now(get_localzone())).total_seconds())
-        ttl = 3600  # seconds = 1 hour default
-        if (delta_sec > 0) and (delta_sec < 43200):  # Between positive and 12 hours
-            ttl = delta_sec
-        fire_msg = json.dumps({'to': device_alert["messaging_token"],
-                               'data': device_alert_msg,
-                               'time_to_live': ttl})
-        firebase_request(fire_msg)
-    except Exception as e:
-        print "push_ptp_traffic / exception: ", e
 
 
 def firebase_request(fire_msg):

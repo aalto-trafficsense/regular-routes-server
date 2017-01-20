@@ -12,8 +12,6 @@ from sqlalchemy.sql import (
     and_, between, column, func, or_, select, table, text)
 import svg_generation
 from datetime import timedelta
-from dateutil.parser import parse
-from tzlocal import get_localzone
 
 from pyfiles.energy_rating import EnergyRating
 from pyfiles.config_helper import get_config
@@ -826,7 +824,7 @@ def match_legs_traffic_disorder(selection, disorder):
             start=disorder["start_time"],
             coordinate=disorder["coordinate"]).fetchall()
     except Exception as e:
-        print "match_device_disorder exception: ", e
+        print "match_legs_traffic_disorder exception: ", e
         return None
 
 
@@ -859,8 +857,17 @@ def match_traffic_disorder(disorder):
                         if len(todays_alert_text_matches(device_id, disorder["fi_description"])) < 1:
                             # No identical alert text found
                             # Parse digitraffic ISO8601 timestamp into a datetime without timezone
-                            alert_end = parse(disorder["end_time"]).astimezone(get_localzone())
+                            # (doesn't work if the server doesn't give a correct localzone)
+                            # alert_end = parse(disorder["end_time"]).astimezone(get_localzone())
                             # This didn't have the expected effect: .replace(tzinfo=None) + ae_with_tz.tzinfo._offset
+                            # Trust Digitraffic platform to take care of DST:
+                            if disorder["end_time"] is None:
+                                # No endtime specified - default 1 hour from now
+                                alert_end = datetime.datetime.now() + datetime.timedelta(hours=1)
+                            else:
+                                # Strip into a timezone-naive datetime:
+                                alert_end = datetime.datetime.strptime(disorder["end_time"][:19].replace("T", " "),
+                                                                       "%Y-%m-%d %H:%M:%S")
                             # Create an alert
                             device_alert = {'device_id': device_id,
                                             'messaging_token': messaging_token,
@@ -876,7 +883,7 @@ def match_traffic_disorder(disorder):
                             db.engine.execute(stmt)
                             yield device_alert
     except Exception as e:
-        print "match_pubtrans_alert exception: ", e
+        print "match_traffic_disorder exception: ", e
 
 
 def match_legs_pubtrans_alert(selection, alert):
@@ -900,7 +907,7 @@ def match_legs_pubtrans_alert(selection, alert):
             line_type=alert["line_type"],
             line_name=alert["line_name"]).fetchall()
     except Exception as e:
-        print "match_legs_alert exception: ", e
+        print "match_legs_pubtrans_alert exception: ", e
         return None
 
 
@@ -934,9 +941,14 @@ def match_pubtrans_alert(alert):
                         if len(todays_alert_text_matches(device_id, alert["fi_description"])) < 1:
                             # No identical alert text found
                             # Create an alert
+                            # If no endtime specified, default 1 hour from now:
+                            if alert["alert_end"] is None:
+                                alert_end = datetime.datetime.now() + datetime.timedelta(hours=1)
+                            else:
+                                alert_end = alert["alert_end"]
                             device_alert = {'device_id': device_id,
                                          'messaging_token': messaging_token,
-                                         'alert_end': alert["alert_end"],
+                                         'alert_end': alert_end,
                                          'alert_type': alert["line_type"],
                                          'fi_text': alert["fi_description"],
                                          'fi_uri': "https://www.reittiopas.fi/disruptions.php",
