@@ -444,6 +444,7 @@ CREATE OR REPLACE VIEW leg_modes AS SELECT
 
     -- strict activity including user correction, no mass transit
     CASE WHEN mu.mode IN :activity_types THEN mu.mode::text::activity_type_enum
+        WHEN mu.mode IN :mass_transit_types THEN 'IN_VEHICLE'
         ELSE activity
         END activity,
 
