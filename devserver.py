@@ -1,10 +1,12 @@
 #!/usr/bin/env python
 
+import datetime
 from datetime import timedelta
 from itertools import groupby
+import json
+import os
 
 from flask import Flask, jsonify, request, render_template, Response, make_response
-from oauth2client.client import *
 from sqlalchemy.sql import and_, func, select, text
 
 from pyfiles.common_helpers import (
@@ -21,14 +23,13 @@ from pyfiles.constants import (
 from pyfiles.database_interface import init_db, db_engine_execute, data_points_snapping
 from pyfiles.prediction.run_prediction import predict
 
-import json
-
 import logging
 logging.basicConfig()
 
 # Used for client_log testing
-from pyfiles.database_interface import (client_log_table_insert, users_table_insert, devices_table_insert,
-                                        get_max_devices_table_id_from_users_table_id,get_user_id_from_device_id)
+from pyfiles.database_interface import (
+    client_log_table_insert, get_max_devices_table_id_from_users_table_id,
+    get_user_id_from_device_id)
 
 APPLICATION_NAME = 'TrafficSense'
 
@@ -394,6 +395,8 @@ def logtest():
     user_id = 1
     device_id = 1
     # Dummy entries for setting up the tables
+    # from pyfiles.database_interface import (
+    #     users_table_insert, devices_table_insert)
     # users_table_insert("user", "foobar", "barfoo")
     # devices_table_insert(1, "foobar", "a5b8ef8f-73b1-4197-ade9-29141c0ed6e9", "model", "a5b8ef8f-73b1-4197-ade9-29141c0ed6e9")
     print 'get_user_id_from_device_id: ' + str(get_user_id_from_device_id(device_id))

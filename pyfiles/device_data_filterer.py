@@ -32,7 +32,8 @@ from pyfiles.database_interface import (
     match_mass_transit_live)
 
 from pyfiles.mass_transit_match_planner import (
-    find_same_journey_time_this_week, match_tripleg_with_publictransport, TripMatchedWithPlannerResult, PlannedTrip, minSpeeds)
+    find_same_journey_time_this_week, match_tripleg_with_publictransport,
+    minSpeeds, TripMatchedWithPlannerResult)
 
 # if enabled, records matching results of each user in a separate csv file
 DUMP_CSV_FILES = False

@@ -1,11 +1,16 @@
 #!/usr/bin/env python
 
+import datetime
+from datetime import timedelta
+
 import geoalchemy2 as ga2
 from flask import abort
 from flask.ext.sqlalchemy import SQLAlchemy
-from oauth2client.client import *
-from sqlalchemy import MetaData, Table, Column, ForeignKey, Enum, BigInteger, Integer, String, Index, UniqueConstraint, \
-    Float
+
+from sqlalchemy import (
+    BigInteger, Column, Enum, Float, ForeignKey, Index, Integer, String, Table,
+    UniqueConstraint)
+
 from sqlalchemy.dialects.postgresql import DOUBLE_PRECISION, TIMESTAMP, UUID
 from sqlalchemy.exc import DataError
 
@@ -13,12 +18,9 @@ from sqlalchemy.sql import (
     and_, between, column, exists, func, or_, select, text)
 
 import svg_generation
-from datetime import timedelta
 
 from pyfiles.energy_rating import EnergyRating
 from pyfiles.config_helper import get_config
-
-import json
 
 from constants import *
 

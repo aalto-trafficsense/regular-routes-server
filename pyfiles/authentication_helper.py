@@ -1,11 +1,16 @@
 #!/usr/bin/env python
 
 import hashlib
+import json
+
 import httplib2
 
 from flask import abort, jsonify
 from flask import make_response
-from oauth2client.client import *
+
+from oauth2client.client import (
+    flow_from_clientsecrets, FlowExchangeError, verify_id_token)
+
 from oauth2client.crypt import AppIdentityError
 
 # from simplekv.memory import DictStore

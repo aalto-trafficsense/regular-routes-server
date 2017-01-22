@@ -1,15 +1,18 @@
 #!/usr/bin/env python
 
-import random
-import string
+import datetime
 from datetime import timedelta
 import json
+import os
+import random
+import string
+
 import httplib2
 
 from flask import (
     Flask, Response, jsonify, make_response, render_template, request, session)
 
-from oauth2client.client import *
+from oauth2client.client import flow_from_clientsecrets, FlowExchangeError
 
 from pyfiles.database_interface import (
     get_filtered_device_data_points, get_svg, get_users_table_id, init_db,

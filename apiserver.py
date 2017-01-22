@@ -1,12 +1,13 @@
 #!/usr/bin/env python
 
+import datetime
+import json
+import os
 from uuid import uuid4
 
 from flask import Flask, abort, jsonify, request, make_response
-from oauth2client.client import *
 from sqlalchemy.sql import and_, between, cast, func, literal, select, text
 from sqlalchemy.types import String
-import json
 from pyfiles.common_helpers import (
     dict_groups,
     simplify_geometry,
