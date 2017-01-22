@@ -463,7 +463,7 @@ def setlegmode_post():
             db.engine.execute(modes.delete().where(where))
         else:
             db.engine.execute(modes.update().where(where).values(values))
-    else:
+    elif legact is not None:
         db.engine.execute(modes.insert().values(values))
 
     client_log_table_insert(
