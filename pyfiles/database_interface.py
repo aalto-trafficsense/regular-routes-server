@@ -866,13 +866,13 @@ def match_traffic_disorder(disorder):
                                 alert_end = datetime.datetime.now() + datetime.timedelta(hours=1)
                             else:
                                 # Strip into a timezone-naive datetime:
-                                alert_end = datetime.datetime.strptime(disorder["end_time"][:19].replace("T", " "),
-                                                                       "%Y-%m-%d %H:%M:%S")
+                                alert_end = datetime.datetime.strptime(disorder["end_time"][:19], "%Y-%m-%dT%H:%M:%S")
                             # Create an alert
                             device_alert = {'device_id': device_id,
                                             'messaging_token': messaging_token,
                                             'alert_end': alert_end,
                                             'alert_type': "DIGITRAFFIC",
+                                            'coordinate': disorder["coordinate"],
                                             'fi_text': disorder["fi_description"],
                                             'fi_uri': None,
                                             'en_text': disorder["fi_description"],

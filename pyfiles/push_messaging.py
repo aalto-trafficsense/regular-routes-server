@@ -82,6 +82,9 @@ def push_ptp_alert(alert_type, device_alert):
                                 'PTP_ALERT_TRAFFIC': '1',
                                 'PTP_ALERT_END': device_alert["alert_end"].strftime("%Y-%m-%d %H:%M:%S"),
                                 'PTP_ALERT_TYPE': device_alert["alert_type"]}
+            success, latitude, longitude = get_lat_lng(device_alert["coordinate"])
+            if success:
+                device_alert_msg.update({'PTP_ALERT_LAT': latitude, 'PTP_ALERT_LNG': longitude})
         delta_sec = int((device_alert["alert_end"] - datetime.datetime.now()).total_seconds())
         ttl = 3600  # seconds = 1 hour default
         if (delta_sec > 0) and (delta_sec < 43200):  # Between positive and 12 hours
@@ -92,6 +95,21 @@ def push_ptp_alert(alert_type, device_alert):
         firebase_request(fire_msg)
     except Exception as e:
         print "push_ptp_pubtrans / exception: ", e
+
+
+def get_lat_lng(crd):
+    try:
+        if crd.startswith("POINT"):
+            i1 = crd.find("(")
+            i2 = crd.find(" ")
+            i3 = crd.find(")")
+            # Send as strings, because firebase only conveys strings anyway.
+            return True, crd[i2 + 1:i3], crd[i1 + 1:i2]
+        else:
+            return False, "", ""
+    except Exception as e:
+        print "get_lat_lng exception: ", e
+        return False, "", ""
 
 
 def firebase_request(fire_msg):
