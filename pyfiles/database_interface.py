@@ -12,7 +12,7 @@ from sqlalchemy import (
     UniqueConstraint)
 
 from sqlalchemy.dialects.postgresql import DOUBLE_PRECISION, TIMESTAMP, UUID
-from sqlalchemy.exc import DataError
+from sqlalchemy.exc import DataError, ProgrammingError
 
 from sqlalchemy.sql import (
     and_, between, column, exists, func, or_, select, text)
@@ -423,8 +423,7 @@ def init_db(app):
     metadata.create_all(checkfirst=True)
 
     # Combined view of legs with migrated/detected/user modes and lines
-    with db.engine.begin() as t:
-        t.execute(text("""
+    create = text("""
 
 CREATE OR REPLACE VIEW leg_modes AS SELECT
     l.id,
@@ -468,10 +467,20 @@ CREATE OR REPLACE VIEW leg_modes AS SELECT
         LEFT JOIN modes ml ON ml.leg = l.id AND ml.source = 'LIVE'
         LEFT JOIN modes mp ON mp.leg = l.id AND mp.source = 'PLANNER'
         LEFT JOIN modes mf ON mf.leg = l.id AND mf.source = 'FILTERED'
-        """),
+        """)
 
-        activity_types=activity_types,
-        mass_transit_types=mass_transit_types)
+    params = {
+        "activity_types": activity_types,
+        "mass_transit_types": mass_transit_types}
+
+    try:
+        with db.engine.begin() as t:
+            t.execute(create, **params)
+    except ProgrammingError as e:
+        # REPLACE VIEW is rather conservative; replace harder...
+        with db.engine.begin() as t:
+            t.execute(text("DROP VIEW leg_modes"))
+            t.execute(create, **params)
 
     global leg_modes_view
     leg_modes_view = Table("leg_modes", metadata,
