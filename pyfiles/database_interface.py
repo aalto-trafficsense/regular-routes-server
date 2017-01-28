@@ -351,7 +351,7 @@ def init_db(app):
                                          Column('time', TIMESTAMP(timezone=True), nullable=False,
                                             default=func.current_timestamp(),
                                             server_default=func.current_timestamp()),
-                                         Column('legs_table_id', Integer, ForeignKey('legs.id'), nullable=False),
+                                         Column('legs_table_id', Integer, ForeignKey('legs.id', ondelete="SET NULL")),
                                          Column('disorders_table_id', Integer, ForeignKey('traffic_disorders.id'), nullable=False))
 
     if not traffic_legs_disorders_table.exists():
