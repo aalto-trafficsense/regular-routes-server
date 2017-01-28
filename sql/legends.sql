@@ -159,7 +159,7 @@ for each row execute procedure legs_updated();
 
 
 -- Function that can be called to cluster legs created before leg_ends set up.
-create or replace function legs_cluster() returns void as $$
+create or replace function legs_cluster(lim integer) returns void as $$
 declare
     leg legs%rowtype;
 begin
@@ -167,6 +167,7 @@ begin
         where user_id is not null
           and coordinate_start is not null
           and cluster_start is null
+        limit lim
     loop
         perform legs_link_start(leg);
     end loop;
@@ -175,6 +176,7 @@ begin
         where user_id is not null
           and coordinate_end is not null
           and cluster_end is null
+        limit lim
     loop
         perform legs_link_end(leg);
     end loop;

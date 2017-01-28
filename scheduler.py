@@ -1,6 +1,6 @@
 import datetime
 from datetime import timedelta
-from itertools import chain
+from itertools import chain, count
 
 import json
 import os
@@ -68,7 +68,7 @@ def initialize():
     scheduler.start()
     scheduler.add_job(retrieve_hsl_data, "cron", second="*/30")
     run_daily_tasks()
-    scheduler.add_job(generate_legs, "cron", minute=24)
+    scheduler.add_job(run_hourly_tasks, "cron", minute=24)
     scheduler.add_job(run_daily_tasks, "cron", hour="3")
     scheduler.add_job(retrieve_transport_alerts, "cron", minute="*/10")
     scheduler.add_job(retrieve_weather_info, "cron", hour="6")
@@ -82,6 +82,10 @@ def run_daily_tasks():
     generate_distance_data()
     update_global_statistics()
     mass_transit_cleanup()
+
+
+def run_hourly_tasks():
+    generate_legs()
 
 
 def generate_legs(maxtime=None, repair=False):
@@ -329,6 +333,19 @@ def generate_legs(maxtime=None, repair=False):
             db.engine.execute(legs.update(
                 legs.c.id==lid).values(user_id=user)) # attach
             print "-> attach"
+
+    # Cluster backlog in batches
+    cluster_legs(1000)
+
+
+def cluster_legs(limit):
+    """New leg ends are clustered live by triggers; this can be used to cluster
+    legs created before clustering."""
+
+    print "cluster_legs up to", limit
+
+    with db.engine.begin() as t:
+        t.execute(text("SELECT legs_cluster(:limit)"), limit=limit)
 
 
 def filter_device_data(maxtime=None):
