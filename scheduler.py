@@ -205,24 +205,32 @@ def generate_legs(maxtime=None, repair=False):
                 "coordinate_start": gj0 and func.ST_GeomFromGeoJSON(gj0),
                 "coordinate_end": gj1 and func.ST_GeomFromGeoJSON(gj1)})
 
-            # Don't touch if same leg already recorded.
-            existing = t.execute(legs.select(and_(*(
-                legs.c[c] == leg[c] for c in leg.keys())))).first()
-            if existing:
+            # Deal with overlapping legs on rewind/repair
+            legid = t.execute(select(
+                [legs.c.id],
+                and_(*(legs.c[c] == leg[c] for c in leg.keys())))).scalar()
+            if legid:
                 print "-> unchanged",
-                legid = existing.id
             else:
-                # Replace legs overlapping on more than a transition point
                 overlapstart = prevleg and prevleg["time_end"] or start
-                rowcount = t.execute(legs.delete(and_(
-                    legs.c.device_id == leg["device_id"],
-                    legs.c.time_start < leg["time_end"],
-                    legs.c.time_end > overlapstart))).rowcount
-                if rowcount:
-                    print "-> delete %d" % rowcount,
-                ins = legs.insert(leg).returning(legs.c.id)
-                legid = t.execute(ins).scalar()
-                print "-> insert",
+                overlaps = [x[0] for x in t.execute(select(
+                    [legs.c.id],
+                    and_(
+                        legs.c.device_id == leg["device_id"],
+                        legs.c.time_start < leg["time_end"],
+                        legs.c.time_end > overlapstart),
+                    order_by=legs.c.time_start))]
+                if overlaps:
+                    legid, dels = overlaps[0], overlaps[1:]
+                    t.execute(legs.update(legs.c.id == legid, leg))
+                    print "-> update",
+                    if dels:
+                        t.execute(legs.delete(legs.c.id.in_(dels)))
+                        print "-> delete %d" % len(dels)
+                else:
+                    ins = legs.insert(leg).returning(legs.c.id)
+                    legid = t.execute(ins).scalar()
+                    print "-> insert",
 
             # Delete mismatching modes, add new modes
             modes = db.metadata.tables["modes"]
