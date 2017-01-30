@@ -5,6 +5,8 @@
     right: 0;
     height: 160px;
     overflow: auto;
+    box-shadow: 0 20px 20px -20px grey;
+    z-index: 1;
 }
 
 #trip { margin-top: 0; margin-bottom: 0 }
