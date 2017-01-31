@@ -53,9 +53,23 @@ $$ language plpgsql volatile returns null on null input;
 -- Recluster places after insert/update/delete.
 create or replace function leg_ends_changed(old leg_ends, new leg_ends)
 returns void as $$
+declare
+    oneref boolean;
 begin
-    if old.coordinate is distinct from new.coordinate then
-        perform leg_ends_unlink(old);
+    if old.coordinate is not distinct from new.coordinate then
+        return;
+    end if;
+
+    -- Don't recreate single-user place from scratch, shift instead
+    select count(*) = 1 from leg_ends where place = old.place
+        and new.coordinate is not null into oneref;
+    if oneref then
+        perform places_fixup(old.place);
+        return;
+    end if;
+
+    perform leg_ends_unlink(old);
+    if new.coordinate is not null then
         perform leg_ends_link(new);
     end if;
 end;
