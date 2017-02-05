@@ -3,6 +3,8 @@
 import datetime
 from datetime import timedelta
 
+import json
+
 import geoalchemy2 as ga2
 from flask import abort
 from flask.ext.sqlalchemy import SQLAlchemy
@@ -22,7 +24,10 @@ import svg_generation
 from pyfiles.energy_rating import EnergyRating
 from pyfiles.config_helper import get_config
 
-from constants import *
+from pyfiles.common_helpers import (
+    get_distance_between_coordinates, trace_discard_sidesteps)
+
+from pyfiles.constants import *
 
 
 # from simplekv.memory import DictStore
@@ -587,6 +592,126 @@ def get_svg(user_id, firstday=None, lastday=None):
     ranking, max_ranking = ranks or (0, 0)
 
     return svg_generation.generate_energy_rating_svg(rating, firstday, end_time, ranking, max_ranking)
+
+
+def update_user_distances(user, start, end, update_rankings=True):
+
+    # Snap to whole days
+    start = start.replace(hour=0, minute=0, second=0, microsecond=0)
+    end += timedelta(days=1, microseconds=-1)
+    end = end.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    data_rows = get_filtered_device_data_points(user, start, end)
+
+    # discard suspiciously sharp movement from bogus location jumps
+    data_rows = trace_discard_sidesteps(data_rows, BAD_LOCATION_RADIUS)
+
+    dists = db.metadata.tables["travelled_distances"]
+    for rating in get_ratings_from_rows(data_rows, user):
+        where = and_(*(dists.c[x] == rating[x] for x in ["user_id", "time"]))
+        ex = db.engine.execute(dists.select(where)).first() # no upsert yet
+        if ex:
+            db.engine.execute(dists.update(where, rating))
+        else:
+            db.engine.execute(dists.insert([rating]))
+
+    if not update_rankings:
+        return
+
+    # Update unused weekly rankings based on ratings
+    query = text("""
+        SELECT DISTINCT time FROM travelled_distances
+        WHERE time >= :start AND time < :end + interval '6 days'
+            AND total_distance IS NOT NULL""")
+    for row in db.engine.execute(query, start=start, end=end):
+        generate_rankings(row[0])
+
+
+def get_ratings_from_rows(filtered_data_rows, user_id):
+    ratings = []
+    rows = list(filtered_data_rows)
+    if len(rows) == 0:
+        return ratings
+    previous_time = rows[0]["time"]
+    current_date = rows[0]["time"].replace(hour = 0, minute = 0, second = 0, microsecond = 0)
+    previous_location = json.loads(rows[0]["geojson"])["coordinates"]
+    rating = EnergyRating(user_id, date=current_date)
+    for row in rows[1:]:
+        current_activity = row["activity"]
+        current_time = row["time"]
+        current_location = json.loads(row["geojson"])["coordinates"]
+
+        if (current_time - current_date).total_seconds() >= 60*60*24: #A full day
+            current_date = current_time.replace(hour = 0, minute = 0, second = 0, microsecond = 0)
+            rating.calculate_rating()
+            if not rating.is_empty():
+                ratings.append(rating.get_data_dict())
+            rating = EnergyRating(user_id, date=current_date)
+
+        if (current_time - previous_time).total_seconds() > MAX_POINT_TIME_DIFFERENCE:
+            previous_time = current_time
+            previous_location = current_location
+            continue
+
+        distance = get_distance_between_coordinates(previous_location, current_location) / 1000.0
+
+        previous_location = current_location
+
+        if current_activity == "IN_VEHICLE":
+            #TODO: handle FERRY somehow.
+            if row["line_type"] == "TRAIN":
+                rating.add_in_mass_transit_A_distance(distance)
+            elif row["line_type"] in ("TRAM", "SUBWAY"):
+                rating.add_in_mass_transit_B_distance(distance)
+            elif row["line_type"] == "BUS":
+                rating.add_in_mass_transit_C_distance(distance)
+            else:
+                rating.add_in_vehicle_distance(distance)
+        elif current_activity == "ON_BICYCLE":
+            rating.add_on_bicycle_distance(distance)
+        elif current_activity == "RUNNING":
+            rating.add_running_distance(distance)
+        elif current_activity == "WALKING":
+            rating.add_walking_distance(distance)
+
+    rating.calculate_rating()
+    if not rating.is_empty():
+        ratings.append(rating.get_data_dict())
+    return ratings
+
+
+def generate_rankings(time):
+    time_end = time + timedelta(days=1)
+    time_start = time_end - timedelta(days=7)
+    query = '''
+        SELECT user_id, total_distance, average_co2
+        FROM travelled_distances
+        WHERE time < :time_end
+        AND time >= :time_start
+    '''
+    travelled_distances_rows = db.engine.execute(text(query), time_start=time_start, time_end=time_end)
+
+    total_distances = {}
+    total_co2 = {}
+    totals = []
+    for row in travelled_distances_rows:
+        if row["total_distance"] is not None:
+            if row["user_id"] in total_distances:
+                total_distances[row["user_id"]] += row["total_distance"]
+                total_co2[row["user_id"]] += row["average_co2"] * row["total_distance"]
+            else:
+                total_distances[row["user_id"]] = row["total_distance"]
+                total_co2[row["user_id"]] = row["average_co2"] * row["total_distance"]
+    for user_id in total_distances:
+        totals.append((user_id, total_co2[user_id] / total_distances[user_id]))
+    totals_sorted = sorted(totals, key=lambda average_co2: average_co2[1])
+    batch = [
+        {   "user_id": totals_sorted[i][0],
+            "time": time,
+            "ranking": i + 1 }
+        for i in range(len(totals_sorted))]
+    if batch:
+        db.engine.execute(travelled_distances_table.insert(batch))
 
 
 def generate_csv(rows):
