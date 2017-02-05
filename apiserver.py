@@ -6,7 +6,10 @@ import os
 from uuid import uuid4
 
 from flask import Flask, abort, jsonify, request, make_response
-from sqlalchemy.sql import and_, between, cast, func, literal, select, text
+
+from sqlalchemy.sql import (
+    and_, between, cast, func, literal, not_, select, text)
+
 from sqlalchemy.types import String
 from pyfiles.common_helpers import (
     dict_groups,
@@ -346,6 +349,11 @@ def maintenance_snapping():
 
 @app.route('/path/<session_token>')
 def path(session_token):
+    dd = db.metadata.tables["device_data"]
+    devices = db.metadata.tables["devices"]
+    legs = db.metadata.tables["leg_modes"]
+    users = db.metadata.tables["users"]
+
     # get data for specified date, or last 12h if unspecified
     date = request.args.get("date")
 
@@ -353,17 +361,18 @@ def path(session_token):
     maxpts = int(request.args.get("maxpts") or 0)
     mindist = int(request.args.get("mindist") or 0)
 
+    # Exclude given comma-separated modes in processed path of path, stops by
+    # default. Blank argument removes excludes
+    exarg = request.args.get("exclude")
+    exclude = True if exarg == "" else not_(
+        legs.c.mode.in_((exarg or "STILL").split(",")))
+
     if date:
         start = datetime.datetime.strptime(date, '%Y-%m-%d').replace(
             hour=0, minute=0, second=0, microsecond=0)
     else:
         start = datetime.datetime.now() - datetime.timedelta(hours=12)
     end = start + datetime.timedelta(hours=24)
-
-    dd = db.metadata.tables["device_data"]
-    devices = db.metadata.tables["devices"]
-    legs = db.metadata.tables["leg_modes"]
-    users = db.metadata.tables["users"]
 
     # find end of user legs
     legsend = select(
@@ -382,6 +391,7 @@ def path(session_token):
         and_(
             devices.c.token == session_token,
             legs.c.activity != None,
+            exclude,
             dd.c.time >= start,
             dd.c.time < end),
         devices \
