@@ -594,12 +594,17 @@ def get_svg(user_id, firstday=None, lastday=None):
     return svg_generation.generate_energy_rating_svg(rating, firstday, end_time, ranking, max_ranking)
 
 
-def update_user_distances(user, start, end, update_rankings=True):
+def update_user_distances(user, start, end, update_derived=True):
 
     # Snap to whole days
     start = start.replace(hour=0, minute=0, second=0, microsecond=0)
     end += timedelta(days=1, microseconds=-1)
     end = end.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    # Decline to write partial stats for today that daily batch won't update
+    last_midnight = datetime.datetime.now().replace(
+        hour=0, minute=0, second=0, microsecond=0)
+    end = min(end, last_midnight)
 
     data_rows = get_filtered_device_data_points(user, start, end)
 
@@ -615,7 +620,8 @@ def update_user_distances(user, start, end, update_rankings=True):
         else:
             db.engine.execute(dists.insert([rating]))
 
-    if not update_rankings:
+    # Batch updates may want to defer generating derived sums and rankings
+    if not update_derived:
         return
 
     # Update unused weekly rankings based on ratings
@@ -625,6 +631,9 @@ def update_user_distances(user, start, end, update_rankings=True):
             AND total_distance IS NOT NULL""")
     for row in db.engine.execute(query, start=start, end=end):
         generate_rankings(row[0])
+
+    # Update unused global distance, co2 average, active users in last 13 days
+    update_global_statistics(start, end)
 
 
 def get_ratings_from_rows(filtered_data_rows, user_id):
@@ -712,6 +721,56 @@ def generate_rankings(time):
         for i in range(len(totals_sorted))]
     if batch:
         db.engine.execute(travelled_distances_table.insert(batch))
+
+
+def update_global_statistics(time_start, the_end):
+    while (time_start < the_end):
+        time_end = time_start + timedelta(days=1)
+        query = '''
+            SELECT total_distance, average_co2
+            FROM travelled_distances
+            WHERE time >= :time_start
+            AND time < :time_end
+        '''
+        travelled_distances_rows = db.engine.execute(text(query), time_start=time_start, time_end=time_end)
+        new = get_global_statistics_for_day(travelled_distances_rows, time_start)
+        time_start += timedelta(days=1)
+
+        # Manual upsert for older db
+        where = global_statistics_table.c.time == new["time"]
+        ex = db.engine.execute(global_statistics_table.select(where)).first()
+        if ex:
+            db.engine.execute(global_statistics_table.update(where, new))
+        else:
+            db.engine.execute(global_statistics_table.insert(new))
+
+
+def get_global_statistics_for_day(travelled_distances_rows, time):
+    time_end = time + timedelta(days=1)
+    time_start = time_end - timedelta(days=7)
+    query = '''
+        SELECT COUNT(DISTINCT user_id)
+        FROM travelled_distances
+        WHERE time < :time_end
+        AND time >= :time_start
+    '''
+    user_id_count_row = db.engine.execute(text(query), time_start=time_start, time_end=time_end).fetchone()
+    id_count = user_id_count_row["count"]
+
+    distance_sum = 0
+    total_co2 = 0
+    for row in travelled_distances_rows:
+        if row["total_distance"]:
+            distance_sum += row["total_distance"]
+            total_co2 += row["total_distance"] * row["average_co2"]
+    if distance_sum == 0:
+        average_co2 = 0
+    else:
+        average_co2 = total_co2 / distance_sum
+    return {'time':time,
+            'average_co2_usage':average_co2,
+            'past_week_certificates_number':id_count,
+            'total_distance':distance_sum}
 
 
 def generate_csv(rows):

@@ -12,7 +12,7 @@ from pyfiles.database_interface import (
     init_db, data_points_by_user_id_after, generate_rankings,
     hsl_alerts_insert, weather_forecast_insert, weather_observations_insert,
     traffic_disorder_insert, match_pubtrans_alert, match_pubtrans_alert_test,
-    match_traffic_disorder, update_user_distances)
+    match_traffic_disorder, update_global_statistics, update_user_distances)
 
 from pyfiles.push_messaging import push_ptp_alert  # push_ptp_pubtrans, push_ptp_traffic,
 from pyfiles.push_messaging import PTP_TYPE_PUBTRANS, PTP_TYPE_DIGITRAFFIC
@@ -83,7 +83,7 @@ def run_daily_tasks():
     generate_legs()
     filter_device_data()
     generate_distance_data()
-    update_global_statistics()
+    generate_global_statistics()
     mass_transit_cleanup()
 
 
@@ -455,7 +455,7 @@ def generate_distance_data():
         generate_rankings(row[0])
 
 
-def update_global_statistics():
+def generate_global_statistics():
     query = """
         SELECT COALESCE(
             (SELECT max(time) + interval '1 day' FROM global_statistics),
@@ -466,48 +466,8 @@ def update_global_statistics():
 
     last_midnight = datetime.datetime.now().replace(
         hour=0, minute=0, second=0, microsecond=0)
-    items = []
-    while (time_start < last_midnight):
-        time_end = time_start + timedelta(days=1)
-        query = '''
-            SELECT total_distance, average_co2
-            FROM travelled_distances
-            WHERE time >= :time_start
-            AND time < :time_end
-        '''
-        travelled_distances_rows = db.engine.execute(text(query), time_start=time_start, time_end=time_end)
-        items.append(get_global_statistics_for_day(travelled_distances_rows, time_start))
-        time_start += timedelta(days=1)
-    if items:
-        db.engine.execute(global_statistics_table.insert(items))
 
-
-def get_global_statistics_for_day(travelled_distances_rows, time):
-    time_end = time + timedelta(days=1)
-    time_start = time_end - timedelta(days=7)
-    query = '''
-        SELECT COUNT(DISTINCT user_id)
-        FROM travelled_distances
-        WHERE time < :time_end
-        AND time >= :time_start
-    '''
-    user_id_count_row = db.engine.execute(text(query), time_start=time_start, time_end=time_end).fetchone()
-    id_count = user_id_count_row["count"]
-
-    distance_sum = 0
-    total_co2 = 0
-    for row in travelled_distances_rows:
-        if row["total_distance"]:
-            distance_sum += row["total_distance"]
-            total_co2 += row["total_distance"] * row["average_co2"]
-    if distance_sum == 0:
-        average_co2 = 0
-    else:
-        average_co2 = total_co2 / distance_sum
-    return {'time':time,
-            'average_co2_usage':average_co2,
-            'past_week_certificates_number':id_count,
-            'total_distance':distance_sum}
+    update_global_statistics(time_start, last_midnight)
 
 
 def mass_transit_cleanup():
