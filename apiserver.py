@@ -384,7 +384,9 @@ def path(session_token):
         [   func.ST_AsGeoJSON(dd.c.coordinate).label("geojson"),
             cast(legs.c.mode, String).label("activity"),
             legs.c.line_name,
-            legs.c.time_start,
+            legs.c.time_start.label("legstart"),
+            cast(legs.c.time_start, String).label("time_start"),
+            cast(legs.c.time_end, String).label("time_end"),
             legs.c.id,
             dd.c.time],
         and_(
@@ -405,7 +407,9 @@ def path(session_token):
         [   func.ST_AsGeoJSON(dd.c.coordinate).label("geojson"),
             cast(dd.c.activity_1, String).label("activity"),
             literal(None).label("line_name"),
+            literal(None).label("legstart"),
             literal(None).label("time_start"),
+            literal(None).label("time_end"),
             literal(None).label("id"),
             dd.c.time],
         and_(
@@ -416,12 +420,12 @@ def path(session_token):
         dd.join(devices))
 
     # Sort also by leg start time so join point repeats adjacent to correct leg
-    query = legsed.union_all(unlegsed).order_by(text("time, time_start"))
+    query = legsed.union_all(unlegsed).order_by(text("time, legstart"))
     points = db.engine.execute(query)
 
     # re-split into legs, and the raw part
     segments = (
-        legpts for (legid, legpts) in dict_groups(points, ["time_start"]))
+        legpts for (legid, legpts) in dict_groups(points, ["legstart"]))
 
     features = []
     for points in segments:
@@ -432,7 +436,8 @@ def path(session_token):
         points = simplify_geometry(
             points, maxpts=maxpts, mindist=mindist, keep_activity=True)
 
-        features += trace_linestrings(points, ('id', 'activity', 'line_name'))
+        features += trace_linestrings(points, (
+            'id', 'activity', 'line_name', 'time_start', 'time_end'))
 
     devices_table_id = get_device_table_id_for_session(session_token)
     client_log_table_insert(
