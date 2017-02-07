@@ -8,11 +8,13 @@ import json
 import urllib2
 import datetime
 from datetime import timedelta
+import re
+import xml.etree.ElementTree as ET
+
 import dateutil.parser
 import requests
 from google.transit import gtfs_realtime_pb2
 from owslib.wfs import WebFeatureService
-import xml.etree.ElementTree as ET
 
 from pyfiles.common_helpers import interpret_jore
 from pyfiles.database_interface import hsl_alerts_get_max, traffic_disorder_max_creation, get_waypoint_id_from_coordinate
@@ -347,9 +349,21 @@ def traffic_disorder_request():
                 description = language_variant.text
                 if language == 'fi':
                     # Only take the ones under "tieliikennekeskus Helsinki"
-                    if description.find("Helsinki") < 0: return None
+#                    if description.find("Helsinki") < 0: return None
+
                     # Strip the constant contact information
-                    fi_description = description.replace(u"Liikenne- ja kelitiedot verkossa: http://liikennetilanne.liikennevirasto.fi/ Liikenneviraston tieliikennekeskus HelsinkiPuh: 0206373328Faksi: 0206373713Sähköposti: helsinki.liikennekeskus@liikennevirasto.fi", "")
+                    footerstarts = [
+                        "http://liikennetilanne.liikennevirasto.fiLiikennevir",
+                        "Liikenne- ja kelitiedot verkossa: http://liikennetil"]
+                    for footer in footerstarts:
+                        i = description.find(footer)
+                        if i != -1:
+                            description = description[:i]
+
+                    # Add missing spaces between concatenated fields...
+                    description = re.sub("\\.([A-ZÅÄÖ])", ". \\1", description)
+
+                    fi_description = description
                 elif language == 'en':
                     en_description = description
                 elif language == 'sv':
