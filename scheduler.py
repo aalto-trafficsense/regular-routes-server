@@ -73,7 +73,7 @@ def initialize():
     run_daily_tasks()
     scheduler.add_job(run_hourly_tasks, "cron", minute=24)
     scheduler.add_job(run_daily_tasks, "cron", hour="3")
-    scheduler.add_job(retrieve_transport_alerts, "cron", minute="*/10")
+    scheduler.add_job(retrieve_transport_alerts, "cron", minute="*/5")
     scheduler.add_job(retrieve_weather_info, "cron", hour="6")
     print "scheduler init done"
 
