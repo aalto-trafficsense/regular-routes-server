@@ -47,6 +47,9 @@ ACTIVITY_WIN = 120
 # Increasing it may lose useful points in valid stops.
 BAD_LOCATION_RADIUS = 1
 
+# Alert user of traffic disorders if within this distance of event
+ALERT_RADIUS = 100000
+
 # Minimum and maximum distance from given coordinates to show destinations to
 # client api
 INCLUDE_DESTINATIONS_BETWEEN = 200, 200000

@@ -1167,7 +1167,8 @@ def match_traffic_disorder(disorder):
             if len(user_ids) > 0:
                 for user in user_ids:
                     # Find the latest eligible device id for this user
-                    response = get_active_device_info_from_users_table_id(user["user_id"])
+                    response = get_active_device_info_from_users_table_id(
+                        user["user_id"], disorder["coordinate"])
                     if response:    # This user has an eligible device
                         device_id = response["id"]
                         messaging_token = response["messaging_token"]
@@ -1202,6 +1203,7 @@ def match_traffic_disorder(disorder):
                             yield device_alert
     except Exception as e:
         print "match_traffic_disorder exception: ", e
+        raise
 
 
 def match_legs_pubtrans_alert(selection, alert):
@@ -1246,12 +1248,15 @@ def match_pubtrans_alert(alert):
                                    'alert_table_id': hsl_alerts_response["id"]})
                 db.engine.execute(stmt)
 
-            # Search again to find the distinct users to inform
-            user_ids = match_legs_pubtrans_alert("DISTINCT user_id", alert)
+            # Search again to find the distinct users to inform, and start
+            # coordinate of arbitrary matching leg
+            user_ids = match_legs_pubtrans_alert(
+                "DISTINCT ON (user_id) user_id, coordinate_start", alert)
             if len(user_ids) > 0:
-                for user in user_ids:
+                for user, coordinate in user_ids:
                     # Find the latest eligible device id for this user
-                    response = get_active_device_info_from_users_table_id(user["user_id"])
+                    response = get_active_device_info_from_users_table_id(
+                        user, coordinate)
                     if response:    # This user has an eligible device
                         device_id = response["id"]
                         messaging_token = response["messaging_token"]
@@ -1457,11 +1462,13 @@ def get_max_devices_table_id_from_users_table_id(users_table_id):
     return -1
 
 
-def get_active_device_info_from_users_table_id(users_table_id):
+def get_active_device_info_from_users_table_id(users_table_id, coordinate):
     """
-    Get a known user's devices_table_id, which has the latest data upload (at least within a week),
-    from coordinates around the Helsinki region and carries a messaging token
+    Get a known user's devices_table_id, which has the latest data upload (at
+    least within a week), within ALERT_RADIUS of the given coordinate, and
+    carries a messaging token
     :param users_table_id (devices.user_id, integer)
+    :param coordinate
     :return: devices.id (integer)
     """
     # Ref: Sample query capturing the area from Inkoo to Askola (ST_MakeEnvelope(left, bottom, right, top, srid))
@@ -1475,9 +1482,12 @@ def get_active_device_info_from_users_table_id(users_table_id):
             devices.user_id = :users_table_id AND
             device_data.device_id = devices.id AND
             devices.messaging_token != '' AND
-            ST_Intersects(device_data.coordinate, ST_MakeEnvelope(23.85211, 59.88652, 25.73626, 60.55221, 4326))
+            ST_DWithin(device_data.coordinate, :coordinate, :radius)
           ORDER BY device_data.time DESC
-          LIMIT 1 ;"""), users_table_id=users_table_id).first()
+          LIMIT 1 ;"""),
+            users_table_id=users_table_id,
+            coordinate=coordinate,
+            radius=ALERT_RADIUS).first()
         if not row:
             return None
         return row
