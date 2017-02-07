@@ -18,7 +18,8 @@ from pyfiles.common_helpers import (
     trace_discard_sidesteps,
     trace_linestrings)
 
-from pyfiles.constants import BAD_LOCATION_RADIUS, DEST_RADIUS_MAX
+from pyfiles.constants import (
+    BAD_LOCATION_RADIUS, DEST_RADIUS_MAX, INCLUDE_DESTINATIONS_BETWEEN)
 
 from pyfiles.database_interface import (init_db, db_engine_execute, users_table_insert, users_table_update, devices_table_insert, device_data_table_insert,
                                         verify_user_id, update_last_activity, update_messaging_token, get_device_table_id,
@@ -251,11 +252,34 @@ def data_post():
 
 @app.route('/destinations/<session_token>')
 def destinations(session_token):
-    start = datetime.datetime.now() - datetime.timedelta(days=30)
 
+    dd = db.metadata.tables["device_data"]
     devices = db.metadata.tables["devices"]
     users = db.metadata.tables["users"]
     legs = db.metadata.tables["legs"]
+
+    # Exclude nearby and faraway destinations from point if given, or last
+    # device location is not given. All included if blank given in either.
+    lat = request.args.get("lat")
+    lng = request.args.get("lng")
+
+    exclude = True
+    if "" not in (lat, lng):
+        if None not in (lat, lng):
+            excoord = "POINT(%s %s)" % (lng, lat)
+        else:
+            excoord = db.engine.execute(select(
+                [func.ST_AsText(dd.c.coordinate)],
+                devices.c.token == session_token,
+                order_by=dd.c.time.desc(),
+                limit=1)).scalar()
+        if excoord is not None:
+            rmin, rmax = INCLUDE_DESTINATIONS_BETWEEN
+            exclude = and_(
+                not_(func.st_dwithin(legs.c.coordinate_start, excoord, rmin)),
+                func.st_dwithin(legs.c.coordinate_start, excoord, rmax))
+
+    start = datetime.datetime.now() - datetime.timedelta(days=30)
 
     query = select(
         [   func.ST_AsGeoJSON(legs.c.coordinate_start).label("geojson"),
@@ -264,7 +288,8 @@ def destinations(session_token):
         and_(
             devices.c.token == session_token,
             legs.c.time_end >= start,
-            legs.c.activity == "STILL"),
+            legs.c.activity == "STILL",
+            exclude),
         devices.join(users).join(legs))
 
     stops = list(dict(x) for x in db.engine.execute(query))

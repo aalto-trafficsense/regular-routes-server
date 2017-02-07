@@ -47,6 +47,10 @@ ACTIVITY_WIN = 120
 # Increasing it may lose useful points in valid stops.
 BAD_LOCATION_RADIUS = 1
 
+# Minimum and maximum distance from given coordinates to show destinations to
+# client api
+INCLUDE_DESTINATIONS_BETWEEN = 200, 200000
+
 
 #Regexes for the HSL api
 jore_ferry_regex = re.compile("^1019")
