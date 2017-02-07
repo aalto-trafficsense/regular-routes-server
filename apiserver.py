@@ -435,7 +435,11 @@ def path(session_token):
         features += trace_linestrings(points, ('id', 'activity', 'line_name'))
 
     devices_table_id = get_device_table_id_for_session(session_token)
-    client_log_table_insert(devices_table_id, get_user_id_from_device_id(devices_table_id), "MOBILE-PATH", "")
+    client_log_table_insert(
+        devices_table_id,
+        get_user_id_from_device_id(devices_table_id),
+        "MOBILE-PATH",
+        date)
 
     return jsonify({'type': 'FeatureCollection', 'features': features})
 
