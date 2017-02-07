@@ -19,7 +19,10 @@ from pyfiles.common_helpers import (
     trace_linestrings)
 
 from pyfiles.constants import (
-    BAD_LOCATION_RADIUS, DEST_RADIUS_MAX, INCLUDE_DESTINATIONS_BETWEEN)
+    BAD_LOCATION_RADIUS,
+    DEST_RADIUS_MAX,
+    DESTINATIONS_LIMIT,
+    INCLUDE_DESTINATIONS_BETWEEN)
 
 from pyfiles.database_interface import (init_db, db_engine_execute, users_table_insert, users_table_update, devices_table_insert, device_data_table_insert,
                                         verify_user_id, update_last_activity, update_messaging_token, get_device_table_id,
@@ -258,6 +261,10 @@ def destinations(session_token):
     users = db.metadata.tables["users"]
     legs = db.metadata.tables["legs"]
 
+    # Limit number of destinations on output, all if blank given
+    limit = request.args.get("limit", DESTINATIONS_LIMIT)
+    limit = None if limit == "" else int(limit)
+
     # Exclude nearby and faraway destinations from point if given, or last
     # device location is not given. All included if blank given in either.
     lat = request.args.get("lat")
@@ -308,7 +315,7 @@ def destinations(session_token):
                     "type": "Point",
                     "coordinates": d["coordinates"]},
                 "properties": d}
-            for d in dests]}
+            for d in dests[:limit]]}
 
     for f in geojson["features"]:
         del f["properties"]["coordinates"] # included in geometry

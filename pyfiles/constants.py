@@ -51,6 +51,9 @@ BAD_LOCATION_RADIUS = 1
 # client api
 INCLUDE_DESTINATIONS_BETWEEN = 200, 200000
 
+# Default maximum number of destinations to emit in client api
+DESTINATIONS_LIMIT = 5
+
 
 #Regexes for the HSL api
 jore_ferry_regex = re.compile("^1019")
