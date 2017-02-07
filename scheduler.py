@@ -283,29 +283,47 @@ def generate_legs(maxtime=None, repair=False):
             legs.c.time_start,
             legs.c.time_end],
         and_(legs.c.activity != None, legs.c.time_end < maxtime),
-        devices.join(legs, devices.c.id == legs.c.device_id)).alias("owned")
+        devices.join(legs, devices.c.id == legs.c.device_id))
+
+    detached = owned.where(legs.c.user_id.is_(None)).alias("detached")
+    attached = owned.where(legs.c.user_id.isnot(None)).alias("attached")
+    owned = owned.alias("owned")
 
     # Find most recently received leg attached per user
     maxattached = select(
-        [owned.c.owner, func.max(owned.c.id).label("id")],
-        owned.c.user_id != None,
-        group_by=owned.c.owner).alias("maxattached")
+        [attached.c.owner, func.max(attached.c.id).label("id")],
+        group_by=attached.c.owner).alias("maxattached")
 
-    # Find earliest starting unattached leg received later
+    # Find start of earliest unattached leg received later
+    mindetached = select(
+        [   detached.c.owner,
+            func.min(detached.c.time_start).label("time_start")],
+        or_(maxattached.c.id.is_(None), detached.c.id > maxattached.c.id),
+        detached.outerjoin(
+            maxattached, detached.c.owner == maxattached.c.owner),
+        group_by=detached.c.owner).alias("mindetached")
+
+    # Find start of attached overlapping leg to make it visible to the process
+    overattached = select(
+        [   attached.c.owner,
+            func.min(attached.c.time_start).label("time_start")],
+        from_obj=attached.join(mindetached, and_(
+            attached.c.owner == mindetached.c.owner,
+            attached.c.time_end > mindetached.c.time_start)),
+        group_by=attached.c.owner).alias("overattached")
+
+    # Find restart point
     starts = select(
-        [owned.c.owner, func.min(owned.c.time_start)],
-        and_(owned.c.user_id.is_(None), or_(
-            maxattached.c.id.is_(None), owned.c.id > maxattached.c.id)),
-        owned.outerjoin(maxattached, owned.c.owner == maxattached.c.owner),
-        group_by=owned.c.owner).alias("minunattached")
+        [   mindetached.c.owner,
+            func.least(mindetached.c.time_start, overattached.c.time_start)],
+        from_obj=mindetached.outerjoin(
+            overattached, mindetached.c.owner == overattached.c.owner))
 
     # In repair mode, just start from the top.
     if repair:
         starts = select(
-            [devices.c.user_id, func.min(legs.c.time_start)],
-            legs.c.time_end < maxtime,
-            legs.join(devices, legs.c.device_id == devices.c.id),
-            group_by=[devices.c.user_id])
+            [owned.c.owner, func.min(owned.c.time_start)],
+            group_by=owned.c.owner)
 
     for user, start in db.engine.execute(starts):
         # Ignore the special legacy user linking userless data
@@ -317,14 +335,12 @@ def generate_legs(maxtime=None, repair=False):
         # Get legs from user's devices in end time order, so shorter
         # legs get attached in favor of longer legs from a more idle device.
         s = select(
-            [legs.c.id, legs.c.time_start, legs.c.time_end, legs.c.user_id],
-            and_(
-                devices.c.user_id == user,
-                legs.c.time_end > start,
-                legs.c.time_end < maxtime,
-                legs.c.activity != None),
-            legs.join(devices, legs.c.device_id == devices.c.id),
-            order_by=legs.c.time_end)
+            [   owned.c.id,
+                owned.c.time_start,
+                owned.c.time_end,
+                owned.c.user_id],
+            and_(owned.c.owner == user, owned.c.time_end > start),
+            order_by=owned.c.time_end)
 
         lastend = None
         for lid, lstart, lend, luser in db.engine.execute(s):
