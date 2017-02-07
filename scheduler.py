@@ -4,6 +4,7 @@ from itertools import chain
 
 import json
 import os
+import re
 import sys
 import time
 import urllib2
@@ -23,12 +24,15 @@ from pyfiles.common_helpers import (
     pairwise,
     point_coordinates)
 
-from pyfiles.constants import *
+from pyfiles.constants import DEST_RADIUS_MAX
+
 from pyfiles.information_services import (
     hsl_alert_request, fmi_forecast_request, fmi_observations_request, traffic_disorder_request)
 from apscheduler.schedulers.background import BackgroundScheduler
 from flask import Flask
-from sqlalchemy.sql.expression import and_, desc, func, nullsfirst, or_, select, text
+
+from sqlalchemy.sql.expression import (
+    and_, column, desc, func, literal, nullsfirst, or_, select, text)
 
 import logging
 logging.basicConfig()
@@ -183,7 +187,7 @@ def generate_legs(maxtime=None, repair=False):
         lastend = None
         newlegs = filterer.generate_device_legs(points, start)
 
-        for (prevleg, prevmodes), (leg, legmodes) in pairwise(
+        for (prevleg, _), (leg, legmodes) in pairwise(
                 chain([(None, None)], newlegs)):
 
           with db.engine.begin() as t:
@@ -281,23 +285,34 @@ def generate_legs(maxtime=None, repair=False):
     unattached = owned.where(legs.c.user_id == None).alias("unattached")
     attached = owned.where(legs.c.user_id != None).alias("attached")
 
-    # Unattached legs without end of attached leg within, so eligible start.
-    # The having clause is any aggregate over a column that is not null, so as
-    # to find null only when no matches in the left join
+    # Unattached leg with no attached leg ending after its start may be
+    # eligible for attaching. The having clause is any aggregate over a not
+    # null column, so as to find null only when no matches in the left join
     eligible = select(
-        [unattached.c.owner, unattached.c.time_start],
+        [unattached.c.owner, unattached.c.time_start, unattached.c.time_end],
         from_obj=unattached.outerjoin(attached, and_(
             unattached.c.owner == attached.c.owner,
-            attached.c.time_end > unattached.c.time_start,
-            attached.c.time_end <= unattached.c.time_end)),
-        group_by=[unattached.c.owner, unattached.c.time_start],
-        having=(func.min(attached.c.time_start) == None)).alias("eligible")
+            attached.c.time_end > unattached.c.time_start)),
+        group_by=[
+            unattached.c.owner,
+            unattached.c.time_start,
+            unattached.c.time_end],
+        having=(func.min(attached.c.time_start) == None))
 
-    # Find start of first eligible leg
+    # Attached leg ending after overlapping eligible leg may be detached
+    eal = eligible.alias("eligible") # subquery, alias, union, jesus
+    deligible = select(
+        [attached.c.owner, func.min(attached.c.time_start), literal(None)],
+        from_obj=attached.join(eal, and_(
+            attached.c.owner == eal.c.owner,
+            attached.c.time_end > eal.c.time_end)),
+        group_by=attached.c.owner)
+
+    # Find restart point
     starts = select(
-        [eligible.c.owner, func.min(eligible.c.time_start)],
-        from_obj=eligible,
-        group_by=[eligible.c.owner])
+        [column("owner"), func.min(column("time_start"))],
+        from_obj=eligible.union_all(deligible).alias("unified"),
+        group_by=[column("owner")])
 
     # In repair mode, just start from the top.
     if repair:
@@ -530,7 +545,7 @@ def retrieve_hsl_data():
     for vehicle in vehicle_data:
         try:
             all_vehicles.append(vehicle_row(vehicle))
-        except Exception as e:
+        except Exception:
             log.exception("Failed to handle vehicle record: %s" % vehicle)
 
     if all_vehicles:
