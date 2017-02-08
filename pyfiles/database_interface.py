@@ -937,7 +937,7 @@ def get_waypoint_id_from_coordinate(coordinate):
 
 def match_mass_transit_legs(device, tstart, tend, activity):
     """Find mass transit matches already recorded in an existing leg, or None
-    if leg matching start/end/activity."""
+    if no leg matching start/end/activity."""
 
     legs = db.metadata.tables["legs"]
     modes = db.metadata.tables["modes"]

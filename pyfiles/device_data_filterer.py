@@ -65,7 +65,7 @@ class DeviceDataFilterer:
             device_data_queue = list(trace_discard_inaccurate(
                 device_data_queue, DEST_RADIUS_MAX / 2))
 
-        if len(device_data_queue) < 2 or activity != "IN_VEHICLE":
+        if len(device_data_queue) < 2:
             return {}
 
         # Reuse previously recorded matches in unchanged legs, useful when
@@ -74,6 +74,9 @@ class DeviceDataFilterer:
         if matches is not None: # matched same start/end/activity
             print "reuselegmatch", matches,
             return {x[0]: x[1:] for x in matches}
+
+        if activity != "IN_VEHICLE":
+            return {}
 
         matches = {}
 
