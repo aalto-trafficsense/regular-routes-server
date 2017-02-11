@@ -114,12 +114,14 @@ def init_db(app):
                           Column('messaging_token', String, unique=True),
                           Column('last_activity', TIMESTAMP, nullable=False, default=func.current_timestamp(),
                                  server_default=func.current_timestamp()),
+                          Column('client_version', String),
                           UniqueConstraint(
                               'user_id', 'device_id', 'installation_id',
                               name='uix_user_id_device_id_installation_id'))
 
-    # Sample psql command to add the new 'messaging token' to an existing devices table:
+    # Sample psql command to add to an existing devices table:
     # ALTER TABLE devices ADD COLUMN messaging_token varchar UNIQUE ;
+    # ALTER TABLE devices ADD COLUMN client_version varchar;
 
     global device_data_table
     device_data_table = Table('device_data', metadata,
@@ -1393,9 +1395,11 @@ def verify_device_token(token):
         abort(403)
 
 
-def update_last_activity(devices_table_id):
+def update_last_activity(devices_table_id, client_version):
     update = devices_table.update() \
-        .values({'last_activity': datetime.datetime.now()}) \
+        .values({
+            'last_activity': datetime.datetime.now(),
+            'client_version': client_version}) \
         .where(devices_table.c.id == devices_table_id)
     db.engine.execute(update)
 
@@ -1547,13 +1551,20 @@ def users_table_update(users_table_id, refresh_token, access_token):
 
     db.engine.execute(stmt)
 
-def devices_table_insert(users_table_id, device_id, installation_id, device_model, session_token):
+def devices_table_insert(
+        users_table_id,
+        device_id,
+        installation_id,
+        device_model,
+        session_token,
+        client_version):
     device_insertion = devices_table.insert(
             {'user_id': users_table_id,
              'device_id': device_id,
              'installation_id': installation_id,
              'device_model': device_model,
-             'token': session_token}) \
+             'token': session_token,
+             'client_version': client_version}) \
         .returning(devices_table.c.id)
     return db.engine.execute(device_insertion).scalar()
 

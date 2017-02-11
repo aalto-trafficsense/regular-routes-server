@@ -82,7 +82,7 @@ def register_post():
     device_model = data['deviceModel']
     # print 'deviceModel=' + str(device_model)
     # Get optionally - old clients do not send this
-    client_version = "ClientVersion:" + data.get('clientVersion', '')
+    client_version = data.get('clientVersion')
 
     # 1. authenticate with Google
     validation_data = authenticate_with_google_oauth(app.config['AUTH_REDIRECT_URI'], CLIENT_SECRET_FILE, CLIENT_ID, google_one_time_token)
@@ -115,14 +115,24 @@ def register_post():
     # 5. Create/update device to db
     if devices_table_id is None:
         session_token = uuid4().hex
-        devices_table_id = devices_table_insert(users_table_id, device_id, installation_id, device_model, session_token)
+        devices_table_id = devices_table_insert(
+            users_table_id,
+            device_id,
+            installation_id,
+            device_model,
+            session_token,
+            client_version)
     else:
         print 'device re-registration detected -> using same device'
-        update_last_activity(devices_table_id)
+        update_last_activity(devices_table_id, client_version)
         session_token = get_session_token_for_device(devices_table_id)
 
     # 6. Log the registration
-    client_log_table_insert(devices_table_id, users_table_id, "MOBILE-REGISTER", client_version)
+    client_log_table_insert(
+        devices_table_id,
+        users_table_id,
+        "MOBILE-REGISTER",
+        "ClientVersion:" + (client_version or ""))
 
     resp = jsonify({'sessionToken': session_token})
     return resp
@@ -135,7 +145,7 @@ def authenticate_post():
     device_id = json['deviceId']
     installation_id = json['installationId']
     # Get optionally - old clients do not send this
-    client_version = "ClientVersion:" + json.get('clientVersion', '')
+    client_version = json.get('clientVersion')
     messaging_token = json.get('messagingToken', '')
 
     # 1. check that user exists or abort
@@ -151,11 +161,14 @@ def authenticate_post():
     # 2. Update messaging token, if included
     if len(messaging_token) > 1:
         update_messaging_token(devices_table_id, messaging_token)
-    else:
-        update_last_activity(devices_table_id)
+    update_last_activity(devices_table_id, client_version)
 
     # 3. Update log
-    client_log_table_insert(devices_table_id, get_user_id_from_device_id(devices_table_id), "MOBILE-AUTHENTICATE", client_version)
+    client_log_table_insert(
+        devices_table_id,
+        get_user_id_from_device_id(devices_table_id),
+        "MOBILE-AUTHENTICATE",
+        "ClientVersion:" + (client_version or ""))
 
     return jsonify({
         'sessionToken': session_token
@@ -523,7 +536,7 @@ def setlegmode_post():
         leg.device_id,
         leg.user_id,
         "MOBILE-PATH-EDIT",
-        "%d %s %s" % (legid, legact, legline))
+        "%s %s %s" % (legid, legact, legline))
 
     return jsonify({})
 
