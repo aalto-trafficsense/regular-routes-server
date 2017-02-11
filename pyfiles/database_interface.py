@@ -1475,16 +1475,17 @@ def get_active_device_info_from_users_table_id(users_table_id, coordinate):
     # SELECT count(*) FROM device_data WHERE ST_Intersects(coordinate, ST_MakeEnvelope(23.85211, 59.88652, 25.73626, 60.55221, 4326)) ;
     try:
         row = db.engine.execute(text("""
-          SELECT devices.id, devices.messaging_token
-          FROM devices, device_data
-          WHERE
-            device_data.time > now()-(interval '1 week') AND
-            devices.user_id = :users_table_id AND
-            device_data.device_id = devices.id AND
-            devices.messaging_token != '' AND
-            ST_DWithin(device_data.coordinate, :coordinate, :radius)
-          ORDER BY device_data.time DESC
-          LIMIT 1 ;"""),
+          SELECT id, messaging_token
+          FROM (SELECT devices.id, messaging_token, coordinate
+            FROM devices, device_data
+            WHERE
+              device_data.time > now()-(interval '1 week') AND
+              devices.user_id = :users_table_id AND
+              device_data.device_id = devices.id AND
+              devices.messaging_token IS NOT NULL
+            ORDER BY device_data.time DESC
+            LIMIT 1) t0
+          WHERE ST_DWithin(coordinate, :coordinate, :radius)"""),
             users_table_id=users_table_id,
             coordinate=coordinate,
             radius=ALERT_RADIUS).first()
