@@ -19,7 +19,7 @@
 .STILL { background-color: rgba(255, 255, 255, .13) }
 .UNKNOWN { background-color: rgba(136, 136, 136, .13) }
 
-#trip .activity div { font-size: xx-large; margin: .2em .2em 0 }
+#trip .activity div, .icon { font-size: xx-large; margin: .2em .2em 0 }
 .material-icons { font-size: inherit }
 
 #trip td.left { text-align: left }
@@ -51,3 +51,13 @@
     border-top: lightgrey thin solid;
     padding: .5em;
 }
+
+label[for="line"], legend {
+    display: block;
+    margin: 1.6em 0 .6em;
+    font-size: smaller;
+}
+
+.ui-checkboxradio-icon { display: none !important }
+.ui-checkboxradio-label { width: 50px; font-size: x-small !important }
+.icon { margin-top: 0 }

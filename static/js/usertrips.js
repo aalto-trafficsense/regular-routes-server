@@ -12,7 +12,26 @@ $(document).ready(function() {
                 var daytable = buildday(daydata, daydate);
                 trips.append(daytable);
             });
-	    content.css('opacity', '');
+
+        $(".activity").not(".STILL").css("cursor", "pointer");
+        $(".activity").not(".STILL").on("click", function(event) {
+            var td = event.currentTarget;
+            selectedLegId = td.getAttribute("legid");
+
+            // Set mode on dialog
+            var mode = td.className.split(" ")[1];
+            $("#"+mode).prop("checked", true);
+            $("#mode").buttonset("refresh");
+
+            // Set line on dialog
+            var parts = td.firstChild.textContent.split(" ");
+            if (parts.length > 1)
+                $("#line").val(parts[1]);
+
+            dialog.dialog("open");
+        });
+
+	content.css('opacity', '');
     }
 
     function buildday(data, date) {
@@ -81,6 +100,7 @@ $(document).ready(function() {
 
                         td.append(col[0][1]); // duration
 
+                        td.attr("legid", col[0][2]);
                     } else if (classname == "place") {
                         var label = col[0];
                         if (label === false) {
@@ -109,6 +129,70 @@ $(document).ready(function() {
         return trip;
     }
 
+    var selectedLegId;
+
+    function setLegMode() {
+        var checked = $.grep(
+            $("#mode").get(0).children,
+            function (x) {return (x.checked)})[0];
+        var mode = $(checked).val();
+
+        if (mode == "RESET")
+            mode = null;
+
+        var data = {
+            id: selectedLegId, activity: mode, line_name: $("#line").val()};
+        $.ajax({
+            type: "POST",
+            url: 'setlegmode',
+            data: JSON.stringify(data),
+            contentType: "application/json",
+            success: hashchange});
+        dialog.dialog("close");
+    }
+
+    function radioChecked(buttonset) {
+        var checked = $.grep(
+            buttonset.children,
+            function (x) {return (x.checked)})[0];
+        var mode = $(checked).val();
+        var masses = ["FERRY", "SUBWAY", "TRAIN", "TRAM", "BUS"];
+        if (-1 == $.inArray(mode, masses)) {
+            $("#line").hide(200);
+            $("#line").prev().hide(200);
+        } else {
+            $("#line").show(200);
+            $("#line").prev().show(200);
+        }
+    }
+
+    var dialog = $("#dialog-form").dialog({
+        autoOpen: false,
+        height: 400,
+        width: 400,
+        modal: true,
+        buttons: {
+            "Submit": setLegMode,
+            Cancel: function() { dialog.dialog("close") }
+        },
+        close: function() {
+            form[0].reset();
+        },
+        open: function() {
+            $("#mode").buttonset().change(function (event) {
+                radioChecked(event.currentTarget);
+            });
+            radioChecked($("#mode").get(0));
+        }
+    });
+
+    var form = dialog.find("form").on("submit", function(event) {
+        event.preventDefault();
+        setLegMode();
+    })
+
+    $("#mode").buttonset();
+
     function hashchange() {
         var hash = location.hash.split("#").splice(-1)[0];
         var dates = hash.split("/");
@@ -122,11 +206,11 @@ $(document).ready(function() {
             args.push("lastday=" + lastday);
         args = args.join("&");
         var qs = args ? "?" + args : "";
+        $("#csvlink").attr("href", "trips_csv" + qs);
 
 	content.css('opacity', 0.1);
 	$.getJSON("trips_json" + qs, eat);
 
-        $("#csvlink").attr("href", "trips_csv" + qs);
     }
 
     $(window).on("hashchange", hashchange);

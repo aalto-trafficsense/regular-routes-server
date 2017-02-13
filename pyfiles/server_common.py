@@ -12,6 +12,8 @@ from sqlalchemy.types import String
 
 from pyfiles.common_helpers import mode_str
 
+from pyfiles.database_interface import (
+    mass_transit_types, update_user_distances)
 
 def common_trips_rows(request, db, user):
     firstday = request.args.get("firstday")
@@ -33,7 +35,8 @@ def common_trips_rows(request, db, user):
     places1 = places0.alias("places1")
 
     s = select(
-        [   legs.c.time_start,
+        [   legs.c.id,
+            legs.c.time_start,
             legs.c.time_end,
             legs.c.activity,
             legs.c.line_type,
@@ -111,17 +114,18 @@ def render_trips_day(legrows):
         steps.append(prior._replace(**kw))
 
     strings = (
-        (   str(t0)[11:16],
+        (   legid,
+            str(t0)[11:16],
             str(t1)[11:16],
             mode_str(activity, ltype, lname),
             " ".join([fmt_duration(t0, t1), fmt_distance(km)]),
             pi0,
             pi1 or pi0)
-        for t0, t1, activity, ltype, lname, km, pi0, pi1
+        for legid, t0, t1, activity, ltype, lname, km, pi0, pi1
         in legrows)
 
     pt1str = pactivity = pplace1 = None
-    for t0str, t1str, activity, duration, place0, place1 in strings:
+    for legid, t0str, t1str, activity, duration, place0, place1 in strings:
 
         # Emit prior end time with appropriate aligment based on change
         if pt1str and t0str != pt1str:
@@ -140,7 +144,7 @@ def render_trips_day(legrows):
         # If going from stop to move starting from same but with internal
         # location change, terminate place label and use activity there instead
         timecell = (t0str, t0str == pt1str and "both" or "start")
-        actcell = (activity, duration)
+        actcell = (activity, duration, legid)
         placecell = place0
         if (pactivity == "STILL" and activity != "STILL"
                 and pplace1 == place0 and pplace1 != place1):
@@ -163,3 +167,46 @@ def render_trips_day(legrows):
     named = zip(State._fields, rle)
 
     return named
+
+
+def common_setlegmode(request, db, user):
+    """Allow user to correct detected transit modes and line names."""
+
+    data = request.json
+    legid = data["id"]
+    legact = data["activity"]
+    legline = data.get("line_name") or None
+
+    # Ignore line name given with non-transit mode
+    if legact not in mass_transit_types:
+        legline = None
+
+    devices = db.metadata.tables["devices"]
+    users = db.metadata.tables["users"]
+    legs = db.metadata.tables["legs"]
+    modes = db.metadata.tables["modes"]
+
+    # Get existing leg, while verifying that the user matches appropriately
+    leg = db.engine.execute(select(
+        [legs.c.device_id, legs.c.time_start, legs.c.time_end],
+        and_(devices.c.user_id == user, legs.c.id == legid),
+        from_obj=devices.join(users).join(legs))).first()
+    if not leg:
+        abort(403)
+
+    values = {"leg": legid, "source": "USER", "mode": legact, "line": legline}
+    existing = db.engine.execute(modes.select().where(and_(
+        modes.c.leg == legid, modes.c.source == "USER"))).first()
+    if existing:
+        where = modes.c.id == existing.id
+        if legact is None:
+            db.engine.execute(modes.delete().where(where))
+        else:
+            db.engine.execute(modes.update().where(where).values(values))
+    elif legact is not None:
+        db.engine.execute(modes.insert().values(values))
+
+    # Recalculate distances
+    update_user_distances(user, leg.time_start, leg.time_end)
+
+    return leg.device_id, legid, legact, legline

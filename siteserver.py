@@ -10,16 +10,22 @@ import string
 import httplib2
 
 from flask import (
+    abort,
     Flask, Response, jsonify, make_response, render_template, request, session)
 
 from oauth2client.client import flow_from_clientsecrets, FlowExchangeError
 
+from sqlalchemy.sql import and_, select
+
 from pyfiles.database_interface import (
     get_filtered_device_data_points, get_svg, get_users_table_id, init_db,
-    client_log_table_insert, get_max_devices_table_id_from_users_table_id)
+    client_log_table_insert, get_max_devices_table_id_from_users_table_id,
+    mass_transit_types, update_user_distances)
 
 from pyfiles.authentication_helper import user_hash, verify_and_get_account_id
-from pyfiles.server_common import common_trips_csv, common_trips_json
+
+from pyfiles.server_common import (
+    common_setlegmode, common_trips_csv, common_trips_json)
 
 
 import logging
@@ -341,6 +347,25 @@ def energycertificate():
         firstday=firstday,
         lastday=lastday)
 
+
+@app.route('/setlegmode', methods=['POST'])
+def setlegmode_post():
+    """Allow user to correct detected transit modes and line names."""
+
+    user_id = session.get('rr_user_id')
+    if user_id == None:
+        # Not authenticated -> throw back to front page
+        return index()
+
+    device, legid, legact, legline = common_setlegmode(request, db, user_id)
+
+    client_log_table_insert(
+        device,
+        user_id,
+        "WEB-PATH-EDIT",
+        "%s %s %s" % (legid, legact, legline))
+
+    return jsonify({})
 
 
 @app.route('/trips')

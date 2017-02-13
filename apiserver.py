@@ -31,6 +31,8 @@ from pyfiles.database_interface import (init_db, db_engine_execute, users_table_
     client_log_table_insert, device_data_waypoint_snapping, get_svg,
     update_user_distances)
 
+from pyfiles.server_common import common_setlegmode
+
 from pyfiles.authentication_helper import user_hash, authenticate_with_google_oauth
 
 import logging
@@ -497,43 +499,17 @@ def path(session_token):
 def setlegmode_post():
     """Allow user to correct detected transit modes and line names."""
 
-    data = request.json
-    session_token = data["sessionToken"]
-    legid = data["id"]
-    legact = data["activity"]
-    legline = data.get("line_name") or None
-
     devices = db.metadata.tables["devices"]
-    users = db.metadata.tables["users"]
-    legs = db.metadata.tables["legs"]
-    modes = db.metadata.tables["modes"]
+    user = select(
+        [devices.c.user_id],
+        devices.c.token == request.json["sessionToken"]
+        ).scalar()
 
-    # Get existing leg, while verifying that the token matches approapriately
-    leg = db.engine.execute(select(
-        [legs.c.device_id, legs.c.user_id, legs.c.time_start, legs.c.time_end],
-        and_(devices.c.token == session_token, legs.c.id == legid),
-        from_obj=devices.join(users).join(legs))).first()
-    if not leg:
-        abort(403)
-
-    values = {"leg": legid, "source": "USER", "mode": legact, "line": legline}
-    existing = db.engine.execute(modes.select().where(and_(
-        modes.c.leg == legid, modes.c.source == "USER"))).first()
-    if existing:
-        where = modes.c.id == existing.id
-        if legact is None:
-            db.engine.execute(modes.delete().where(where))
-        else:
-            db.engine.execute(modes.update().where(where).values(values))
-    elif legact is not None:
-        db.engine.execute(modes.insert().values(values))
-
-    # Recalculate distances
-    update_user_distances(leg.user_id, leg.time_start, leg.time_end)
+    device, legid, legact, legline = common_setlegmode(request, db, user)
 
     client_log_table_insert(
-        leg.device_id,
-        leg.user_id,
+        device,
+        user,
         "MOBILE-PATH-EDIT",
         "%s %s %s" % (legid, legact, legline))
 
