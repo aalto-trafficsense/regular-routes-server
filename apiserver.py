@@ -502,7 +502,7 @@ def setlegmode_post():
     session_token = data["sessionToken"]
     legid = data["id"]
     legact = data["activity"]
-    legline = data.get("line_name")
+    legline = data.get("line_name") or None
 
     devices = db.metadata.tables["devices"]
     users = db.metadata.tables["users"]
