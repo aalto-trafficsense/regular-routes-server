@@ -1132,7 +1132,9 @@ def match_legs_traffic_disorder(selection, disorder):
                              interval '24h' - :margin OR
              "time"(:start AT TIME ZONE 'Europe/Helsinki') - "time"(time)
                 BETWEEN - interval :margin AND interval :margin) AND
-            legs.activity = 'IN_VEHICLE' AND
+            legs.activity = 'IN_VEHICLE' AND (
+                line_type IS NULL OR
+                line_type NOT IN ('FERRY', 'SUBWAY', 'TRAIN')) AND
             legs.device_id = device_data.device_id AND
             device_data.time BETWEEN time_start AND time_end AND
             ST_Distance(device_data.coordinate, :coordinate) < 300;'''
