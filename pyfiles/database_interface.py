@@ -481,11 +481,9 @@ CREATE OR REPLACE VIEW leg_modes AS SELECT
         END activity,
 
     -- strict mass transit line_type, no activity
-    coalesce(
-        CASE WHEN mu.mode IN :mass_transit_types THEN mu.mode END,
-        ml.mode,
-        mp.mode,
-        mf.mode) line_type,
+    CASE WHEN mu.mode IN :mass_transit_types THEN mu.mode
+        WHEN mu.mode IS NULL THEN coalesce(ml.mode, mp.mode, mf.mode)
+        END line_type,
 
     -- collateral coalesce of line on mode
     CASE WHEN mu.mode IS NOT NULL THEN mu.line
@@ -577,8 +575,8 @@ def get_svg(user_id, firstday=None, lastday=None):
     end_time = lastday + timedelta(days=1)
     rating, ranking = get_rating(user_id, firstday, end_time)
 
-    # get_rating returns stored 7 day rating regardless of window length;
-    # calculate true rating in window
+    # get_rating returns stored 7 day ranking regardless of window length;
+    # calculate true ranking in window
     query = text("""
         WITH totals AS (SELECT
                 user_id,
