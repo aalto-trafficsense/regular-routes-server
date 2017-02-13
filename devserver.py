@@ -1,13 +1,9 @@
 #!/usr/bin/env python
 
-from collections import namedtuple
 import datetime
 from datetime import timedelta
-from itertools import groupby
 import json
 import os
-import re
-import urllib2
 
 from flask import Flask, jsonify, request, render_template, Response, make_response
 from sqlalchemy import and_, func, or_, select, text
@@ -15,6 +11,7 @@ from sqlalchemy import and_, func, or_, select, text
 from pyfiles.common_helpers import (
     datetime_range_str,
     dict_groups,
+    mode_str,
     simplify_geometry,
     trace_destinations,
     trace_discard_sidesteps,
@@ -340,14 +337,12 @@ def visualize_device_geojson(device_id):
         order_by=ends.c.id)
 
     def actormass(p):
-        mode = (p["line_type"]
-            and " ".join([p["line_type"], p["line_name"]])
-            or p["activity"])
+        mode = mode_str(p["activity"], p["line_type"], p["line_name"])
         return "_" in mode and mode or "by " + mode # preposition it if not yet
 
     # Group by hand here to collect visit summaries
     clusters = []
-    for keys, ends in dict_groups(db.engine.execute(s), ["id"]):
+    for _, ends in dict_groups(db.engine.execute(s), ["id"]):
         events = []
         stopcount = 0
         for l in sorted(ends, key=lambda x: x["time_start"]):

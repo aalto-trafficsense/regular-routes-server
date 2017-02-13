@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from itertools import groupby
 from sqlalchemy import and_, cast, func, select, String
 
-from pyfiles.common_helpers import get_distance_between_coordinates
+from pyfiles.common_helpers import mode_str
 
 
 def common_trips_json(request, db, user):
@@ -63,7 +63,7 @@ def common_trips_json(request, db, user):
     strings = (
         (   str(t0)[11:16],
             str(t1)[11:16],
-            ltype and " ".join([ltype, lname]) or activity,
+            mode_str(activity, ltype, lname),
             " ".join([fmt_duration(t0, t1), fmt_distance(km)]),
             pi0,
             pi1 or pi0)

@@ -718,3 +718,7 @@ def interpret_jore(jore_code):
         line_name = jore_code
         line_type = "BUS"
     return line_name, line_type
+
+
+def mode_str(activity, line_type, line_name):
+    return " ".join([line_type or "", line_name or ""]).strip() or activity
