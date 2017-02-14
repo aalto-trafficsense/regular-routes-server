@@ -72,7 +72,7 @@ class DeviceDataFilterer:
         # reconstructing legs with changed algorithm or parameters.
         matches = self._match_mass_transit_legs(activity, device_data_queue)
         if matches is not None: # matched same start/end/activity
-            print "reuselegmatch", matches,
+            print matches,
             return {x[0]: x[1:] for x in matches}
 
         if activity != "IN_VEHICLE":

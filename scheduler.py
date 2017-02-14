@@ -276,43 +276,25 @@ def generate_legs(maxtime=None, repair=False):
     # Real legs from devices with the owner added in, also when unattached
     owned = select(
         [   devices.c.user_id.label("owner"),
+            legs.c.id,
             legs.c.user_id,
             legs.c.time_start,
             legs.c.time_end],
         and_(legs.c.activity != None, legs.c.time_end < maxtime),
-        devices.join(legs, devices.c.id == legs.c.device_id))
+        devices.join(legs, devices.c.id == legs.c.device_id)).alias("owned")
 
-    unattached = owned.where(legs.c.user_id == None).alias("unattached")
-    attached = owned.where(legs.c.user_id != None).alias("attached")
+    # Find most recently received leg attached per user
+    maxattached = select(
+        [owned.c.owner, func.max(owned.c.id).label("id")],
+        owned.c.user_id != None,
+        group_by=owned.c.owner).alias("maxattached")
 
-    # Unattached leg with no attached leg ending after its start may be
-    # eligible for attaching. The having clause is any aggregate over a not
-    # null column, so as to find null only when no matches in the left join
-    eligible = select(
-        [unattached.c.owner, unattached.c.time_start, unattached.c.time_end],
-        from_obj=unattached.outerjoin(attached, and_(
-            unattached.c.owner == attached.c.owner,
-            attached.c.time_end > unattached.c.time_start)),
-        group_by=[
-            unattached.c.owner,
-            unattached.c.time_start,
-            unattached.c.time_end],
-        having=(func.min(attached.c.time_start) == None))
-
-    # Attached leg ending after overlapping eligible leg may be detached
-    eal = eligible.alias("eligible") # subquery, alias, union, jesus
-    deligible = select(
-        [attached.c.owner, func.min(attached.c.time_start), literal(None)],
-        from_obj=attached.join(eal, and_(
-            attached.c.owner == eal.c.owner,
-            attached.c.time_end > eal.c.time_end)),
-        group_by=attached.c.owner)
-
-    # Find restart point
+    # Find earliest starting unattached leg received later
     starts = select(
-        [column("owner"), func.min(column("time_start"))],
-        from_obj=eligible.union_all(deligible).alias("unified"),
-        group_by=[column("owner")])
+        [owned.c.owner, func.min(owned.c.time_start)],
+        and_(owned.c.user_id == None, owned.c.id > maxattached.c.id),
+        owned.join(maxattached, owned.c.owner == maxattached.c.owner),
+        group_by=owned.c.owner).alias("minunattached")
 
     # In repair mode, just start from the top.
     if repair:
@@ -329,20 +311,20 @@ def generate_legs(maxtime=None, repair=False):
 
         print "u"+str(user), "start attach", start
 
-        # Get unattached legs from user's devices in end time order, so shorter
+        # Get legs from user's devices in end time order, so shorter
         # legs get attached in favor of longer legs from a more idle device.
-        unattached = select(
+        s = select(
             [legs.c.id, legs.c.time_start, legs.c.time_end, legs.c.user_id],
             and_(
                 devices.c.user_id == user,
-                legs.c.time_start >= start,
+                legs.c.time_end > start,
                 legs.c.time_end < maxtime,
                 legs.c.activity != None),
             legs.join(devices, legs.c.device_id == devices.c.id),
             order_by=legs.c.time_end)
 
         lastend = None
-        for lid, lstart, lend, luser in db.engine.execute(unattached):
+        for lid, lstart, lend, luser in db.engine.execute(s):
             print " ".join(["u"+str(user), str(lstart)[:19], str(lend)[:19]]),
             if lastend and lstart < lastend:
                 if luser is None:
