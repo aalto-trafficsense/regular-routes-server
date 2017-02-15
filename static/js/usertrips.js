@@ -1,21 +1,7 @@
 $(document).ready(function() {
     var content = $('#content');
 
-    var date = $('#date');
-    date.pickadate({
-	clear: '',
-	firstDay: 1,
-	format: 'dd.mm.yyyy',
-	hiddenName: true,
-	onClose: function() {
-	    location.hash = this.get('select', 'yyyy-mm-dd');
-	    date.blur(); // https://github.com/amsul/pickadate.js/issues/160
-	},
-    });
-
     function update(date) {
-        $("#date").pickadate("picker").set("select", Date.parse(date));
-
 	content.css('opacity', 0.1);
 	$.getJSON('trips_json?date=' + date, function(response) {
             var trip = $("#trip");
@@ -107,6 +93,7 @@ $(document).ready(function() {
         var today = (new Date()).toISOString().slice(0, 10);
         update(date || today);
     }
+
     $(window).on("hashchange", hashchange);
     hashchange();
 });
