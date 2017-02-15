@@ -46,22 +46,28 @@ $(document).ready(function() {
         else
             $("#lastday").pickadate("picker").clear();
 
-        var presetLast = new Date();
+        // toISOString formats conveniently only in UTC, fudge zone offset in
+        var last = new Date();
+        last.setMinutes(last.getMinutes() - last.getTimezoneOffset());
+
+        // Depending on view, presets may want to end on today or yesterday
         var offset = $("#presets").attr("offset") || 0;
-        presetLast.setDate(presetLast.getDate() + parseInt(offset));
-        presetLast = presetLast.toISOString().slice(0, 10);
+        last.setDate(last.getDate() + parseInt(offset));
+        lastStr = last.toISOString().slice(0, 10);
 
-        var rweek = new Date();
-        rweek.setDate(rweek.getDate() - 7);
-        rweek = rweek.toISOString().slice(0, 10) + "/" + presetLast;
+        var rweek = new Date(last.getTime());
+        rweek.setDate(rweek.getDate() - 6);
+        rweek = rweek.toISOString().slice(0, 10) + "/" + lastStr;
 
-        var rmonth = new Date();
+        var rmonth = new Date(last.getTime());
         rmonth.setMonth(rmonth.getMonth() - 1);
-        rmonth = rmonth.toISOString().slice(0, 10) + "/" + presetLast;
+        rmonth.setDate(rmonth.getDate() + 1);
+        rmonth = rmonth.toISOString().slice(0, 10) + "/" + lastStr;
 
-        var ryear = new Date();
+        var ryear = new Date(last.getTime());
         ryear.setFullYear(ryear.getFullYear() - 1);
-        ryear = ryear.toISOString().slice(0, 10) + "/" + presetLast;
+        ryear.setDate(ryear.getDate() + 1);
+        ryear = ryear.toISOString().slice(0, 10) + "/" + lastStr;
 
         var presets = [
             {id: "#weeklink", href: rweek},
