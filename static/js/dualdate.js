@@ -46,21 +46,22 @@ $(document).ready(function() {
         else
             $("#lastday").pickadate("picker").clear();
 
-        var yesterday = new Date();
-        yesterday.setDate(yesterday.getDate() - 1);
-        yesterday = yesterday.toISOString().slice(0, 10);
+        var presetLast = new Date();
+        var offset = $("#presets").attr("offset") || 0;
+        presetLast.setDate(presetLast.getDate() + parseInt(offset));
+        presetLast = presetLast.toISOString().slice(0, 10);
 
         var rweek = new Date();
         rweek.setDate(rweek.getDate() - 7);
-        rweek = rweek.toISOString().slice(0, 10) + "/" + yesterday;
+        rweek = rweek.toISOString().slice(0, 10) + "/" + presetLast;
 
         var rmonth = new Date();
         rmonth.setMonth(rmonth.getMonth() - 1);
-        rmonth = rmonth.toISOString().slice(0, 10) + "/" + yesterday;
+        rmonth = rmonth.toISOString().slice(0, 10) + "/" + presetLast;
 
         var ryear = new Date();
         ryear.setFullYear(ryear.getFullYear() - 1);
-        ryear = ryear.toISOString().slice(0, 10) + "/" + yesterday;
+        ryear = ryear.toISOString().slice(0, 10) + "/" + presetLast;
 
         var presets = [
             {id: "#weeklink", href: rweek},

@@ -10,7 +10,10 @@
 }
 
 #trip { margin-top: 0; margin-bottom: 0 }
+#trip table { margin-top: 0 }
+
 #map-wrap { position: fixed; top: 240px; left: 0; right: 0; bottom: 0 }
 #map-canvas { height: 100% }
 
 #controls-wrap { position: absolute }
+.daycell { display: none }

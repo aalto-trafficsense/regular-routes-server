@@ -3,18 +3,24 @@ import json
 from collections import namedtuple
 from datetime import datetime, timedelta
 from itertools import groupby
-from sqlalchemy import and_, cast, func, select, String
+from sqlalchemy.sql import and_, cast, func, select
+from sqlalchemy.types import String
 
 from pyfiles.common_helpers import mode_str
 
 
 def common_trips_json(request, db, user):
-    date_start = 'date' in request.args \
-        and datetime.strptime(request.args['date'], '%Y-%m-%d') \
-        or datetime.now()
+    firstday = request.args.get("firstday")
+    firstday = firstday and datetime.strptime(firstday, '%Y-%m-%d')
+    firstday = firstday or datetime.now()
 
-    date_start = date_start.replace(hour=0, minute=0, second=0, microsecond=0)
-    date_end = date_start + timedelta(hours=24)
+    lastday = request.args.get("lastday")
+    lastday = lastday and datetime.strptime(lastday, '%Y-%m-%d')
+    lastday = lastday or firstday
+
+    date_start = firstday.replace(hour=0, minute=0, second=0, microsecond=0)
+    date_end = lastday.replace(hour=0, minute=0, second=0, microsecond=0) \
+        + timedelta(hours=24)
 
     legs = db.metadata.tables["leg_modes"]
     legends0 = db.metadata.tables["leg_ends"]
@@ -43,6 +49,22 @@ def common_trips_json(request, db, user):
             .outerjoin(places1, legends1.c.place == places1.c.id),
         order_by=legs.c.time_start)
 
+    # A leg overlapping the midnight at start of range is fudged into the first
+    # day. It's mostly relevant in single day view
+    dategrouped = groupby(
+        db.engine.execute(s),
+        lambda x: max(x.time_start, date_start) \
+            .replace(hour=0, minute=0, second=0, microsecond=0)
+            .strftime("%Y-%m-%d"))
+
+    return json.dumps([{
+            "date": date,
+            "data": render_trips_day(legrows)}
+        for date, legrows in dategrouped])
+
+
+def render_trips_day(legrows):
+
     def fmt_duration(t0, t1):
         h, m = divmod(int(round((t1 - t0).total_seconds() / 60)), 60)
         return h and "{}h{:02}".format(h, m) or "{}min".format(m)
@@ -68,7 +90,7 @@ def common_trips_json(request, db, user):
             pi0,
             pi1 or pi0)
         for t0, t1, activity, ltype, lname, km, pi0, pi1
-        in db.engine.execute(s))
+        in legrows)
 
     pt1str = pactivity = pplace1 = None
     for t0str, t1str, activity, duration, place0, place1 in strings:
@@ -78,7 +100,7 @@ def common_trips_json(request, db, user):
             step(time=(pt1str, "end"))
 
         # If place changed, or transfer, emit prior place on prior leg
-        if pplace1 and place0 != pplace1 or activity != "STILL":
+        if pplace1 and (place0 != pplace1 or activity != "STILL"):
             step(place=pplace1)
 
         # Visualize time gap if place changes, or activity is same
@@ -112,8 +134,4 @@ def common_trips_json(request, db, user):
     rle = [[(y, len(list(z))) for y, z in groupby(x)] for x in pivot]
     named = zip(State._fields, rle)
 
-    dated = [{
-        "date": date_start.strftime("%Y-%m-%d"),
-        "data": named}]
-
-    return json.dumps(dated)
+    return named

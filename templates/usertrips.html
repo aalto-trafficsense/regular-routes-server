@@ -4,7 +4,7 @@
     <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/meyer-reset/2.0/reset.css">
     <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/pickadate.js/3.5.3/compressed/themes/default.css">
     <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/pickadate.js/3.5.3/compressed/themes/default.date.css">
-    <link rel="stylesheet" href="../../static/css/singledate.css">
+    <link rel="stylesheet" href="../../static/css/dualdate.css">
     <link rel="stylesheet" href="../../static/css/usertrips.css">
     <link rel="icon" href="../../static/icon/favicon.ico">
     <script src="//cdnjs.cloudflare.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
@@ -14,13 +14,29 @@
   <body>
     <div id="controls-wrap">
       <div id="controls">
-        <input id="date" />
+        <span id="presets">
+          Show last
+          <a id="weeklink">week</a> |
+          <a id="monthlink">month</a> |
+          <a id="yearlink">year</a>
+        </span>
+        <span class="nowrap">
+          <label for="firstday">Start date</label>
+          <input class="datepicker" id="firstday" />
+        </span>
+        <span class="nowrap">
+          <label for="lastday">End date</label>
+          <input class="datepicker" id="lastday" />
+        </span>
+        <form method="get" action="menu">
+          <button id="menu">Return to menu</button>
+        </form>
       </div>
     </div>
     <div id="content">
       <div id="trip"></div>
     </div>
-    <script src="../../static/js/singledate.js"></script>
+    <script src="../../static/js/dualdate.js"></script>
     <script src="../../static/js/usertrips.js"></script>
   </body>
 </html>

@@ -1,35 +1,42 @@
 $(document).ready(function() {
     var content = $('#content');
 
-    function update(date) {
-	content.css('opacity', 0.1);
-	$.getJSON('trips_json?date=' + date, function(response) {
+    function eat(response) {
             var trips = $("#trip");
             trips.empty();
+            if (response.length == 0)
+                trips.html("<table><tr><td>No trips.</td></tr></table>");
             response.forEach(function (day) {
                 var daydate = day["date"];
                 var daydata = day["data"];
+/*
                 if (response.length > 1) {
                     var dayhead = document.createElement("h1");
                     dayhead.textContent = daydate;
                     trips.append(dayhead);
                 }
-                var daytable = buildday(daydata);
+*/
+                var daytable = buildday(daydata, daydate);
                 trips.append(daytable);
             });
 	    content.css('opacity', '');
-	});
     }
 
-    function buildday(data) {
+    function buildday(data, date) {
         var trip = $(document.createElement("table"));
-        if (data.length == 0)
-            trip.html("<tr><td>No trips.</td></tr>");
+        var daycell = document.createElement("td");
+        daycell.textContent = date;
+        daycell.setAttribute("rowspan", 3);
+        daycell.setAttribute("class", "daycell");
         $.each(data, function (i, row) {
                 var classname = row[0];
                 var cells = row[1];
                 var tr = $(document.createElement("tr"));
                 trip.append(tr);
+            if (daycell) {
+                tr.append(daycell)
+                daycell = null;
+            }
                 cells.forEach(function (col) {
                     var td = $(document.createElement("td"));
                     td.addClass(classname);
@@ -104,9 +111,23 @@ $(document).ready(function() {
     }
 
     function hashchange() {
-        var date = location.hash.split("#").splice(-1)[0];
-        var today = (new Date()).toISOString().slice(0, 10);
-        update(date || today);
+        var hash = location.hash.split("#").splice(-1)[0];
+        var dates = hash.split("/");
+        var firstday = dates[0];
+        var lastday = dates[1];
+
+        var url = "trips_json";
+        var args = [];
+        if (firstday)
+            args.push("firstday=" + firstday);
+        if (lastday)
+            args.push("lastday=" + lastday);
+        args = args.join("&");
+        if (args)
+            url += "?" + args;
+
+	content.css('opacity', 0.1);
+	$.getJSON(url, eat);
     }
 
     $(window).on("hashchange", hashchange);
