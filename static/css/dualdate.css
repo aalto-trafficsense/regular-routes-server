@@ -1,0 +1,23 @@
+#controls-wrap {
+  width: 100%;
+  top: 0;
+  z-index: 42;
+  text-align: center;
+  pointer-events: none; /* don't block map controls in corner */
+  background: #eee;
+}
+#controls {
+  display: inline-block;
+  padding: 10px;
+  margin-left: auto;
+  margin-right: auto;
+  pointer-events: auto;
+  font-family: sans-serif;
+  font-size: smaller;
+}
+#presets { margin-right: 1em }
+#presets a { font-weight: bold; text-decoration: none }
+#presets a[href] { font-weight: inherit }
+.datepicker { text-align: center; margin-right: 1em; width: 13ex }
+.nowrap { white-space: nowrap }
+#controls form { display: inline-block; margin-right: 1em }
