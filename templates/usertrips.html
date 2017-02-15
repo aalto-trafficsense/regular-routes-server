@@ -7,9 +7,6 @@
     <link rel="stylesheet" href="../../static/css/singledate.css">
     <link rel="stylesheet" href="../../static/css/usertrips.css">
     <link rel="icon" href="../../static/icon/favicon.ico">
-    <script type="text/javascript">
-      var user = {{ user }};
-    </script>
     <script src="//cdnjs.cloudflare.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
     <script src="//cdnjs.cloudflare.com/ajax/libs/pickadate.js/3.5.3/picker.js"></script>
     <script src="//cdnjs.cloudflare.com/ajax/libs/pickadate.js/3.5.3/compressed/picker.date.js"></script>
@@ -20,8 +17,9 @@
         <input id="date" />
       </div>
     </div>
-    <div id="content"></div>
-    <table id="trip"></table>
+    <div id="content">
+      <div id="trip"></div>
+    </div>
     <script src="../../static/js/singledate.js"></script>
     <script src="../../static/js/usertrips.js"></script>
   </body>

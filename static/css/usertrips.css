@@ -52,7 +52,8 @@
 #trip td.center { text-align: center }
 #trip td.right { text-align: right }
 
-#trip { margin: 1em; border-collapse: separate; border-spacing: 5px }
+#trip { margin: 0 1em }
+#trip table { border-collapse: separate; border-spacing: 5px }
 
 #trip .place { border: none; vertical-align: middle }
 #trip .place.move { background: none; padding: 0 }
@@ -69,3 +70,5 @@
 #trip .time.both { position: relative; left: -4ex }
 
 #trip .gap { visibility: hidden }
+
+h1 { margin: 1em; font-family: sans-serif }

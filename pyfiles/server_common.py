@@ -112,4 +112,8 @@ def common_trips_json(request, db, user):
     rle = [[(y, len(list(z))) for y, z in groupby(x)] for x in pivot]
     named = zip(State._fields, rle)
 
-    return json.dumps(named)
+    dated = [{
+        "date": date_start.strftime("%Y-%m-%d"),
+        "data": named}]
+
+    return json.dumps(dated)

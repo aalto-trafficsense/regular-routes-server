@@ -4,11 +4,28 @@ $(document).ready(function() {
     function update(date) {
 	content.css('opacity', 0.1);
 	$.getJSON('trips_json?date=' + date, function(response) {
-            var trip = $("#trip");
-            trip.empty();
-            if (response.length == 0)
-                trip.html("<tr><td>No trips.</td></tr>");
-            response.forEach(function (row) {
+            var trips = $("#trip");
+            trips.empty();
+            response.forEach(function (day) {
+                var daydate = day["date"];
+                var daydata = day["data"];
+                if (response.length > 1) {
+                    var dayhead = document.createElement("h1");
+                    dayhead.textContent = daydate;
+                    trips.append(dayhead);
+                }
+                var daytable = buildday(daydata);
+                trips.append(daytable);
+            });
+	    content.css('opacity', '');
+	});
+    }
+
+    function buildday(data) {
+        var trip = $(document.createElement("table"));
+        if (data.length == 0)
+            trip.html("<tr><td>No trips.</td></tr>");
+        $.each(data, function (i, row) {
                 var classname = row[0];
                 var cells = row[1];
                 var tr = $(document.createElement("tr"));
@@ -82,10 +99,8 @@ $(document).ready(function() {
                         $(td).text(text);
                     }
                 });
-            });
-
-	    content.css('opacity', '');
-	});
+        });
+        return trip;
     }
 
     function hashchange() {
