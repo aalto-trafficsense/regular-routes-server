@@ -9,13 +9,6 @@ $(document).ready(function() {
             response.forEach(function (day) {
                 var daydate = day["date"];
                 var daydata = day["data"];
-/*
-                if (response.length > 1) {
-                    var dayhead = document.createElement("h1");
-                    dayhead.textContent = daydate;
-                    trips.append(dayhead);
-                }
-*/
                 var daytable = buildday(daydata, daydate);
                 trips.append(daytable);
             });
@@ -25,7 +18,8 @@ $(document).ready(function() {
     function buildday(data, date) {
         var trip = $(document.createElement("table"));
         var daycell = document.createElement("td");
-        daycell.textContent = date;
+        var weekday = (new Date(Date.parse(date))).toDateString().slice(0, 3);
+        daycell.textContent = weekday + "\xa0" + date;
         daycell.setAttribute("rowspan", 3);
         daycell.setAttribute("class", "daycell");
         $.each(data, function (i, row) {
