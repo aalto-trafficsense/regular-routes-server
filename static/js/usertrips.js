@@ -114,18 +114,18 @@ $(document).ready(function() {
         var firstday = dates[0];
         var lastday = dates[1];
 
-        var url = "trips_json";
         var args = [];
         if (firstday)
             args.push("firstday=" + firstday);
         if (lastday)
             args.push("lastday=" + lastday);
         args = args.join("&");
-        if (args)
-            url += "?" + args;
+        var qs = args ? "?" + args : "";
 
 	content.css('opacity', 0.1);
-	$.getJSON(url, eat);
+	$.getJSON("trips_json" + qs, eat);
+
+        $("#csvlink").attr("href", "trips_csv" + qs);
     }
 
     $(window).on("hashchange", hashchange);

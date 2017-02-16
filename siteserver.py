@@ -19,7 +19,7 @@ from pyfiles.database_interface import (
     client_log_table_insert, get_max_devices_table_id_from_users_table_id)
 
 from pyfiles.authentication_helper import user_hash, verify_and_get_account_id
-from pyfiles.server_common import common_trips_json
+from pyfiles.server_common import common_trips_csv, common_trips_json
 
 
 import logging
@@ -355,6 +355,18 @@ def trips():
         'usertrips.html',
         RR_URL_PREFIX=app.config['RR_URL_PREFIX'],
         api_key=app.config['MAPS_API_KEY'])
+
+
+@app.route('/trips_csv')
+def trips_csv():
+    user_id = session.get('rr_user_id')
+    if user_id == None:
+        response = make_response(json.dumps(
+            'No user data in current session.'), 401)
+        response.headers['Content-Type'] = 'application/json'
+        return response
+
+    return common_trips_csv(request, db, user_id)
 
 
 @app.route('/trips_json')

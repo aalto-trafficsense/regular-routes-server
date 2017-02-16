@@ -1,15 +1,19 @@
 import json
 
 from collections import namedtuple
+from csv import DictWriter
 from datetime import datetime, timedelta
 from itertools import groupby
+from StringIO import StringIO
+
+from flask import make_response
 from sqlalchemy.sql import and_, cast, func, select
 from sqlalchemy.types import String
 
 from pyfiles.common_helpers import mode_str
 
 
-def common_trips_json(request, db, user):
+def common_trips_rows(request, db, user):
     firstday = request.args.get("firstday")
     firstday = firstday and datetime.strptime(firstday, '%Y-%m-%d')
     firstday = firstday or datetime.now()
@@ -49,10 +53,34 @@ def common_trips_json(request, db, user):
             .outerjoin(places1, legends1.c.place == places1.c.id),
         order_by=legs.c.time_start)
 
+    return date_start, db.engine.execute(s)
+
+
+def common_trips_csv(request, db, user):
+    # Sadly, both the csv source and the response sink want to be the driver,
+    # so not buffering the whole thing isn't convenient
+    buf = StringIO()
+    _, rows = common_trips_rows(request, db, user)
+    print rows.keys()
+    csv = DictWriter(buf, rows.keys())
+    csv.writeheader()
+    for r in rows:
+        r = {k: v.encode("utf8") if isinstance(v, unicode) else v
+             for k, v in r.items()}
+        csv.writerow(r)
+
+    response = make_response(buf.getvalue())
+    response.mimetype = "text/csv"
+    return response
+
+
+def common_trips_json(request, db, user):
+    date_start, rows = common_trips_rows(request, db, user)
+
     # A leg overlapping the midnight at start of range is fudged into the first
     # day. It's mostly relevant in single day view
     dategrouped = groupby(
-        db.engine.execute(s),
+        rows,
         lambda x: max(x.time_start, date_start) \
             .replace(hour=0, minute=0, second=0, microsecond=0)
             .strftime("%Y-%m-%d"))

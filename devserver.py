@@ -21,7 +21,7 @@ from pyfiles.constants import (
     BAD_LOCATION_RADIUS, DEST_DURATION_MIN, DEST_RADIUS_MAX)
 from pyfiles.database_interface import init_db, db_engine_execute, data_points_snapping
 from pyfiles.prediction.run_prediction import predict
-from pyfiles.server_common import common_trips_json
+from pyfiles.server_common import common_trips_csv, common_trips_json
 
 import logging
 logging.basicConfig()
@@ -218,6 +218,11 @@ def predict_dev(device_id):
 def trips(user):
     return render_template(
         'usertrips.html', api_key=app.config['MAPS_API_KEY'], user=user)
+
+
+@app.route('/users/<int:user>/trips_csv')
+def trips_csv(user):
+    return common_trips_csv(request, db, user)
 
 
 @app.route('/users/<int:user>/trips_json')
