@@ -56,27 +56,28 @@ $(document).ready(function() {
                         td.addClass(mode);
                         var glyph = null;
                         switch (mode) {
-                        case 'ON_BICYCLE': glyph = "\uD83D\uDEB4\uFE0E"; break;
+                        case 'ON_BICYCLE': glyph = "directions_bike"; break;
                         case 'WALKING':
-                        case 'ON_FOOT':    glyph = "\uD83D\uDEB6\uFE0E"; break;
-                        case 'RUNNING':    glyph = "\uD83C\uDFC3\uFE0E"; break;
-                        case 'IN_VEHICLE': glyph = "\uD83D\uDE98\uFE0E"; break;
-                        case "TRAIN":      glyph = "\uD83D\uDE82\uFE0E"; break;
-                        case 'SUBWAY':     glyph = "\uD83D\uDE87\uFE0E"; break;
-                        case 'TRAM':       glyph = "\uD83D\uDE8B\uFE0E"; break;
-                        case 'FERRY':      glyph = "\u26F4\uFE0E"; break;
-                        case 'BUS':        glyph = "\uD83D\uDE8D\uFE0E"; break;
-//                      case 'BUS':        glyph = "\uD83D\uDE8C\uFE0E"; break;
-                        case 'TILTING':    glyph = "/"; break;
+                        case 'ON_FOOT':    glyph = "directions_walk"; break;
+                        case 'RUNNING':    glyph = "directions_run"; break;
+                        case 'IN_VEHICLE': glyph = "directions_car"; break;
+                        case "TRAIN":      glyph = "train"; break;
+                        case 'SUBWAY':     glyph = "subway"; break;
+                        case 'TRAM':       glyph = "tram"; break;
+                        case 'FERRY':      glyph = "directions_boat"; break;
+                        case 'BUS':        glyph = "directions_bus"; break;
+                        case 'TILTING':    glyph = "screen_rotation"; break;
                         case 'STILL':      glyph = "\xa0"; break;
-//                      case 'STILL':      glyph = "\uD83D\uDECB\uFE0E"; break;
                         case 'UNKNOWN':    glyph = "?"; break;
 //                      default:           glyph = "!"; break;
                         }
 
                         var icon = $(document.createElement("div"));
+                        var matic = $(document.createElement("span"));
+                        matic.addClass("material-icons");
+                        matic.text(glyph);
+                        icon.append(matic);
                         td.append(icon);
-                        icon.text(glyph);
 
                         td.append(col[0][1]); // duration
 

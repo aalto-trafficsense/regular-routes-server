@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/icon?family=Material+Icons');
+
 #trip td {
     border: grey solid thin;
     text-align: center;
@@ -17,11 +19,8 @@
 .STILL { background-color: rgba(255, 255, 255, .13) }
 .UNKNOWN { background-color: rgba(136, 136, 136, .13) }
 
-#trip .activity div {
-    font-size: xx-large;
-    margin: .2em;
-    transform: scaleX(-1);
-}
+#trip .activity div { font-size: xx-large; margin: .2em }
+.material-icons { font-size: inherit }
 
 #trip td.left { text-align: left }
 #trip td.center { text-align: center }
