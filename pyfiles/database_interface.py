@@ -19,15 +19,21 @@ from sqlalchemy.exc import DataError, ProgrammingError
 from sqlalchemy.sql import (
     and_, between, column, exists, func, or_, select, text)
 
-import svg_generation
-
 from pyfiles.energy_rating import EnergyRating
 from pyfiles.config_helper import get_config
 
 from pyfiles.common_helpers import (
     get_distance_between_coordinates, trace_discard_sidesteps)
 
-from pyfiles.constants import *
+from pyfiles.constants import (
+    ALERT_RADIUS,
+    BAD_LOCATION_RADIUS,
+    DEST_RADIUS_MAX,
+    DISRUPTION_URI_EN,
+    DISRUPTION_URI_FI,
+    MAX_POINT_TIME_DIFFERENCE)
+
+from pyfiles.svg_generation import generate_energy_rating_svg
 
 
 # from simplekv.memory import DictStore
@@ -591,7 +597,8 @@ def get_svg(user_id, firstday=None, lastday=None):
         query, firstday=firstday, lastday=lastday, user=user_id).first()
     ranking, max_ranking = ranks or (0, 0)
 
-    return svg_generation.generate_energy_rating_svg(rating, firstday, end_time, ranking, max_ranking)
+    return generate_energy_rating_svg(
+        rating, firstday, end_time, ranking, max_ranking)
 
 
 def update_user_distances(user, start, end, update_derived=True):
@@ -1276,9 +1283,9 @@ def match_pubtrans_alert(alert):
                                          'alert_end': alert_end,
                                          'alert_type': alert["line_type"],
                                          'fi_text': alert["fi_description"],
-                                         'fi_uri': "https://www.reittiopas.fi/disruptions.php",
+                                         'fi_uri': DISRUPTION_URI_FI,
                                          'en_text': alert["en_description"],
-                                         'en_uri': "https://www.reittiopas.fi/en/disruptions.php",
+                                         'en_uri': DISRUPTION_URI_EN,
                                          'info': alert["line_type"] + ": " + alert["line_name"]}
                             # Save the new alert to device_alerts
                             stmt = device_alerts_table.insert(device_alert)
@@ -1303,9 +1310,9 @@ def match_pubtrans_alert_test(alert):
                             'alert_end': alert["alert_end"],
                             'alert_type': alert["line_type"],
                             'fi_text': alert["fi_description"],
-                            'fi_uri': "https://www.reittiopas.fi/disruptions.php",
+                            'fi_uri': DISRUPTION_URI_FI,
                             'en_text': alert["en_description"],
-                            'en_uri': "https://www.reittiopas.fi/en/disruptions.php",
+                            'en_uri': DISRUPTION_URI_EN,
                             'info': alert["line_type"] + ": " + alert["line_name"]}
             yield device_alert
     except Exception as e:

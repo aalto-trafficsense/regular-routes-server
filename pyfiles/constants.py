@@ -57,6 +57,9 @@ INCLUDE_DESTINATIONS_BETWEEN = 200, 200000
 # Default maximum number of destinations to emit in client api
 DESTINATIONS_LIMIT = 5
 
+# Links to transit disruption pages
+DISRUPTION_URI_EN = "https://www.hsl.fi/en/news"
+DISRUPTION_URI_FI = "https://www.hsl.fi/ajankohtaista"
 
 #Regexes for the HSL api
 jore_ferry_regex = re.compile("^1019")
@@ -72,7 +75,6 @@ jore_bus_replace_regex = re.compile("^.0*")
 # Maximum distance (m) and minimum duration (s) for detecting a stopover.
 DEST_DURATION_MIN = 300
 DEST_RADIUS_MAX = 100
-
 
 # GTFS Route Types
 gtfs_route_types = {    0: 'Tram, Light Rail, Streetcar',
