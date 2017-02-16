@@ -17,20 +17,24 @@ $(document).ready(function() {
 
     function buildday(data, date) {
         var trip = $(document.createElement("table"));
+
         var daycell = document.createElement("td");
+        daycell.appendChild(document.createTextNode(date));
+        var p = daycell.appendChild(document.createElement("p"));
         var weekday = (new Date(Date.parse(date))).toDateString().slice(0, 3);
-        daycell.textContent = weekday + "\xa0" + date;
+        p.appendChild(document.createTextNode(weekday));
         daycell.setAttribute("rowspan", 3);
         daycell.setAttribute("class", "daycell");
+
         $.each(data, function (i, row) {
                 var classname = row[0];
                 var cells = row[1];
                 var tr = $(document.createElement("tr"));
                 trip.append(tr);
-            if (daycell) {
-                tr.append(daycell)
-                daycell = null;
-            }
+                if (daycell) {
+                    tr.append(daycell)
+                    daycell = null;
+                }
                 cells.forEach(function (col) {
                     var td = $(document.createElement("td"));
                     td.addClass(classname);

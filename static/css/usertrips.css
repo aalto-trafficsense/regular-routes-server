@@ -47,3 +47,8 @@
 #trip .gap { visibility: hidden }
 
 #trip .daycell { vertical-align: top; border: none }
+#trip .daycell p {
+    margin-top: 5px;
+    border-top: lightgrey thin solid;
+    padding: .5em;
+}
