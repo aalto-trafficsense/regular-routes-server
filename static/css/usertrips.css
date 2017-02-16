@@ -6,16 +6,16 @@
     padding: .5em;
 }
 
-.ON_BICYCLE { background-color: #008c5822 }
-.WALKING, .ON_FOOT { background-color: #20ac2922 }
-.RUNNING { background-color: #add50022 }
-.IN_VEHICLE { background-color: #dd002022 }
-.TRAIN { background-color: #f7f70022 }
-.SUBWAY, .TRAM { background-color: #f6bd0022 }
-.FERRY, .BUS { background-color: #e6631322 }
-.TILTING { background-color: #00f2 }
-.STILL { background-color: #fff2 }
-.UNKNOWN { background-color: #8882 }
+.ON_BICYCLE { background-color: rgba(0, 140, 88, .13) }
+.WALKING, .ON_FOOT { background-color: rgba(32, 172, 41, .13) }
+.RUNNING { background-color: rgba(173, 213, 0, .13) }
+.IN_VEHICLE { background-color: rgba(221, 0, 32, .13) }
+.TRAIN { background-color: rgba(247, 247, 0, .13) }
+.SUBWAY, .TRAM { background-color: rgba(246, 189, 0, .13) }
+.FERRY, .BUS { background-color: rgba(230, 99, 19, .13) }
+.TILTING { background-color: rgba(0, 0, 255, .13) }
+.STILL { background-color: rgba(255, 255, 255, .13) }
+.UNKNOWN { background-color: rgba(136, 136, 136, .13) }
 
 #trip .activity div {
     font-size: xx-large;
@@ -46,7 +46,7 @@
 
 #trip .gap { visibility: hidden }
 
-#trip .daycell { vertical-align: top; border: none }
+#trip .daycell { vertical-align: top; border: none; white-space: nowrap }
 #trip .daycell p {
     margin-top: 5px;
     border-top: lightgrey thin solid;
