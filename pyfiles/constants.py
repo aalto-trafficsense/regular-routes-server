@@ -66,7 +66,7 @@ jore_ferry_regex = re.compile("^1019")
 jore_subway_regex = re.compile("^1300")
 jore_rail_regex = re.compile("^300")
 jore_tram_regex = re.compile("^10(0|10)")
-jore_bus_regex = re.compile("^(1|2|4)...")
+jore_bus_regex = re.compile("^(1|2|4|5|6|9)...")
 
 jore_tram_replace_regex = re.compile("^.0*")
 jore_bus_replace_regex = re.compile("^.0*")
