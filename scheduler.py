@@ -292,8 +292,9 @@ def generate_legs(maxtime=None, repair=False):
     # Find earliest starting unattached leg received later
     starts = select(
         [owned.c.owner, func.min(owned.c.time_start)],
-        and_(owned.c.user_id == None, owned.c.id > maxattached.c.id),
-        owned.join(maxattached, owned.c.owner == maxattached.c.owner),
+        and_(owned.c.user_id.is_(None), or_(
+            maxattached.c.id.is_(None), owned.c.id > maxattached.c.id)),
+        owned.outerjoin(maxattached, owned.c.owner == maxattached.c.owner),
         group_by=owned.c.owner).alias("minunattached")
 
     # In repair mode, just start from the top.
