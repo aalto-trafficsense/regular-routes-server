@@ -8,7 +8,7 @@ from uuid import uuid4
 from flask import Flask, abort, jsonify, request, make_response
 
 from sqlalchemy.sql import (
-    and_, between, cast, func, literal, not_, select, text)
+    and_, between, cast, func, literal, not_, or_, select, text)
 
 from sqlalchemy.types import String
 from pyfiles.common_helpers import (
@@ -420,9 +420,9 @@ def path(session_token):
 
     # find end of user legs
     legsend = select(
-        [func.max(legs.c.time_end)],
+        [func.max(legs.c.time_end).label("time_end")],
         devices.c.token == session_token,
-        devices.join(users).join(legs))
+        devices.join(users).join(legs)).alias("legsend")
 
     # use user legs if available
     legsed = select(
@@ -461,8 +461,8 @@ def path(session_token):
             devices.c.token == session_token,
             dd.c.time >= start,
             dd.c.time < end,
-            dd.c.time > legsend),
-        dd.join(devices))
+            or_(legsend.c.time_end.is_(None), dd.c.time > legsend.c.time_end)),
+        dd.join(devices).join(legsend, literal(True)))
 
     # Sort also by leg start time so join point repeats adjacent to correct leg
     query = legsed.union_all(unlegsed).order_by(text("time, legstart"))
