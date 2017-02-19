@@ -96,6 +96,7 @@ def run_hourly_tasks():
     delete_device_data_duplicates()
     generate_legs()
     set_device_data_waypoints()
+    set_leg_waypoints()
 
 
 def generate_legs(keepto=None, maxtime=None, repair=False):
@@ -612,6 +613,36 @@ def set_device_data_waypoints():
     t = time.time()
     rowcount = device_data_waypoint_snapping()
     print "set_device_data_waypoints on %d points in %.2g seconds" % (
+        rowcount, time.time() - t)
+
+
+def set_leg_waypoints():
+    t = time.time()
+
+    dd = db.metadata.tables["device_data"]
+    legs = db.metadata.tables["legs"]
+    glue = db.metadata.tables["leg_waypoints"]
+
+    legpoints = select(
+        [legs.c.id, dd.c.waypoint_id, dd.c.time, dd.c.snapping_time],
+        from_obj=dd.join(legs, and_(
+            dd.c.device_id == legs.c.device_id,
+            dd.c.time.between(legs.c.time_start, legs.c.time_end)))) \
+        .alias("legpoints")
+    done = select([glue.c.leg], distinct=True)
+    nounsnapped = select(
+        [legpoints.c.id],
+        legpoints.c.id.notin_(done),
+        group_by=legpoints.c.id,
+        having=func.bool_and(legpoints.c.snapping_time.isnot(None)))
+    newitems = select(
+        [legpoints.c.id, legpoints.c.waypoint_id, func.min(legpoints.c.time)],
+        legpoints.c.id.in_(nounsnapped),
+        group_by=[legpoints.c.id, legpoints.c.waypoint_id]).alias("newitems")
+
+    ins = glue.insert().from_select(["leg", "waypoint", "first"], newitems)
+    rowcount = db.engine.execute(ins).rowcount
+    print "set_leg_waypoints on %d rows in %.2g seconds" % (
         rowcount, time.time() - t)
 
 

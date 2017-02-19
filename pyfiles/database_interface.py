@@ -229,6 +229,15 @@ def init_db(app):
         Column('line', String),
         UniqueConstraint('leg', 'source'))
 
+    Table('waypoints', metadata, autoload=True)
+
+    Table('leg_waypoints', metadata,
+        Column(
+            'leg', ForeignKey('legs.id', ondelete="CASCADE"), nullable=False),
+        Column('waypoint', BigInteger), # ForeignKey('waypoints.id') ephemeral
+        Column('first', TIMESTAMP, nullable=False),
+        UniqueConstraint('leg', 'waypoint'))
+
     # travelled distances per day per device
     global travelled_distances_table
     travelled_distances_table = Table('travelled_distances', metadata,
