@@ -10,7 +10,8 @@ import time
 import urllib2
 
 from pyfiles.database_interface import (
-    init_db, data_points_by_user_id_after, generate_rankings,
+    init_db, data_points_by_user_id_after, device_data_waypoint_snapping,
+    generate_rankings,
     hsl_alerts_insert, weather_forecast_insert, weather_observations_insert,
     traffic_disorder_insert, match_pubtrans_alert, match_pubtrans_alert_test,
     match_traffic_disorder, update_global_statistics, update_user_distances)
@@ -32,7 +33,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from flask import Flask
 
 from sqlalchemy.sql.expression import (
-    and_, column, desc, func, literal, nullsfirst, or_, select, text)
+    and_, desc, func, nullsfirst, or_, select, text)
 
 import logging
 logging.basicConfig()
@@ -84,7 +85,7 @@ def initialize():
 
 def run_daily_tasks():
     # The order is important.
-    generate_legs()
+    run_hourly_tasks()
     filter_device_data()
     generate_distance_data()
     generate_global_statistics()
@@ -93,6 +94,7 @@ def run_daily_tasks():
 
 def run_hourly_tasks():
     generate_legs()
+    set_device_data_waypoints()
 
 
 def generate_legs(maxtime=None, repair=False):
@@ -574,6 +576,13 @@ def retrieve_weather_info():
     # TODO: If either one returns an empty set, re-schedule fetch after a few minutes and try to keep some max_retry counter?
     weather_forecast_insert(fmi_forecast_request())
     weather_observations_insert(fmi_observations_request())
+
+
+def set_device_data_waypoints():
+    t = time.time()
+    rowcount = device_data_waypoint_snapping()
+    print "set_device_data_waypoints on %d points in %.2g seconds" % (
+        rowcount, time.time() - t)
 
 
 def main_loop():

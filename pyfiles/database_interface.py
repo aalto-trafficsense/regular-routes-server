@@ -1595,3 +1595,6 @@ def db_engine_execute(query):
     return db.engine.execute(query)
 
 
+def device_data_waypoint_snapping():
+    with open('sql/snapping.sql') as sql_file:
+        return db.engine.execute(text(sql_file.read())).rowcount

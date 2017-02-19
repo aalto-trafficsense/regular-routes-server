@@ -28,7 +28,8 @@ from pyfiles.database_interface import (init_db, db_engine_execute, users_table_
                                         verify_user_id, update_last_activity, update_messaging_token, get_device_table_id,
                                         get_device_table_id_for_session, get_users_table_id, get_session_token_for_device, get_user_id_from_device_id,
                                         activity_types,
-    get_svg, client_log_table_insert, update_user_distances)
+    client_log_table_insert, device_data_waypoint_snapping, get_svg,
+    update_user_distances)
 
 from pyfiles.authentication_helper import user_hash, authenticate_with_google_oauth
 
@@ -385,10 +386,8 @@ def maintenance_duplicates():
 
 @app.route('/maintenance/snapping')
 def maintenance_snapping():
-    with open('sql/snapping.sql', 'r') as sql_file:
-        sql = sql_file.read()
-        result = db_engine_execute(text(sql))
-        return 'Snapping was done to %d data points' % (result.rowcount)
+    rowcount = device_data_waypoint_snapping()
+    return 'Snapping was done to %d data points' % (rowcount)
 
 
 @app.route('/path/<session_token>')
