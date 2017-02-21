@@ -33,7 +33,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from flask import Flask
 
 from sqlalchemy.sql.expression import (
-    and_, desc, func, nullsfirst, or_, select, text)
+    and_, column, desc, func, nullsfirst, or_, select, text)
 
 import logging
 logging.basicConfig()
@@ -173,6 +173,7 @@ def generate_legs(keepto=None, maxtime=None, repair=False):
             devmax.c.firstpoint.label("rewind"),
             devmax.c.firstpoint.label("start")])
 
+    starts = starts.order_by(devmax.c.device_id)
     for device, rewind, start in db.engine.execute(starts):
         query = select(
             [   func.ST_AsGeoJSON(dd.c.coordinate).label("geojson"),
@@ -333,7 +334,7 @@ def generate_legs(keepto=None, maxtime=None, repair=False):
             [owned.c.owner, func.min(owned.c.time_start)],
             group_by=owned.c.owner)
 
-    for user, start in db.engine.execute(starts):
+    for user, start in db.engine.execute(starts.order_by(column("owner"))):
         # Ignore the special legacy user linking userless data
         if user == 0:
             continue
