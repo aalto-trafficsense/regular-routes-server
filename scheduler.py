@@ -25,7 +25,7 @@ from pyfiles.common_helpers import (
     pairwise,
     point_coordinates)
 
-from pyfiles.constants import DEST_RADIUS_MAX
+from pyfiles.constants import DEST_RADIUS_MAX, TRIP_STOP_DURATION
 
 from pyfiles.information_services import (
     hsl_alert_request, fmi_forecast_request, fmi_observations_request, traffic_disorder_request)
@@ -97,6 +97,7 @@ def run_hourly_tasks():
     generate_legs()
     set_device_data_waypoints()
     set_leg_waypoints()
+    generate_trips()
 
 
 def generate_legs(keepto=None, maxtime=None, repair=False):
@@ -493,6 +494,103 @@ def generate_global_statistics():
         hour=0, minute=0, second=0, microsecond=0)
 
     update_global_statistics(time_start, last_midnight)
+
+
+def generate_trips():
+    legs = db.metadata.tables["legs"]
+    trips = db.metadata.tables["trips"]
+
+    # Legs may become detached from users with multiple devices rewriting
+    # history. Delete trips where associated legs have no user
+    userless_od = select(
+        [trips.c.id],
+        legs.c.user_id.is_(None),
+        trips.join(legs, legs.c.id.in_([trips.c.origin, trips.c.destination])))
+    userless_intra = select(
+        [legs.c.trip.distinct()],
+        and_(legs.c.user_id.is_(None), legs.c.trip.isnot(None)))
+    rowcount = db.engine.execute(trips.delete(or_(
+        trips.c.id.in_(userless_od), trips.c.id.in_(userless_intra)))).rowcount
+    if rowcount:
+        print "Deleted %d trips with userless legs" % rowcount
+
+    # Find tripless user moves
+    untripped = select([legs.c.user_id, legs.c.time_start]) \
+        .where(and_(
+            legs.c.user_id.isnot(None),
+            legs.c.activity.isnot(None),
+            legs.c.activity != "STILL",
+            legs.c.trip.is_(None))) \
+        .cte("untripped")
+
+    # Find nearest origin and destination longstops containing tripless. Doing
+    # this in one legs^3 join is ...slow... so do (legs^2)^2 instead
+    orig, dest = [
+        select([untripped.c.user_id,
+                untripped.c.time_start.label("move_start"),
+                aggregate(legs.c.time_start).label("time_start")]) \
+            .select_from(untripped.join(legs, and_(
+                beforeafter,
+                legs.c.user_id == untripped.c.user_id,
+                legs.c.activity == "STILL",
+                legs.c.time_end - legs.c.time_start >= TRIP_STOP_DURATION))) \
+            .group_by(untripped.c.user_id, untripped.c.time_start) \
+            .alias(alias)
+        for aggregate, beforeafter, alias
+        in [(func.max, legs.c.time_start < untripped.c.time_start, "orig"),
+            (func.min, legs.c.time_start > untripped.c.time_start, "dest")]]
+    tripends = select([orig.c.user_id, orig.c.time_start, dest.c.time_start]) \
+        .select_from(orig.join(dest, and_(
+            orig.c.user_id == dest.c.user_id,
+            orig.c.move_start == dest.c.move_start))) \
+        .distinct() \
+        .order_by(orig.c.user_id, orig.c.time_start)
+
+    for user, ostart, dstart in db.engine.execute(tripends):
+        with db.engine.begin() as t:
+            # Tripless legs may appear in the middle of an existing trip when
+            # user has multiple devices. Nuke trips that are in the way
+            overlap_orig = select([trips.c.id]) \
+                .select_from(trips.join(legs, and_(
+                    legs.c.user_id == user,
+                    legs.c.id == trips.c.origin,
+                    legs.c.time_start >= ostart,
+                    legs.c.time_start < dstart)))
+            overlap_dest = select([trips.c.id]) \
+                .select_from(trips.join(legs, and_(
+                    legs.c.user_id == user,
+                    legs.c.id == trips.c.destination,
+                    legs.c.time_start > ostart,
+                    legs.c.time_start <= dstart)))
+            overlap_intra = select([legs.c.trip]) \
+                .where(and_(
+                    legs.c.user_id == user,
+                    legs.c.time_start.between(ostart, dstart)))
+            dels = db.engine.execute(trips.delete(or_(
+                    trips.c.id.in_(overlap_orig),
+                    trips.c.id.in_(overlap_dest),
+                    trips.c.id.in_(overlap_intra))).returning(trips.c.id)) \
+                .fetchall()
+            if dels:
+                print "Deleted overlap trips %s" % " ".join(
+                    str(x[0]) for x in dels)
+
+            # Find and associate trip legs
+            sel = select([legs.c.id]) \
+                .where(and_(
+                    legs.c.user_id == user,
+                    legs.c.time_start.between(ostart, dstart))) \
+                .order_by(legs.c.time_start)
+            triplegs = [x[0] for x in t.execute(sel).fetchall()]
+            orig, intra, dest = triplegs[0], triplegs[1:-1], triplegs[-1]
+            ins = trips.insert() \
+                .values(origin=orig, destination=dest) \
+                .returning(trips.c.id)
+            trip = t.execute(ins).scalar()
+            upd = legs.update().values(trip=trip).where(legs.c.id.in_(intra))
+            t.execute(upd)
+            print "u"+str(user), "t"+str(trip), "ostart", str(ostart)[:16], \
+                "dstart", str(dstart)[:16], orig, intra, dest
 
 
 def mass_transit_cleanup():

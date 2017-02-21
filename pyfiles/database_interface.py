@@ -66,7 +66,6 @@ users_table = None
 devices_table = None
 device_data_table = None
 device_data_filtered_table = None
-legs_table = None
 modes_table = None
 leg_modes_view = None
 leg_ends_table = None
@@ -187,9 +186,21 @@ def init_db(app):
         name="mode_enum",
         metadata=metadata)
 
+    trips_table = Table(
+        'trips', metadata,
+        Column('id', Integer, primary_key=True),
+        Column(
+            'origin',
+            ForeignKey('legs.id', ondelete="CASCADE"),
+            unique=True),
+        Column(
+            'destination',
+            ForeignKey('legs.id', ondelete="CASCADE"),
+            unique=True))
+
     # Decided activity and detected mass transit line in trace time ranges
-    global legs_table
-    legs_table = Table('legs', metadata,
+    legs_table = Table(
+        'legs', metadata,
         Column('id', Integer, primary_key=True),
         Column('device_id', Integer, ForeignKey('devices.id'), nullable=False),
         Column('user_id', Integer, ForeignKey('users.id')),
@@ -203,6 +214,7 @@ def init_db(app):
         Column('cluster_start', Integer, ForeignKey('leg_ends.id'), index=True),
         Column('cluster_end', Integer, ForeignKey('leg_ends.id'), index=True),
         Column('km', Float),
+        Column('trip', ForeignKey('trips.id', ondelete="SET NULL")),
 
         # useful near beginning of time
         Index('idx_legs_user_id_time_start_time_end',
@@ -453,6 +465,7 @@ CREATE OR REPLACE VIEW leg_modes AS SELECT
     l.cluster_start,
     l.cluster_end,
     l.km,
+    l.trip,
     mu.mode mode_user, mu.line line_user,
     ml.mode mode_live, ml.line line_live,
     mp.mode mode_planner, mp.line line_planner,
@@ -503,6 +516,7 @@ CREATE OR REPLACE VIEW leg_modes AS SELECT
     leg_modes_view = Table("leg_modes", metadata,
         Column("device_id", ForeignKey(devices_table.c.id)),
         Column("user_id", ForeignKey(users_table.c.id)),
+        Column("trip", ForeignKey(trips_table.c.id)),
         autoload=True)
 
     # Functions and triggers that maintain the leg_ends table

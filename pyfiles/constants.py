@@ -61,6 +61,9 @@ DESTINATIONS_LIMIT = 5
 DISRUPTION_URI_EN = "https://www.hsl.fi/en/news"
 DISRUPTION_URI_FI = "https://www.hsl.fi/ajankohtaista"
 
+# Minimum duration for activity location flavor of stop for trip splitting
+TRIP_STOP_DURATION = "1 hour"
+
 #Regexes for the HSL api
 jore_ferry_regex = re.compile("^1019")
 jore_subway_regex = re.compile("^1300")
