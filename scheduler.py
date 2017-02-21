@@ -339,7 +339,7 @@ def generate_legs(maxtime=None, repair=False):
                 owned.c.time_start,
                 owned.c.time_end,
                 owned.c.user_id],
-            and_(owned.c.owner == user, owned.c.time_end > start),
+            and_(owned.c.owner == user, owned.c.time_start >= start),
             order_by=owned.c.time_end)
 
         lastend = None
