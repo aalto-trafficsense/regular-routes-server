@@ -608,11 +608,10 @@ def stop_clusters(stops, cluster_distance):
         total = sum(len(d["visits"]) for d in destinations)
         return tuple(sum(c) / total for c in zip(*weighted))
 
-    def heapitem(d0, dests):
-        """Find nearest neighbor for d0 as sortable [distance, nearest, d0]"""
-        return (min([dest_dist(d0, d1),
-                     d1] for d1 in dests if d1 is not d0)
-                  + [d0])
+    def dest_merge(d0, d1):
+        return {
+            "coordinates": dest_weighted_center(d0, d1),
+            "visits": d0["visits"] + d1["visits"]}
 
     # Start by making each stop a destination with a single visit.
     dests = [{
@@ -622,40 +621,8 @@ def stop_clusters(stops, cluster_distance):
                 "time_end": x["time_end"]}]}
         for x in stops]
 
-    heap = [[None, None, d] for d in dests]
-    d0 = d1 = merged = None
-    while len(heap) > 1:
-        for item in heap:
-            # rescan nearest where nearest was merged away, or not yet set
-            if item[1] in (None, d0, d1):
-                item[:] = heapitem(item[2], (x[2] for x in heap))
-                continue
+    groups = do_cluster(dests, dest_merge, dest_dist, cluster_distance)
 
-            # update others where merged now nearest
-            if item[2] is not merged:
-                distance = dest_dist(item[2], merged)
-                if item[0] > distance:
-                    item[0:2] = distance, merged
-
-        # arrange heap, pop out one end of shortest edge
-        heapify(heap)
-        distance, d1, d0 = item = heappop(heap)
-
-        # if shortest edge is long enough, unpop and stop
-        if distance is None or distance >= cluster_distance:
-            heappush(heap, item) # unspill the milk
-            break
-
-        # replace other end with merged destination
-        merged = {
-            "coordinates": dest_weighted_center(d0, d1),
-            "visits": d0["visits"] + d1["visits"]}
-        for i in range(len(heap)):
-            if heap[i][2] is d1:
-                heap[i] = [None, None, merged]
-                break
-
-    groups = [x[2] for x in heap]
     for g in groups:
         g["total_time"] = sum(
             (v["time_end"] - v["time_start"]).total_seconds()
@@ -681,6 +648,54 @@ def stop_clusters(stops, cluster_distance):
         g["visits_rank"] = r + 1
 
     return groups
+
+
+def do_cluster(items, mergefun, distfun, distlim):
+    """Pairwise nearest merging clusterer.
+    items -- list of dicts
+    mergefun -- merge two items
+    distfun -- distance function
+    distlim -- stop merging when distance above this limit
+    """
+
+    def heapitem(d0, dests):
+        """Find nearest neighbor for d0 as sortable [distance, nearest, d0]"""
+        return (min([distfun(d0, d1),
+                     d1] for d1 in dests if d1 is not d0)
+                  + [d0])
+
+    heap = [[None, None, d] for d in items]
+    d0 = d1 = merged = None
+    while len(heap) > 1:
+        for item in heap:
+            # rescan nearest where nearest was merged away, or not yet set
+            if item[1] in (None, d0, d1):
+                item[:] = heapitem(item[2], (x[2] for x in heap))
+                continue
+
+            # update others where merged now nearest
+            if item[2] is not merged:
+                distance = distfun(item[2], merged)
+                if item[0] > distance:
+                    item[0:2] = distance, merged
+
+        # arrange heap, pop out one end of shortest edge
+        heapify(heap)
+        distance, d1, d0 = item = heappop(heap)
+
+        # if shortest edge is long enough, unpop and stop
+        if distance is None or distance > distlim:
+            heappush(heap, item) # unspill the milk
+            break
+
+        # replace other end with merged destination
+        merged = mergefun(d0, d1)
+        for i in range(len(heap)):
+            if heap[i][2] is d1:
+                heap[i] = [None, None, merged]
+                break
+
+    return [x[2] for x in heap]
 
 
 def trace_split_sparse(points, interval):
