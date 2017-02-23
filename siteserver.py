@@ -21,7 +21,7 @@ from pyfiles.database_interface import (
 from pyfiles.authentication_helper import user_hash, verify_and_get_account_id
 
 from pyfiles.server_common import (
-    common_setlegmode, common_trips_csv, common_trips_json)
+    common_routes_json, common_setlegmode, common_trips_csv, common_trips_json)
 
 
 import logging
@@ -342,6 +342,34 @@ def energycertificate():
         RR_URL_PREFIX=app.config['RR_URL_PREFIX'],
         firstday=firstday,
         lastday=lastday)
+
+
+@app.route('/routes')
+def routes():
+    """Draw a day of trips of the user."""
+
+    user_id = session.get('rr_user_id')
+    if user_id == None:
+        # Not authenticated -> throw back to front page
+        return index()
+
+#    client_log_table_insert(get_max_devices_table_id_from_users_table_id(user_id), user_id, "WEB-PATH", "") XXX add me
+    return render_template(
+        'userroutes.html',
+        RR_URL_PREFIX=app.config['RR_URL_PREFIX'],
+        api_key=app.config['MAPS_API_KEY'])
+
+
+@app.route('/routes_json')
+def routes_json():
+    user_id = session.get('rr_user_id')
+    if user_id == None:
+        response = make_response(json.dumps(
+            'No user data in current session.'), 401)
+        response.headers['Content-Type'] = 'application/json'
+        return response
+
+    return common_routes_json(request, db, user_id)
 
 
 @app.route('/setlegmode', methods=['POST'])

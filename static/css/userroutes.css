@@ -1,0 +1,27 @@
+@import url("usertrips.css");
+
+canvas {
+    margin-top: 1em;
+    margin-left: 75px;
+    box-shadow: 0 0 5px 0 lightgrey;
+}
+
+#trip .activity div {
+    float: left;
+    margin-top: 0;
+    margin-left: 0;
+    width: .9em; /* samey wider blank on stills */
+}
+
+#trip .activity {
+    text-align: left;
+    min-width: 12em; /* don't wrap under float */
+}
+
+#trip .activity.gap {
+    min-width: auto;
+}
+
+.activity div .material-icons {
+    vertical-align: middle; /* no descenders so don't leave that space */
+}

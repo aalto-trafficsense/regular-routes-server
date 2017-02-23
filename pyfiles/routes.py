@@ -1,21 +1,14 @@
 #!/usr/bin/env python
 
 from collections import Counter
-from itertools import chain, groupby
+from itertools import groupby
 
 from sqlalchemy.sql import select
 
-from pyfiles.common_helpers import do_cluster
+from pyfiles.common_helpers import do_cluster, group_unsorted
 
 
-def group_unsorted(iterable, keyfunc):
-    r = dict()
-    for x in iterable:
-        r.setdefault(keyfunc(x), list()).append(x)
-    return r
-
-
-def test(db, threshold):
+def get_routes(db, threshold, user):
     ends = db.metadata.tables["leg_ends"]
     legs = db.metadata.tables["leg_modes"]
     lwps = db.metadata.tables["leg_waypoints"]
@@ -35,20 +28,20 @@ def test(db, threshold):
             .join(oend, oleg.c.cluster_start == oend.c.id) \
             .join(dleg, trips.c.destination == dleg.c.id) \
             .join(dend, dleg.c.cluster_start == dend.c.id)) \
-        .where(oend.c.user_id == 16)
+        .where(oend.c.user_id == user)
     tripitems = {x[0]: dict(x) for x in db.engine.execute(sel)}
 
     # Add waypointmodes on trips
     sel = select([legs.c.trip, legs.c.mode, lwps.c.waypoint]) \
         .select_from(legs.join(lwps, lwps.c.leg == legs.c.id)) \
         .where(legs.c.trip.isnot(None)) \
-        .where(legs.c.user_id == 16) \
+        .where(lwps.c.waypoint.isnot(None)) \
+        .where(legs.c.user_id == user) \
         .order_by(legs.c.trip)
-    trippoints = groupby(db.engine.execute(sel), lambda x: x.trip)
-    for trip, points in trippoints:
-        if trip not in tripitems:
-            continue
-        tripitems[trip]["points"] = list(x[1:] for x in points) # strip trip
+    trippoints = group_unsorted(db.engine.execute(sel), lambda x: x.trip)
+    for tid, titem in tripitems.iteritems():
+        points = trippoints.get(tid, [])
+        titem["points"] = list(x[1:] for x in points) # strip trip
 
     # Group by origin/destination
     odgroups = group_unsorted(
@@ -72,12 +65,12 @@ def test(db, threshold):
         keys = set(p0.keys() + p1.keys())
         union = sum(max(p0.get(x, 0), p1.get(x, 0)) for x in keys)
         intersection = sum(min(p0.get(x, 0), p1.get(x, 0)) for x in keys)
-        return 1.0 - 1.0 * intersection / union
+        return 1.0 - 1.0 * intersection / union if union else 1
 
     counter = Counter()
-    for _, group in odgroups.iteritems():
+    for od, group in odgroups.iteritems():
         clusters = [
-            {   "probs": Counter({p: 1 for p in x["points"]}),
+            {   "probs": Counter({p: 1 for p in x.get("points", [])}),
                 "trips": [x]}
             for x in group]
         clustered = do_cluster(
@@ -86,4 +79,5 @@ def test(db, threshold):
             counter["intraclusters"] += 1
             counter["trips"] += len(c["trips"])
         counter["odclusters"] += 1
+        yield od, clustered
     print counter

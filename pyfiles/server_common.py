@@ -10,7 +10,8 @@ from flask import abort, make_response
 from sqlalchemy.sql import and_, cast, func, select
 from sqlalchemy.types import String
 
-from pyfiles.common_helpers import mode_str
+from pyfiles.common_helpers import group_unsorted, mode_str
+from pyfiles.routes import get_routes
 
 from pyfiles.database_interface import (
     mass_transit_types, update_user_distances)
@@ -29,6 +30,16 @@ def common_trips_rows(request, db, user):
         + timedelta(hours=24)
 
     legs = db.metadata.tables["leg_modes"]
+    where = and_(
+        legs.c.user_id == int(user),
+        legs.c.time_end >= date_start,
+        legs.c.time_start <= date_end)
+
+    return date_start, fetch_legs(db, where)
+
+
+def fetch_legs(db, where):
+    legs = db.metadata.tables["leg_modes"]
     legends0 = db.metadata.tables["leg_ends"]
     legends1 = legends0.alias("legends1")
     places0 = db.metadata.tables["places"]
@@ -42,21 +53,19 @@ def common_trips_rows(request, db, user):
             legs.c.line_type,
             legs.c.line_name,
             legs.c.km,
+            legs.c.trip,
             func.coalesce(places0.c.label, cast(
                 places0.c.id, String)).label("startplace"),
             func.coalesce(places1.c.label, cast(
                 places1.c.id, String)).label("endplace")],
-        and_(
-            legs.c.user_id == int(user),
-            legs.c.time_end >= date_start,
-            legs.c.time_start <= date_end),
+        where,
         legs.outerjoin(legends0, legs.c.cluster_start == legends0.c.id) \
             .outerjoin(legends1, legs.c.cluster_end == legends1.c.id) \
             .outerjoin(places0, legends0.c.place == places0.c.id) \
             .outerjoin(places1, legends1.c.place == places1.c.id),
         order_by=legs.c.time_start)
 
-    return date_start, db.engine.execute(s)
+    return db.engine.execute(s)
 
 
 def common_trips_csv(request, db, user):
@@ -75,6 +84,47 @@ def common_trips_csv(request, db, user):
     response = make_response(buf.getvalue())
     response.mimetype = "text/csv"
     return response
+
+
+def common_routes_json(request, db, user):
+    clustered = list(get_routes(db, .5, user))
+    for od, routes in clustered:
+        for route in routes:
+            print "probs", route["probs"]
+            for trip in route["trips"]:
+                print "trip", trip["id"]
+
+    tids = [
+        trip["id"]
+        for od, routes in clustered
+        for route in routes
+        for trip in route["trips"]]
+
+    legs = db.metadata.tables["leg_modes"]
+    where = legs.c.trip.in_(tids)
+    legrows = fetch_legs(db, where)
+    bytrip = group_unsorted(legrows, lambda x: x.trip)
+
+    # Sort most common route pattern in first
+    clustered.sort(key=lambda x: -sum(len(y["trips"]) for y in x[1]))
+
+    for od, routes in clustered:
+        # Sort most common OD first
+        routes.sort(key=lambda x: -len(x["trips"]))
+        for route in routes:
+            # Sort oldest trip first
+            route["trips"].sort(key=lambda x: bytrip[x["id"]][0].time_start)
+            # Make probs jsonifiable, tuple keys aren't so
+            route["probs"] = route["probs"].items()
+
+    bytrip = {
+        x: {"date": y[0].time_start.strftime("%Y-%m-%d"),
+            "render": render_trips_day(y)}
+        for x, y in bytrip.iteritems()}
+
+    return json.dumps({
+        "clustered": clustered,
+        "trips": bytrip})
 
 
 def common_trips_json(request, db, user):
@@ -114,15 +164,15 @@ def render_trips_day(legrows):
         steps.append(prior._replace(**kw))
 
     strings = (
-        (   legid,
-            str(t0)[11:16],
-            str(t1)[11:16],
-            mode_str(activity, ltype, lname),
-            " ".join([fmt_duration(t0, t1), fmt_distance(km)]),
-            pi0,
-            pi1 or pi0)
-        for legid, t0, t1, activity, ltype, lname, km, pi0, pi1
-        in legrows)
+        (   x.id,
+            str(x.time_start)[11:16],
+            str(x.time_end)[11:16],
+            mode_str(x.activity, x.line_type, x.line_name),
+            " ".join([
+                fmt_duration(x.time_start, x.time_end), fmt_distance(x.km)]),
+            x.startplace,
+            x.endplace or x.startplace)
+        for x in legrows)
 
     pt1str = pactivity = pplace1 = None
     for legid, t0str, t1str, activity, duration, place0, place1 in strings:

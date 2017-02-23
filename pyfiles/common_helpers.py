@@ -698,6 +698,13 @@ def do_cluster(items, mergefun, distfun, distlim):
     return [x[2] for x in heap]
 
 
+def group_unsorted(iterable, keyfunc):
+    r = dict()
+    for x in iterable:
+        r.setdefault(keyfunc(x), list()).append(x)
+    return r
+
+
 def trace_split_sparse(points, interval):
     """"Split location trace where interval between points exceeds given
     threshold interval."""
