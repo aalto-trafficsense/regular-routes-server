@@ -13,9 +13,12 @@ $(document).ready(function() {
         var ymax = -999;
         for (var i = 0; i < points.length; ++i) {
             // Fish approximate coords from the ID, or could query for exact
-            var lola = points[i][0][1];
-            var lat = - lola%1000000/10000; // y is down on canvas
-            var lon = Math.floor(lola/1000000)/10000;
+            // var lola = points[i][0][1];
+            // var lat = - lola%1000000/10000; // y is down on canvas
+            // var lon = Math.floor(lola/1000000)/10000;
+            var lon = points[i][0][1];
+            var lat = -points[i][0][2]; // y is down on canvas
+            console.log(lat, lon);
             ymin = Math.min(ymin, lat);
             ymax = Math.max(ymax, lat);
 
@@ -45,7 +48,7 @@ $(document).ready(function() {
         canvas.attr("width", cw);
         canvas.attr("height", ch);
         var ctx = canvas.get(0).getContext("2d");
-        console.log(scale, xmin, xmax, ymin, ymax);
+//        console.log(scale, xmin, xmax, ymin, ymax);
         for (var i = 0; i < points.length; ++i) {
             ctx.fillStyle = getActivityColor(modes[i]);
             ctx.globalAlpha = probs[i];
@@ -53,7 +56,7 @@ $(document).ready(function() {
   //              scale * (xs[i] - xmin) - r, scale * (ys[i] - ymin) - r,
     //            2*r, 2*r);
             ctx.fillRect(xs[i] - r, ys[i] - r, 2*r, 2*r);
-            console.log(xs[i], ys[i], modes[i], probs[i], ctx.fillStyle);
+//            console.log(xs[i], ys[i], modes[i], probs[i], ctx.fillStyle);
         }
         return canvas;
     }

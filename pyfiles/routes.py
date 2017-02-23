@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
 from collections import Counter
-from itertools import groupby
 
-from sqlalchemy.sql import select
+from sqlalchemy.sql import and_, literal_column, select
+from sqlalchemy.types import Float
 
 from pyfiles.common_helpers import do_cluster, group_unsorted
 
@@ -11,7 +11,8 @@ from pyfiles.common_helpers import do_cluster, group_unsorted
 def get_routes(db, threshold, user):
     ends = db.metadata.tables["leg_ends"]
     legs = db.metadata.tables["leg_modes"]
-    lwps = db.metadata.tables["leg_waypoints"]
+#    lwps = db.metadata.tables["leg_waypoints"]
+    dd = db.metadata.tables["device_data"]
     trips = db.metadata.tables["trips"]
 
     # Fetch trips
@@ -32,16 +33,23 @@ def get_routes(db, threshold, user):
     tripitems = {x[0]: dict(x) for x in db.engine.execute(sel)}
 
     # Add waypointmodes on trips
-    sel = select([legs.c.trip, legs.c.mode, lwps.c.waypoint]) \
-        .select_from(legs.join(lwps, lwps.c.leg == legs.c.id)) \
+    sel = select(
+        [   legs.c.trip,
+            legs.c.mode,
+            literal_column('round(st_x(coordinate::geometry)::numeric, 3)'),
+            literal_column('round(st_y(coordinate::geometry)::numeric, 3)')]) \
+        .select_from(legs.join(dd, and_(
+            dd.c.device_id == legs.c.device_id,
+            dd.c.time.between(legs.c.time_start, legs.c.time_end)))) \
         .where(legs.c.trip.isnot(None)) \
-        .where(lwps.c.waypoint.isnot(None)) \
         .where(legs.c.user_id == user) \
+        .distinct() \
         .order_by(legs.c.trip)
     trippoints = group_unsorted(db.engine.execute(sel), lambda x: x.trip)
     for tid, titem in tripitems.iteritems():
+        # Strip trip and convert Decimal to float for json serialization
         points = trippoints.get(tid, [])
-        titem["points"] = list(x[1:] for x in points) # strip trip
+        titem["points"] = [(x[1], float(x[2]), float(x[3])) for x in points]
 
     # Group by origin/destination
     odgroups = group_unsorted(
