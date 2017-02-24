@@ -1,10 +1,7 @@
 $(document).ready(function() {
     var content = $('#content');
 
-//    function draw(points, cw, ch, canvas) {
-//    }
-    function canvas_route(points, cw, ch) {
-        // XXX make the drawing tasks async with setTimeout
+    function lazydraw(points, cw, ch, ctx) {
         var modes = [];
         var xs = [];
         var ys = [];
@@ -44,20 +41,19 @@ $(document).ready(function() {
             xs[i] = scale * (xs[i] - xmin) + xoff;
             ys[i] = scale * (ys[i] - ymin) + yoff;
         }
+        for (var i = 0; i < points.length; ++i) {
+            ctx.fillStyle = getActivityColor(modes[i]);
+            ctx.globalAlpha = probs[i];
+            ctx.fillRect(xs[i] - r, ys[i] - r, 2*r, 2*r);
+        }
+    }
+
+    function canvas_route(points, cw, ch) {
         var canvas = $(document.createElement("canvas"));
         canvas.attr("width", cw);
         canvas.attr("height", ch);
         var ctx = canvas.get(0).getContext("2d");
-//        console.log(scale, xmin, xmax, ymin, ymax);
-        for (var i = 0; i < points.length; ++i) {
-            ctx.fillStyle = getActivityColor(modes[i]);
-            ctx.globalAlpha = probs[i];
-//            ctx.fillRect(
-  //              scale * (xs[i] - xmin) - r, scale * (ys[i] - ymin) - r,
-    //            2*r, 2*r);
-            ctx.fillRect(xs[i] - r, ys[i] - r, 2*r, 2*r);
-//            console.log(xs[i], ys[i], modes[i], probs[i], ctx.fillStyle);
-        }
+        setTimeout(lazydraw, 0, points, cw, ch, ctx);
         return canvas;
     }
 
@@ -99,7 +95,11 @@ $(document).ready(function() {
 
     function buildday(data, date) {
         var trip = $(document.createElement("table"));
+        setTimeout(lazyfill, 0, data, date, trip);
+        return trip;
+    }
 
+    function lazyfill(data, date, trip) {
         var daycell = document.createElement("td");
         daycell.appendChild(document.createTextNode(date));
         var p = daycell.appendChild(document.createElement("p"));
@@ -189,7 +189,6 @@ $(document).ready(function() {
                     }
                 });
         });
-        return trip;
     }
 
     function hashchange() {
