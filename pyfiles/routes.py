@@ -36,8 +36,10 @@ def get_routes(db, threshold, user):
     sel = select(
         [   legs.c.trip,
             legs.c.mode,
-            literal_column('round(st_x(coordinate::geometry)::numeric, 3)'),
-            literal_column('round(st_y(coordinate::geometry)::numeric, 3)')]) \
+            literal_column(
+                'st_x(st_snaptogrid(coordinate::geometry, .004))'),
+            literal_column(
+                'st_y(st_snaptogrid(coordinate::geometry, .002))')]) \
         .select_from(legs.join(dd, and_(
             dd.c.device_id == legs.c.device_id,
             dd.c.time.between(legs.c.time_start, legs.c.time_end)))) \
