@@ -15,7 +15,6 @@ $(document).ready(function() {
             // var lon = Math.floor(lola/1000000)/10000;
             var lon = points[i][0][1];
             var lat = -points[i][0][2]; // y is down on canvas
-            console.log(lat, lon);
             ymin = Math.min(ymin, lat);
             ymax = Math.max(ymax, lat);
 
@@ -38,10 +37,8 @@ $(document).ready(function() {
         var xoff = (cw - scale * (xmax - xmin)) / 2;
         var yoff = (ch - scale * (ymax - ymin)) / 2;
         for (var i = 0; i < points.length; ++i) {
-            xs[i] = scale * (xs[i] - xmin) + xoff;
-            ys[i] = scale * (ys[i] - ymin) + yoff;
-        }
-        for (var i = 0; i < points.length; ++i) {
+            xs[i] = Math.round(scale * (xs[i] - xmin) + xoff);
+            ys[i] = Math.round(scale * (ys[i] - ymin) + yoff);
             ctx.fillStyle = getActivityColor(modes[i]);
             ctx.globalAlpha = probs[i];
             ctx.fillRect(xs[i] - r, ys[i] - r, 2*r, 2*r);
@@ -64,23 +61,11 @@ $(document).ready(function() {
             trips.html("<table><tr><td>No trips.</td></tr></table>");
         response.clustered.forEach(function (odgroup) {
             var h1 = $(document.createElement("h1"));
-            h1.text(odgroup[0]);
+            h1.text(odgroup[0][0] + " \u2014 " + odgroup[0][1]);
             trips.append(h1);
             odgroup[1].forEach(function (route) {
-//                var h2 = $(document.createElement("h2"));
-//                h2.text(route.probs.join(" "));
-//                trips.append(h2);
-
                 var canvas = canvas_route(route.probs, 200, 200);
                 trips.append(canvas);
-                // $(document.createElement("canvas"));
-                // canvas.attr("width", 100);
-                // canvas.attr("height", 100);
-                // trips.append(canvas);
-                // var ctx = canvas.get(0).getContext("2d");
-                // ctx.fillStyle = 'rgb(200, 0, 0)';
-                // ctx.fillRect(10, 10, 50, 50);
-
                 route.trips.forEach(function (trip) {
                     var tripdata = response.trips[trip["id"]];
                     var daydate = tripdata.date;
@@ -101,7 +86,10 @@ $(document).ready(function() {
 
     function lazyfill(data, date, trip) {
         var daycell = document.createElement("td");
-        daycell.appendChild(document.createTextNode(date));
+        var datelink = document.createElement("a");
+        datelink.textContent = date;
+        datelink.setAttribute("href", "/energymap#" + date);
+        daycell.appendChild(datelink);
         var p = daycell.appendChild(document.createElement("p"));
         var weekday = (new Date(Date.parse(date))).toDateString().slice(0, 3);
         p.appendChild(document.createTextNode(weekday));

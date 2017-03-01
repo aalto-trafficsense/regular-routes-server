@@ -25,3 +25,6 @@ canvas {
 .activity div .material-icons {
     vertical-align: middle; /* no descenders so don't leave that space */
 }
+
+h1 { font-family: sans-serif; margin: 2em 0 }
+.daycell a { text-decoration: inherit }
