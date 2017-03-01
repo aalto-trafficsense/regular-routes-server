@@ -8,7 +8,12 @@ from sqlalchemy.types import Float
 from pyfiles.common_helpers import do_cluster, group_unsorted
 
 
-def get_routes(db, threshold, user):
+def get_routes(db, threshold, user, start=None, end=None):
+
+    # XXX HAX
+    from datetime import datetime, timedelta
+    start = datetime.now() - timedelta(days=365.2425/2)
+
     ends = db.metadata.tables["leg_ends"]
     legs = db.metadata.tables["leg_modes"]
 #    lwps = db.metadata.tables["leg_waypoints"]
@@ -37,7 +42,8 @@ def get_routes(db, threshold, user):
         [   legs.c.trip,
             legs.c.mode,
             literal_column(
-                'st_x(st_snaptogrid(coordinate::geometry, .004))'),
+                """st_x(st_snaptogrid(coordinate::geometry, .002 / cos(radians(
+                      st_y(st_snaptogrid(coordinate::geometry, .002))))))"""),
             literal_column(
                 'st_y(st_snaptogrid(coordinate::geometry, .002))')]) \
         .select_from(legs.join(dd, and_(
@@ -47,10 +53,18 @@ def get_routes(db, threshold, user):
         .where(legs.c.user_id == user) \
         .distinct() \
         .order_by(legs.c.trip)
+    if start:
+        sel = sel.where(legs.c.time_end > start)
+    if end:
+        sel = sel.where(legs.c.time_start < end)
+
     trippoints = group_unsorted(db.engine.execute(sel), lambda x: x.trip)
-    for tid, titem in tripitems.iteritems():
-        # Strip trip and convert Decimal to float for json serialization
+    for tid, titem in tripitems.items():
+        # No time limit on tripitems query so drop those without points now
         points = trippoints.get(tid, [])
+        if not points:
+            del tripitems[tid]
+        # Strip trip and convert Decimal to float for json serialization
         titem["points"] = [(x[1], float(x[2]), float(x[3])) for x in points]
 
     # Group by origin/destination
