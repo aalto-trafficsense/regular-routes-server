@@ -2,46 +2,55 @@ $(document).ready(function() {
     var content = $('#content');
 
     function lazydraw(points, cw, ch, ctx) {
-        var modes = [];
-        var xs = [];
-        var ys = [];
-        var probs = [];
+        var xmin = 999;
+        var xmax = -999;
         var ymin = 999;
         var ymax = -999;
         for (var i = 0; i < points.length; ++i) {
-            // Fish approximate coords from the ID, or could query for exact
-            // var lola = points[i][0][1];
-            // var lat = - lola%1000000/10000; // y is down on canvas
-            // var lon = Math.floor(lola/1000000)/10000;
-            var lon = points[i][0][1];
-            var lat = -points[i][0][2]; // y is down on canvas
-            ymin = Math.min(ymin, lat);
-            ymax = Math.max(ymax, lat);
+            xmin = Math.min(xmin, points[i][0][1]);
+            xmax = Math.max(xmax, points[i][0][1]);
+            ymin = Math.min(ymin, points[i][0][2]);
+            ymax = Math.max(ymax, points[i][0][2]);
+        }
+        var xcen = (xmin + xmax) / 2;
+        var ycen = (ymin + ymax) / 2;
+        var xext = xmax - xmin;
+        var yext = ymax - ymin;
+        var cosy = Math.cos(ycen * Math.PI / 180);
+        var xzoo = Math.log(cw / xext / 256 * 360) / Math.log(2);
+        var yzoo = Math.log(ch / yext / 256 * 360 * cosy) / Math.log(2);
+        var zoom = Math.floor(Math.min(xzoo, yzoo));
+        var google_tile = "http://maps.google.com/maps/api/staticmap" +
+            "?style=feature:all|visibility:off" +
+            "&style=feature:landscape|element:geometry|visibility:on" +
+                "|color:0xffffff" +
+            "&style=feature:water|visibility:on|color:0x000000" +
+            "&style=feature:road|element:geometry|color:0x7f7f7f" +
+                "|visibility:simplified" +
+            "&style=feature:transit.line|visibility:on|color:0x7f7f7f" +
+            "&center=" + ycen + "," + xcen + "&zoom=" + zoom +
+            "&size=" + cw + "x" + ch + "&key=" + key;
+        var imageObj = new Image();
+        imageObj.src = google_tile;
+        imageObj.onload = function(){
+            ctx.globalAlpha = 0.1;
+            ctx.drawImage(imageObj, 0, 0);
+            lazydrawpoints(points, cw, ch, ctx, xcen, ycen, zoom, cosy);
+        }
+    }
 
-            modes.push(points[i][0][0]);
-            xs.push(lon);
-            ys.push(lat);
-            probs.push(points[i][1]);
-        }
-        var xmin = 999;
-        var xmax = -999;
-        var xscale = Math.cos(Math.PI / 180 * ((ymin + ymax) / 2));
+    function lazydrawpoints(points, cw, ch, ctx, xcen, ycen, zoom, cosy) {
+        var r = 2; // Math.pow(2, zoom) / 500;
         for (var i = 0; i < points.length; ++i) {
-            // Rough equirectangular projection
-            xs[i] *= xscale;
-            xmin = Math.min(xmin, xs[i]);
-            xmax = Math.max(xmax, xs[i]);
-        }
-        var r = 2;
-        var scale = Math.min((cw-2*r) / (xmax-xmin), (ch-2*r) / (ymax-ymin));
-        var xoff = (cw - scale * (xmax - xmin)) / 2;
-        var yoff = (ch - scale * (ymax - ymin)) / 2;
-        for (var i = 0; i < points.length; ++i) {
-            xs[i] = Math.round(scale * (xs[i] - xmin) + xoff);
-            ys[i] = Math.round(scale * (ys[i] - ymin) + yoff);
-            ctx.fillStyle = getActivityColor(modes[i]);
-            ctx.globalAlpha = probs[i];
-            ctx.fillRect(xs[i] - r, ys[i] - r, 2*r, 2*r);
+            var mode = points[i][0][0];
+            var xdeg = points[i][0][1];
+            var ydeg = points[i][0][2];
+            var prob = points[i][1];
+            var xpix = cw / 2 + (xdeg - xcen) * 256 * Math.pow(2, zoom) / 360;
+            var ypix = ch / 2 - (ydeg - ycen) * 256 * Math.pow(2, zoom) / 360 / cosy;
+            ctx.fillStyle = getActivityColor(mode);
+            ctx.globalAlpha = prob;
+            ctx.fillRect(xpix - r, ypix - r, 2*r, 2*r);
         }
     }
 
