@@ -87,7 +87,7 @@ def common_trips_csv(request, db, user):
 
 
 def common_routes_json(request, db, user):
-    clustered = list(get_routes(db, .5, user))
+    clustered = list(get_routes(db, 1.0/3, user))
     for od, routes in clustered:
         for route in routes:
             print "probs", route["probs"]

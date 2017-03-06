@@ -12,28 +12,33 @@ def get_routes(db, threshold, user, start=None, end=None):
 
     # XXX HAX
     from datetime import datetime, timedelta
-    start = datetime.now() - timedelta(days=365.2425/2)
+    start = datetime.now() - timedelta(days=365.2425)
 
     ends = db.metadata.tables["leg_ends"]
     legs = db.metadata.tables["leg_modes"]
 #    lwps = db.metadata.tables["leg_waypoints"]
     dd = db.metadata.tables["device_data"]
     trips = db.metadata.tables["trips"]
+    places = db.metadata.tables["places"]
 
     # Fetch trips
     oleg = legs.alias("oleg")
     dleg = legs.alias("dleg")
     oend = ends.alias("oend")
     dend = ends.alias("dend")
+    oplace = places.alias("oplace")
+    dplace = places.alias("dplace")
     sel = select([
             trips.c.id,
-            oend.c.place.label("origin"),
-            dend.c.place.label("destination")]) \
+            oplace.c.label.label("origin"),
+            dplace.c.label.label("destination")]) \
         .select_from(trips
             .join(oleg, trips.c.origin == oleg.c.id) \
             .join(oend, oleg.c.cluster_start == oend.c.id) \
+            .join(oplace, oend.c.place == oplace.c.id) \
             .join(dleg, trips.c.destination == dleg.c.id) \
-            .join(dend, dleg.c.cluster_start == dend.c.id)) \
+            .join(dend, dleg.c.cluster_start == dend.c.id) \
+            .join(dplace, dend.c.place == dplace.c.id)) \
         .where(oend.c.user_id == user)
     tripitems = {x[0]: dict(x) for x in db.engine.execute(sel)}
 
@@ -42,10 +47,10 @@ def get_routes(db, threshold, user, start=None, end=None):
         [   legs.c.trip,
             legs.c.mode,
             literal_column(
-                """st_x(st_snaptogrid(coordinate::geometry, .002 / cos(radians(
-                      st_y(st_snaptogrid(coordinate::geometry, .002))))))"""),
+                """st_x(st_snaptogrid(coordinate::geometry, .0036 / cos(radians(
+                      st_y(st_snaptogrid(coordinate::geometry, .0036))))))"""),
             literal_column(
-                'st_y(st_snaptogrid(coordinate::geometry, .002))')]) \
+                'st_y(st_snaptogrid(coordinate::geometry, .0036))')]) \
         .select_from(legs.join(dd, and_(
             dd.c.device_id == legs.c.device_id,
             dd.c.time.between(legs.c.time_start, legs.c.time_end)))) \
@@ -104,4 +109,3 @@ def get_routes(db, threshold, user, start=None, end=None):
             counter["trips"] += len(c["trips"])
         counter["odclusters"] += 1
         yield od, clustered
-    print counter
