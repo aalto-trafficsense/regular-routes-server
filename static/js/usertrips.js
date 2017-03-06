@@ -38,7 +38,10 @@ $(document).ready(function() {
         var trip = $(document.createElement("table"));
 
         var daycell = document.createElement("td");
-        daycell.appendChild(document.createTextNode(date));
+        var datelink = document.createElement("a");
+        datelink.textContent = date;
+        datelink.setAttribute("href", "/energymap#" + date);
+        daycell.appendChild(datelink);
         var p = daycell.appendChild(document.createElement("p"));
         var weekday = (new Date(Date.parse(date))).toDateString().slice(0, 3);
         p.appendChild(document.createTextNode(weekday));
