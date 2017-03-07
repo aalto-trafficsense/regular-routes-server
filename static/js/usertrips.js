@@ -78,17 +78,17 @@ $(document).ready(function() {
                         td.addClass(mode);
                         var glyph = null;
                         switch (mode) {
-                        case 'ON_BICYCLE': glyph = "directions_bike"; break;
+                        case 'ON_BICYCLE': glyph = "\uE52F"; break;
                         case 'WALKING':
-                        case 'ON_FOOT':    glyph = "directions_walk"; break;
-                        case 'RUNNING':    glyph = "directions_run"; break;
-                        case 'IN_VEHICLE': glyph = "directions_car"; break;
-                        case "TRAIN":      glyph = "train"; break;
-                        case 'SUBWAY':     glyph = "subway"; break;
-                        case 'TRAM':       glyph = "tram"; break;
-                        case 'FERRY':      glyph = "directions_boat"; break;
-                        case 'BUS':        glyph = "directions_bus"; break;
-                        case 'TILTING':    glyph = "screen_rotation"; break;
+                        case 'ON_FOOT':    glyph = "\uE536"; break;
+                        case 'RUNNING':    glyph = "\uE566"; break;
+                        case 'IN_VEHICLE': glyph = "\uE531"; break;
+                        case "TRAIN":      glyph = "\uE570"; break;
+                        case 'SUBWAY':     glyph = "\uE56F"; break;
+                        case 'TRAM':       glyph = "\uE571"; break;
+                        case 'FERRY':      glyph = "\uE532"; break;
+                        case 'BUS':        glyph = "\uE530"; break;
+                        case 'TILTING':    glyph = "\uE1C1"; break;
                         case 'STILL':      glyph = "\xa0"; break;
                         case 'UNKNOWN':    glyph = "?"; break;
 //                      default:           glyph = "!"; break;
