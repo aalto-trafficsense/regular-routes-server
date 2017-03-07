@@ -443,7 +443,7 @@ def init_db(app):
                  "MOBILE-DESTINATIONS", "MOBILE-DEST-HISTORY", "MOBILE-CERTIFICATE",
                  "MOBILE-SHARE-CERTIFICATE", "MOBILE-PATH-EDIT", "MOBILE-FCM-TOKEN",
                  "WEB-CONNECT", "WEB-PATH", "WEB-CERTIFICATE", "WEB-TRIP-COMPARISON", "WEB-DEST-HISTORY",
-                 "CANCEL-PARTICIPATION", "WEB-PATH-EDIT",
+                 "CANCEL-PARTICIPATION", "WEB-PATH-EDIT", "WEB-TRIPS-LIST",
                  name="client_function_enum")),
         Column('info', String),
         Index('idx_client_log_time', 'time'))
@@ -456,11 +456,11 @@ def init_db(app):
 
     metadata.create_all(checkfirst=True)
 
-    query = text("""
-        ALTER TYPE client_function_enum
-            ADD VALUE IF NOT EXISTS 'WEB-PATH-EDIT'""")
     conn = db.engine.connect().execution_options(isolation_level="AUTOCOMMIT")
-    conn.execute(query)
+    conn.execute("""ALTER TYPE client_function_enum
+            ADD VALUE IF NOT EXISTS 'WEB-PATH-EDIT'""")
+    conn.execute("""ALTER TYPE client_function_enum
+            ADD VALUE IF NOT EXISTS 'WEB-TRIPS-LIST'""")
     conn.close()
 
     # Combined view of legs with migrated/detected/user modes and lines

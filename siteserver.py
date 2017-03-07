@@ -375,7 +375,6 @@ def trips():
     if user_id == None:
         # Not authenticated -> throw back to front page
         return index()
-#    client_log_table_insert(get_max_devices_table_id_from_users_table_id(user_id), user_id, "WEB-PATH", "") XXX add me
     return render_template(
         'usertrips.html',
         RR_URL_PREFIX=app.config['RR_URL_PREFIX'],
@@ -402,6 +401,13 @@ def trips_json():
             'No user data in current session.'), 401)
         response.headers['Content-Type'] = 'application/json'
         return response
+
+    client_log_table_insert(
+        get_max_devices_table_id_from_users_table_id(user_id),
+        user_id,
+        "WEB-TRIPS-LIST", "/".join([
+            request.args.get("firstday", ""),
+            request.args.get("lastday", "")]))
 
     return common_trips_json(request, db, user_id)
 

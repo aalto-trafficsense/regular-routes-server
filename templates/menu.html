@@ -14,9 +14,11 @@
     <img src="../static/icon/trafficsense_icon_noborder.png"
     align="right" width=100></a></h2>
     <br>
-    <button id="certificate" >View Your Energy Certificate for The Past Week</button>
+    <button id="certificate">View Your Energy Certificate</button>
     <br><br>
     <button id="energymap" >View Qualified Routes on A Map</button>
+    <br><br>
+    <button id="trips">View Daily Trips Summary</button>
     <br><br>
     <button id="signout" >Log Out</button>
     <br><br>
@@ -32,6 +34,7 @@
     $(document).ready(function() {
         $('#certificate').click(function() { window.location='energycertificate' } );
         $('#energymap').click(function() { window.location='energymap' } );
+        $('#trips').click(function() { window.location='trips' } );
         $('#signout').click(disconnectServer);
         $('#cancel_participation').click(cancelParticipation);
     });
