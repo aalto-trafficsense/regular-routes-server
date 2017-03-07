@@ -27,8 +27,6 @@ $(document).ready(function() {
     var currentDate;
 
     function update(date) {
-	if (date === currentDate)
-	    return;
 	currentDate = date;
 
 	mapCanvas.css('opacity', 0.1);
