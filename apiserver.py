@@ -28,8 +28,7 @@ from pyfiles.database_interface import (init_db, db_engine_execute, users_table_
                                         verify_user_id, update_last_activity, update_messaging_token, get_device_table_id,
                                         get_device_table_id_for_session, get_users_table_id, get_session_token_for_device, get_user_id_from_device_id,
                                         activity_types,
-    client_log_table_insert, device_data_waypoint_snapping, get_svg,
-    update_user_distances)
+    client_log_table_insert, device_data_waypoint_snapping, get_svg)
 
 from pyfiles.server_common import common_setlegmode
 

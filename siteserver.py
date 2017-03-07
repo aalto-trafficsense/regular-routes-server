@@ -10,17 +10,13 @@ import string
 import httplib2
 
 from flask import (
-    abort,
     Flask, Response, jsonify, make_response, render_template, request, session)
 
 from oauth2client.client import flow_from_clientsecrets, FlowExchangeError
 
-from sqlalchemy.sql import and_, select
-
 from pyfiles.database_interface import (
     get_filtered_device_data_points, get_svg, get_users_table_id, init_db,
-    client_log_table_insert, get_max_devices_table_id_from_users_table_id,
-    mass_transit_types, update_user_distances)
+    client_log_table_insert, get_max_devices_table_id_from_users_table_id)
 
 from pyfiles.authentication_helper import user_hash, verify_and_get_account_id
 

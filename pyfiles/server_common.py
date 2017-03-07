@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from itertools import groupby
 from StringIO import StringIO
 
-from flask import make_response
+from flask import abort, make_response
 from sqlalchemy.sql import and_, cast, func, select
 from sqlalchemy.types import String
 
