@@ -4,6 +4,11 @@ from datetime import timedelta
 from heapq import heapify, heappop, heappush
 from itertools import tee
 from math import cos, pi
+import requests
+import urllib2
+from datetime import datetime
+
+from pyfiles.logger import(log, loge, logi)
 
 
 def get_distance_between_coordinates(coord1, coord2):
@@ -47,6 +52,88 @@ def point_coordinates(p):
 def point_distance(p0, p1):
     return get_distance_between_coordinates(
         point_coordinates(p0), point_coordinates(p1))
+
+
+def round_dict_values(keyvals, precision):
+    rounded_keyvals = {}
+    for k,v in keyvals.iteritems():
+        rounded_keyvals[k] = round(v, precision)
+    if precision == 0:
+        for k,v in rounded_keyvals.iteritems():
+            rounded_keyvals[k] = int(v)
+    return rounded_keyvals
+
+def dict_timedelta_to_text(keyvals):
+    new_keyvals = {}
+    for k,v in keyvals.iteritems():
+        new_keyvals[k] = DateTimeDelta_to_Text(v)
+    return new_keyvals
+
+def dict_to_sqlstr(keyvals):
+    newkeyvals = str(keyvals)
+    newkeyvals = newkeyvals.replace("'", "''")
+    newkeyvals = newkeyvals.replace(":", "\:")        
+    return newkeyvals
+
+def jsonstr_to_sqlstr(jsonstr):
+    #newstr = str(jsonstr)
+    newstr = jsonstr
+    newstr = newstr.replace("'", "''")
+    #newstr = newstr.replace(":", "\:")        
+    return newstr
+
+def shift_time_to_specific_date(original_date_time,  desired_date_time):
+    adjusted_datetime = datetime.combine(desired_date_time.date(), original_date_time.time())
+    return adjusted_datetime
+
+# ------ point, geoLoc point functions ------------
+def pointRow_to_geoText(point):
+    point_location = point_coordinates(point)
+    point_location_str='{1},{0}'.format(point_location[0], point_location[1])
+    return point_location_str
+
+def pointRow_to_postgisPoint(point):
+    point_location = point_coordinates(point)
+    point_location_str='POINT({0} {1})'.format(point_location[0], point_location[1])
+    return point_location_str
+
+def geoJSON_to_geoText(geoJSONPoint):
+    point_location = json.loads(geoJSONPoint)["coordinates"]
+    point_location_str='{1},{0}'.format(point_location[0], point_location[1])
+    return point_location_str
+    
+def geoLoc_to_pointRow(lat, lon):
+    return {"geojson": json.dumps({"coordinates": [lon, lat]})} #TODO NOTE: "time" and other attributes are irrelevant here and not set
+
+def geoJSON_to_pointRow(geoJSONPoint):
+    return {"geojson":geoJSONPoint}
+
+# ------ date time and duration helper functions -------
+def DateTime_to_Text(t):
+    if t is None:
+        return ""
+    else:
+        return str(t.replace(microsecond = 0))
+
+def DateTime_to_SqlText(t):
+    if t is None:
+        return "null"
+    else:
+        return "'" + str(t.replace(microsecond = 0)) + "'"
+        
+def DateTimeDelta_to_Text(delta):
+    return str(delta).split(".")[0]
+
+def OTPTimeStampToNormalDateTime(hsl_timestamp):
+    date_and_time = datetime.fromtimestamp(hsl_timestamp / 1000) #datetime doesn't like millisecond accuracy
+    return date_and_time
+
+def OTPDurationToNormalDuration(hsl_duration):
+    # hsl_duration is in seconds
+    duration = timedelta(seconds = hsl_duration)
+    # old code (converetd to string!): duration = "{0}:{1}".format(hsl_duration/60 , hsl_duration%60)  # convert to in min:sec format
+    return duration
+# --------------------------------------------------
 
 
 def point_interval(p0, p1):
@@ -463,3 +550,40 @@ def trace_split_sparse(points, interval):
         segment.append(p)
     if segment:
         yield segment
+        
+
+        
+def http_request_with_get(apiurl, querystr):
+    # Notes: 
+    # GET request with urllib2: If you do not pass the data argument, urllib2 uses a GET request (you can encode the data in URL itself)
+    # POST request with urllib2: Just as easy as GET, simply passing (encoded) request data as an extra parameter
+
+    #params = urllib.urlencode(querystr)
+    params = querystr
+    apiurl_with_query = apiurl + "?" + params;    
+    log(["params:", params])
+    log(["apiurl_with_query:", apiurl_with_query])
+
+    json_data = '{}'
+    try:
+	    #response = urllib2.urlopen(apiurl_with_query)
+	    response = requests.get(apiurl_with_query, verify=False) # //TODO: possible security issue! verify=True works from python command line !!!!
+	    #print response.text
+	    json_data = json.loads(response.content)
+	    #print "json_data:", json_data
+	    response.close()
+    except urllib2.HTTPError as e:
+        json_data = json.loads('{"error":{"id":0, "msg":"(!) HTTPError EXCEPTION catched", "message":""}}')
+        json_data["error"]["message"] = e
+	    #print "(!) EXCEPTION catched: ", e
+    except requests.exceptions.ConnectionError as e:
+        json_data = json.loads('{"error":{"id":0, "msg":"(!) ConnectionError EXCEPTION catched", "message":""}}')
+        json_data["error"]["message"] = e
+	    #print "(!) EXCEPTION catched: ", e
+    except Exception as e:
+        json_data = json.loads('{"error":{"id":0, "msg":"(!) EXCEPTION catched", "message":""}}')
+        json_data["error"]["message"] = e
+	    #print "(!) EXCEPTION catched: ", e
+    
+    return json_data
+
