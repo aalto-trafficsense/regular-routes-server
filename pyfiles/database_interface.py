@@ -164,8 +164,6 @@ def init_db(app):
                               Index('idx_device_data_filtered_time', 'time'),
                               Index('idx_device_data_filtered_user_id_time', 'user_id', 'time'))
 
-    device_data_filtered_table.create(checkfirst=True)
-
     # User leg ends are clustered into shared places
     global places_table
     places_table = Table('places', metadata,
@@ -302,9 +300,6 @@ def init_db(app):
                               Column('sv_description', String),
                               Column('en_description', String))
 
-    if not hsl_alerts_table.exists():
-        hsl_alerts_table.create(checkfirst=True)
-
     # Weather forecasts
     global weather_forecast_table
     weather_forecast_table = Table('weather_forecast', metadata,
@@ -317,11 +312,6 @@ def init_db(app):
         Column('total_cloud_cover', Float, nullable=False),
         Column('precipitation_1h', Float, nullable=False))
 
-
-    if not weather_forecast_table.exists():
-        weather_forecast_table.create(checkfirst=True)
-
-
     # Weather observations
     global weather_observations_table
     weather_observations_table = Table('weather_observations', metadata,
@@ -332,11 +322,6 @@ def init_db(app):
         Column('temperature', Float, nullable=False),
         Column('windspeed_ms', Float, nullable=False),
         Column('precipitation_1h', Float, nullable=False))
-
-
-    if not weather_observations_table.exists():
-        weather_observations_table.create(checkfirst=True)
-
 
     # Traffic disorders
     global traffic_disorders_table
@@ -354,10 +339,6 @@ def init_db(app):
         Column('sv_description', String, nullable=True),
         Column('en_description', String, nullable=True))
 
-
-    if not traffic_disorders_table.exists():
-        traffic_disorders_table.create(checkfirst=True)
-
     # Sample psql command to add the new 'coordinate' and 'waypoint_id' columns to an existing traffic_disorders table:
     # ALTER TABLE traffic_disorders ADD COLUMN coordinate geography(Point,4326) ;
     # ALTER TABLE traffic_disorders ADD COLUMN waypoint_id bigint ;
@@ -374,10 +355,6 @@ def init_db(app):
                                 Column('legs_table_id', Integer, ForeignKey('legs.id'), nullable=False),
                                 Column('alert_table_id', Integer, ForeignKey('hsl_alerts.id'), nullable=False))
 
-    if not pubtrans_legs_alerts_table.exists():
-        pubtrans_legs_alerts_table.create(checkfirst=True)
-
-
     # Traffic disorders matching to specific device_data points
     global traffic_legs_disorders_table
     traffic_legs_disorders_table = Table('traffic_legs_disorders', metadata,
@@ -387,10 +364,6 @@ def init_db(app):
                                             server_default=func.current_timestamp()),
                                          Column('legs_table_id', Integer, ForeignKey('legs.id', ondelete="SET NULL")),
                                          Column('disorders_table_id', Integer, ForeignKey('traffic_disorders.id'), nullable=False))
-
-    if not traffic_legs_disorders_table.exists():
-        traffic_legs_disorders_table.create(checkfirst=True)
-
 
     # Alerts delivered
     global device_alerts_table
@@ -411,9 +384,6 @@ def init_db(app):
         Column('en_uri', String),
         Column('info', String))
 
-    if not device_alerts_table.exists():
-        device_alerts_table.create(checkfirst=True)
-
     # Commands to convert device_alerts table from the earlier version
     # ALTER TABLE device_alerts DROP COLUMN firebase_id ;
     # ALTER TABLE device_alerts ADD COLUMN messaging_token VARCHAR ;
@@ -427,7 +397,6 @@ def init_db(app):
                               Column('past_week_certificates_number', Integer, nullable=False),
                               Column('total_distance', Float, nullable=False), #Daily amount of distance
                               Index('idx_global_statistics_time', 'time'),)
-    global_statistics_table.create(checkfirst=True)
 
     # log activity from both mobile and web clients
     # Note: Web client doesn't have a device_id: Using the latest one for the user
@@ -450,9 +419,6 @@ def init_db(app):
 
     # Sample line to add new enum values to client_function_enum:
     # ALTER TYPE client_function_enum ADD VALUE 'MOBILE-FCM-TOKEN' ;
-
-    if not client_log_table.exists():
-        client_log_table.create(checkfirst=True)
 
     metadata.create_all(checkfirst=True)
 
