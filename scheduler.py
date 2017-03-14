@@ -496,11 +496,13 @@ def mass_transit_cleanup():
     if not days:
         return
 
-    # snap deletion to daystart; be noisy as these can take quite a long time
+    # Snap deletion to daystart; be noisy as these can take quite a long time.
+    # Also delete martians from the future, no use in preferring those forever.
     log.info("Deleting mass_transit_data older than %d days...", days)
     query = text("""
         DELETE FROM mass_transit_data
-        WHERE time < date_trunc('day', now() - interval ':days days')""")
+        WHERE time < date_trunc('day', now() - interval ':days days')
+           OR time > date_trunc('day', now() + interval '2 days')""")
     delrows = db.engine.execute(query, days=days).rowcount
     log.info("Deleted %d rows of mass_transit_data.", delrows)
     if not delrows:
