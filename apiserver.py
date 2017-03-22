@@ -377,20 +377,6 @@ def device(session_token):
         return jsonify({'error': "Invalid session token"})
 
 
-@app.route('/maintenance/duplicates')
-def maintenance_duplicates():
-    with open('sql/delete_duplicate_device_data.sql', 'r') as sql_file:
-        sql = sql_file.read()
-        result = db_engine_execute(text(sql))
-        return '%d duplicate data points were deleted' % (result.rowcount)
-
-
-@app.route('/maintenance/snapping')
-def maintenance_snapping():
-    rowcount = device_data_waypoint_snapping()
-    return 'Snapping was done to %d data points' % (rowcount)
-
-
 @app.route('/path/<session_token>')
 def path(session_token):
     dd = db.metadata.tables["device_data"]

@@ -10,8 +10,8 @@ import time
 import urllib2
 
 from pyfiles.database_interface import (
-    init_db, data_points_by_user_id_after, device_data_waypoint_snapping,
-    generate_rankings,
+    init_db, data_points_by_user_id_after, device_data_delete_duplicates,
+    device_data_waypoint_snapping, generate_rankings,
     hsl_alerts_insert, weather_forecast_insert, weather_observations_insert,
     traffic_disorder_insert, match_pubtrans_alert, match_pubtrans_alert_test,
     match_traffic_disorder, update_global_statistics, update_user_distances)
@@ -93,6 +93,7 @@ def run_daily_tasks():
 
 
 def run_hourly_tasks():
+    delete_device_data_duplicates()
     generate_legs()
     set_device_data_waypoints()
 
@@ -594,6 +595,11 @@ def retrieve_weather_info():
     # TODO: If either one returns an empty set, re-schedule fetch after a few minutes and try to keep some max_retry counter?
     weather_forecast_insert(fmi_forecast_request())
     weather_observations_insert(fmi_observations_request())
+
+
+def delete_device_data_duplicates():
+    rowcount = device_data_delete_duplicates()
+    print '%d duplicate device_data points were deleted' % rowcount
 
 
 def set_device_data_waypoints():

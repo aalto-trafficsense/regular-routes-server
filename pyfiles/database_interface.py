@@ -1568,6 +1568,11 @@ def db_engine_execute(query):
     return db.engine.execute(query)
 
 
+def device_data_delete_duplicates():
+    with open('sql/delete_duplicate_device_data.sql', 'r') as sql_file:
+        return db_engine_execute(text(sql_file.read())).rowcount
+
+
 def device_data_waypoint_snapping():
     with open('sql/snapping.sql') as sql_file:
         return db.engine.execute(text(sql_file.read())).rowcount
