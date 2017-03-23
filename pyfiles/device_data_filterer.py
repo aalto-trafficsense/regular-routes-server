@@ -207,7 +207,10 @@ class DeviceDataFilterer:
             print "----- TRIP-LEG (in_vehicle) #", self.user_invehicle_triplegs ,"(from first filter detection): ", user_id, activity, line_type, line_name_str
             print "trip-leg starts. ends: ", device_data_queue[0]['time'], " --> ", device_data_queue[trip_leg_points-1]['time'] \
                     , "(poitns in this trip leg:", trip_leg_points, ")"
-            
+
+            line_type = line_name = None
+            line_name_str = "None"
+
             # detect starting point and end point of the trip-leg":
             start_row = device_data_queue[0]
             end_row = device_data_queue[trip_leg_points-1]
@@ -230,9 +233,8 @@ class DeviceDataFilterer:
             
             matchres = TripMatchedWithPlannerResult()
             
-            # if we already got the linename and linetype hsl live, that's more accurate --> we skip the following trip-leg-matching code
             # less than 200 meter, not a big impact! --> ignore            
-            if (line_type==None or (line_name=='' or line_name==None)) and distance > 200:
+            if distance > 200:
                 # try to match this trip-leg with a public transport ride (using hsl query)
                 # print "we're sending this to match function:", start_location_str, end_location_str, start_time, end_time
                 res, matchres = match_tripleg_with_publictransport(start_location_str, end_location_str, start_time, end_time, device_data_queue)
