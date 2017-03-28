@@ -574,17 +574,15 @@ def get_svg(user_id, firstday=None, lastday=None):
         rating, firstday, end_time, ranking, max_ranking)
 
 
-def update_user_distances(user, start, end, update_derived=True):
+def update_user_distances(user, start, end, update_only=True):
+    """Update travelled_distances for given user, based on changes to data
+    between given start and end. If update_only, disallow writing stats on a
+    new day, do update global stats."""
 
     # Snap to whole days
     start = start.replace(hour=0, minute=0, second=0, microsecond=0)
     end += timedelta(days=1, microseconds=-1)
     end = end.replace(hour=0, minute=0, second=0, microsecond=0)
-
-    # Decline to write partial stats for today that daily batch won't update
-    last_midnight = datetime.datetime.now().replace(
-        hour=0, minute=0, second=0, microsecond=0)
-    end = min(end, last_midnight)
 
     data_rows = get_filtered_device_data_points(user, start, end)
 
@@ -597,11 +595,13 @@ def update_user_distances(user, start, end, update_derived=True):
         ex = db.engine.execute(dists.select(where)).first() # no upsert yet
         if ex:
             db.engine.execute(dists.update(where, rating))
-        else:
+        elif not update_only:
+            # Refrain from writing partial stats for today that daily batch
+            # then wouldn't update
             db.engine.execute(dists.insert([rating]))
 
     # Batch updates may want to defer generating derived sums and rankings
-    if not update_derived:
+    if not update_only:
         return
 
     # Update unused weekly rankings based on ratings
