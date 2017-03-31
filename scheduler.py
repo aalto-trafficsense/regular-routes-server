@@ -98,13 +98,18 @@ def run_hourly_tasks():
     set_device_data_waypoints()
 
 
-def generate_legs(maxtime=None, repair=False):
-    """Record legs from stops and mobile activity found in device telemetry, up
-    to now or given maxtime. In repair mode, re-evaluate and replace all
-    changed legs."""
+def generate_legs(keepto=None, maxtime=None, repair=False):
+    """Record legs from stops and mobile activity found in device telemetry.
 
+    keepto -- keep legs before this time, except last two or so for restart
+    maxtime -- process device data up to this time
+    repair -- re-evaluate and replace all changed legs"""
+
+    now = datetime.datetime.now()
+    if not keepto:
+        keepto = now
     if not maxtime:
-        maxtime = datetime.datetime.now()
+        maxtime = now
 
     print "generate_legs up to", maxtime
 
@@ -140,12 +145,13 @@ def generate_legs(maxtime=None, repair=False):
             func.nth_value(legs.c.time_start, 2) \
                 .over(partition_by=legs.c.device_id, order_by=order) \
                 .label("rewrite")],
-        and_(legs.c.activity != None),
+        and_(legs.c.activity != None, legs.c.time_start <= keepto),
         distinct=True).alias("rrlegs")
 
     # Find end of processed legs, including terminator for each device.
     lastleg = select(
         [legs.c.device_id, func.max(legs.c.time_end).label("time_end")],
+        legs.c.time_start < keepto,
         group_by=legs.c.device_id).alias("lastleg")
 
     # If trailing points exist, start from rewind leg, or first point
