@@ -45,7 +45,7 @@ ACTIVITY_WIN = 120
 # Repeat false accurate location points are typically clustered close together;
 # this threshold distance is used to collect them together for discarding.
 # Increasing it may lose useful points in valid stops.
-BAD_LOCATION_RADIUS = 1
+BAD_LOCATION_RADIUS = 10
 
 # Alert user of traffic disorders if within this distance of event
 ALERT_RADIUS = 100000
