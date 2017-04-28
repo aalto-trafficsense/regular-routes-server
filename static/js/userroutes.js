@@ -37,6 +37,9 @@ $(document).ready(function() {
             ctx.drawImage(imageObj, 0, 0);
             lazydrawpoints(points, cw, ch, ctx, xcen, ycen, zoom, cosy);
         }
+        imageObj.onerror = function(){ // draw points even if bg map fails
+            lazydrawpoints(points, cw, ch, ctx, xcen, ycen, zoom, cosy);
+        }
     }
 
     function lazydrawpoints(points, cw, ch, ctx, xcen, ycen, zoom, cosy) {
