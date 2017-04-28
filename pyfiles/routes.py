@@ -9,11 +9,6 @@ from pyfiles.common_helpers import do_cluster, group_unsorted
 
 
 def get_routes(db, threshold, user, start=None, end=None):
-
-    # XXX HAX
-    from datetime import datetime, timedelta
-    start = datetime.now() - timedelta(days=365.2425)
-
     ends = db.metadata.tables["leg_ends"]
     legs = db.metadata.tables["leg_modes"]
 #    lwps = db.metadata.tables["leg_waypoints"]

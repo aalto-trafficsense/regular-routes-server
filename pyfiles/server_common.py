@@ -87,7 +87,19 @@ def common_trips_csv(request, db, user):
 
 
 def common_routes_json(request, db, user):
-    clustered = list(get_routes(db, 1.0/3, user))
+    firstday = request.args.get("firstday")
+    firstday = firstday and datetime.strptime(firstday, '%Y-%m-%d')
+    firstday = firstday or datetime.now()
+
+    lastday = request.args.get("lastday")
+    lastday = lastday and datetime.strptime(lastday, '%Y-%m-%d')
+    lastday = lastday or firstday
+
+    date_start = firstday.replace(hour=0, minute=0, second=0, microsecond=0)
+    date_end = lastday.replace(hour=0, minute=0, second=0, microsecond=0) \
+        + timedelta(hours=24)
+
+    clustered = list(get_routes(db, 1.0/3, user, date_start, date_end))
     for od, routes in clustered:
         for route in routes:
             print "probs", route["probs"]
