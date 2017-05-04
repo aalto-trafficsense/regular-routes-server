@@ -360,8 +360,8 @@ def traffic_disorder_request():
                         if i != -1:
                             description = description[:i]
 
-                    # Add missing spaces between concatenated fields...
-                    description = re.sub("\\.([A-ZÅÄÖ])", ". \\1", description)
+                    # Compact whitespace in description
+                    description = re.sub("[\\n ]+", " ", description)
 
                     fi_description = description
                 elif language == 'en':
