@@ -286,7 +286,8 @@ def init_db(app):
     global mass_transit_data_table
     mass_transit_data_table = Table('mass_transit_data', metadata,
                               Column('id', Integer, primary_key=True),
-                              Column('coordinate', ga2.Geography('point', 4326), nullable=False),
+                              Column('coordinate',
+            ga2.Geography('point', 4326, spatial_index=False), nullable=False),
                               Column('time', TIMESTAMP, nullable=False),
                               Column('line_type', mass_transit_type_enum, nullable=False),
                               Column('line_name', String, nullable=False),
