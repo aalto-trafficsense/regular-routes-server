@@ -8,29 +8,23 @@ from uuid import uuid4
 from flask import Flask, abort, jsonify, request, make_response
 
 from sqlalchemy.sql import (
-    and_, between, cast, func, literal, not_, or_, select, text)
+    and_, func, not_, select)
 
-from sqlalchemy.types import String
-from pyfiles.common_helpers import (
-    dict_groups,
-    simplify_geometry,
-    stop_clusters,
-    trace_discard_sidesteps,
-    trace_linestrings)
+from pyfiles.common_helpers import stop_clusters
 
 from pyfiles.constants import (
-    BAD_LOCATION_RADIUS,
     DEST_RADIUS_MAX,
     DESTINATIONS_LIMIT,
     INCLUDE_DESTINATIONS_BETWEEN)
 
-from pyfiles.database_interface import (init_db, db_engine_execute, users_table_insert, users_table_update, devices_table_insert, device_data_table_insert,
+from pyfiles.database_interface import (init_db, users_table_insert, users_table_update, devices_table_insert, device_data_table_insert,
                                         verify_user_id, update_last_activity, update_messaging_token, get_device_table_id,
                                         get_device_table_id_for_session, get_users_table_id, get_session_token_for_device, get_user_id_from_device_id,
                                         activity_types,
-    client_log_table_insert, device_data_waypoint_snapping, get_svg)
+    client_log_table_insert, get_svg)
 
-from pyfiles.server_common import common_setlegmode
+from pyfiles.server_common import common_setlegmode, common_path
+
 
 from pyfiles.authentication_helper import user_hash, authenticate_with_google_oauth
 
@@ -379,105 +373,15 @@ def device(session_token):
 
 @app.route('/path/<session_token>')
 def path(session_token):
-    dd = db.metadata.tables["device_data"]
-    devices = db.metadata.tables["devices"]
-    legs = db.metadata.tables["leg_modes"]
-    users = db.metadata.tables["users"]
-
-    # get data for specified date, or last 12h if unspecified
-    date = request.args.get("date")
-
-    # passed on to simplify_geometry
-    maxpts = int(request.args.get("maxpts") or 0)
-    mindist = int(request.args.get("mindist") or 0)
-
-    # Exclude given comma-separated modes in processed path of path, stops by
-    # default. Blank argument removes excludes
-    exarg = request.args.get("exclude")
-    exclude = True if exarg == "" else not_(
-        legs.c.mode.in_((exarg or "STILL").split(",")))
-
-    if date:
-        start = datetime.datetime.strptime(date, '%Y-%m-%d').replace(
-            hour=0, minute=0, second=0, microsecond=0)
-    else:
-        start = datetime.datetime.now() - datetime.timedelta(hours=12)
-    end = start + datetime.timedelta(hours=24)
-
-    # find end of user legs
-    legsend = select(
-        [func.max(legs.c.time_end).label("time_end")],
-        devices.c.token == session_token,
-        devices.join(users).join(legs)).alias("legsend")
-
-    # use user legs if available
-    legsed = select(
-        [   func.ST_AsGeoJSON(dd.c.coordinate).label("geojson"),
-            cast(legs.c.mode, String).label("activity"),
-            legs.c.line_name,
-            legs.c.time_start.label("legstart"),
-            cast(legs.c.time_start, String).label("time_start"),
-            cast(legs.c.time_end, String).label("time_end"),
-            legs.c.id,
-            dd.c.time],
-        and_(
-            devices.c.token == session_token,
-            legs.c.activity != None,
-            exclude,
-            dd.c.time >= start,
-            dd.c.time < end),
-        devices \
-            .join(users) \
-            .join(legs) \
-            .join(dd, and_(
-                legs.c.device_id == dd.c.device_id,
-                between(dd.c.time, legs.c.time_start, legs.c.time_end))))
-
-    # fall back on raw trace beyond end of user legs
-    unlegsed = select(
-        [   func.ST_AsGeoJSON(dd.c.coordinate).label("geojson"),
-            cast(dd.c.activity_1, String).label("activity"),
-            literal(None).label("line_name"),
-            literal(None).label("legstart"),
-            literal(None).label("time_start"),
-            literal(None).label("time_end"),
-            literal(None).label("id"),
-            dd.c.time],
-        and_(
-            devices.c.token == session_token,
-            dd.c.time >= start,
-            dd.c.time < end,
-            or_(legsend.c.time_end.is_(None), dd.c.time > legsend.c.time_end)),
-        dd.join(devices).join(legsend, literal(True)))
-
-    # Sort also by leg start time so join point repeats adjacent to correct leg
-    query = legsed.union_all(unlegsed).order_by(text("time, legstart"))
-    points = db.engine.execute(query)
-
-    # re-split into legs, and the raw part
-    segments = (
-        legpts for (legid, legpts) in dict_groups(points, ["legstart"]))
-
-    features = []
-    for points in segments:
-        # discard the less credible location points
-        points = trace_discard_sidesteps(points, BAD_LOCATION_RADIUS)
-
-        # simplify the path geometry by dropping redundant points
-        points = simplify_geometry(
-            points, maxpts=maxpts, mindist=mindist, keep_activity=True)
-
-        features += trace_linestrings(points, (
-            'id', 'activity', 'line_name', 'time_start', 'time_end'))
-
     devices_table_id = get_device_table_id_for_session(session_token)
     client_log_table_insert(
         devices_table_id,
         get_user_id_from_device_id(devices_table_id),
         "MOBILE-PATH",
-        date)
-
-    return jsonify({'type': 'FeatureCollection', 'features': features})
+        request.args.get("date"))
+    devices = db.metadata.tables["devices"]
+    where = devices.c.token == session_token
+    return common_path(request, db, where)
 
 
 @app.route('/setlegmode', methods=['POST'])

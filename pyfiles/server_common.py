@@ -6,11 +6,22 @@ from datetime import datetime, timedelta
 from itertools import groupby
 from StringIO import StringIO
 
-from flask import abort, make_response
-from sqlalchemy.sql import and_, cast, func, select
+from flask import abort, jsonify, make_response
+
+from sqlalchemy.sql import (
+    and_, between, cast, func, literal, not_, or_, select, text)
+
 from sqlalchemy.types import String
 
-from pyfiles.common_helpers import group_unsorted, mode_str
+from pyfiles.common_helpers import (
+    dict_groups,
+    group_unsorted,
+    mode_str,
+    simplify_geometry,
+    trace_discard_sidesteps,
+    trace_linestrings)
+
+from pyfiles.constants import BAD_LOCATION_RADIUS
 from pyfiles.routes import get_routes
 
 from pyfiles.database_interface import (
@@ -272,3 +283,98 @@ def common_setlegmode(request, db, user):
     update_user_distances(user, leg.time_start, leg.time_end)
 
     return leg.device_id, legid, legact, legline
+
+
+def common_path(request, db, where):
+    dd = db.metadata.tables["device_data"]
+    devices = db.metadata.tables["devices"]
+    legs = db.metadata.tables["leg_modes"]
+    users = db.metadata.tables["users"]
+
+    # get data for specified date, or last 12h if unspecified
+    date = request.args.get("date")
+
+    # passed on to simplify_geometry
+    maxpts = int(request.args.get("maxpts") or 0)
+    mindist = int(request.args.get("mindist") or 0)
+
+    # Exclude given comma-separated modes in processed path of path, stops by
+    # default. Blank argument removes excludes
+    exarg = request.args.get("exclude")
+    exclude = True if exarg == "" else not_(
+        legs.c.mode.in_((exarg or "STILL").split(",")))
+
+    if date:
+        start = datetime.strptime(date, '%Y-%m-%d').replace(
+            hour=0, minute=0, second=0, microsecond=0)
+    else:
+        start = datetime.now() - timedelta(hours=12)
+    end = start + timedelta(hours=24)
+
+    # find end of user legs
+    legsend = select(
+        [func.max(legs.c.time_end).label("time_end")],
+        where,
+        devices.join(users).join(legs)).alias("legsend")
+
+    # use user legs if available
+    legsed = select(
+        [   func.ST_AsGeoJSON(dd.c.coordinate).label("geojson"),
+            cast(legs.c.mode, String).label("activity"),
+            legs.c.line_name,
+            legs.c.time_start.label("legstart"),
+            cast(legs.c.time_start, String).label("time_start"),
+            cast(legs.c.time_end, String).label("time_end"),
+            legs.c.id,
+            dd.c.time],
+        and_(
+            where,
+            legs.c.activity != None,
+            exclude,
+            dd.c.time >= start,
+            dd.c.time < end),
+        devices \
+            .join(users) \
+            .join(legs) \
+            .join(dd, and_(
+                legs.c.device_id == dd.c.device_id,
+                between(dd.c.time, legs.c.time_start, legs.c.time_end))))
+
+    # fall back on raw trace beyond end of user legs
+    unlegsed = select(
+        [   func.ST_AsGeoJSON(dd.c.coordinate).label("geojson"),
+            cast(dd.c.activity_1, String).label("activity"),
+            literal(None).label("line_name"),
+            literal(None).label("legstart"),
+            literal(None).label("time_start"),
+            literal(None).label("time_end"),
+            literal(None).label("id"),
+            dd.c.time],
+        and_(
+            where,
+            dd.c.time >= start,
+            dd.c.time < end,
+            or_(legsend.c.time_end.is_(None), dd.c.time > legsend.c.time_end)),
+        dd.join(devices).join(legsend, literal(True)))
+
+    # Sort also by leg start time so join point repeats adjacent to correct leg
+    query = legsed.union_all(unlegsed).order_by(text("time, legstart"))
+    points = db.engine.execute(query)
+
+    # re-split into legs, and the raw part
+    segments = (
+        legpts for (legid, legpts) in dict_groups(points, ["legstart"]))
+
+    features = []
+    for points in segments:
+        # discard the less credible location points
+        points = trace_discard_sidesteps(points, BAD_LOCATION_RADIUS)
+
+        # simplify the path geometry by dropping redundant points
+        points = simplify_geometry(
+            points, maxpts=maxpts, mindist=mindist, keep_activity=True)
+
+        features += trace_linestrings(points, (
+            'id', 'activity', 'line_name', 'time_start', 'time_end'))
+
+    return jsonify({'type': 'FeatureCollection', 'features': features})
