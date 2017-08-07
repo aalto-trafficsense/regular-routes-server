@@ -21,7 +21,11 @@ from pyfiles.database_interface import (
 from pyfiles.authentication_helper import user_hash, verify_and_get_account_id
 
 from pyfiles.server_common import (
-    common_routes_json, common_setlegmode, common_trips_csv, common_trips_json)
+    common_path,
+    common_routes_json,
+    common_setlegmode,
+    common_trips_csv,
+    common_trips_json)
 
 
 import logging
@@ -434,6 +438,22 @@ def trips_json():
             request.args.get("lastday", "")]))
 
     return common_trips_json(request, db, user_id)
+
+
+@app.route('/path_json')
+def path_json():
+    user_id = session.get('rr_user_id')
+    if user_id == None:
+        response = make_response(json.dumps(
+            'No user data in current session.'), 401)
+        response.headers['Content-Type'] = 'application/json'
+        return response
+
+    devices = db.metadata.tables["devices"]
+    response = make_response(
+        common_path(request, db, devices.c.user_id==user_id))
+    response.headers['Content-Type'] = 'application/json'
+    return response
 
 
 # App starting point:
