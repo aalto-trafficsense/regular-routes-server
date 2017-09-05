@@ -295,7 +295,7 @@ def graphql_request(urlstr, querystr):
     return json_data
 
 
-ns = {'sju': 'http://tie.digitraffic.fi/sujuvuus/schemas',
+ns = {'sju': 'http://tie.digitraffic.fi/schemas',
       'soap': 'http://schemas.xmlsoap.org/soap/envelope/',
       'pp': 'http://datex2.eu/schema/2/2_0',
       'xsi': 'http://www.w3.org/2001/XMLSchema-instance'}
@@ -308,7 +308,7 @@ def traffic_disorder_request():
         xml_root = ET.parse(debug_input_filename).getroot()
     else:
         try:
-            url = 'http://tie.digitraffic.fi/sujuvuus/ws/trafficDisorders'
+            url = 'https://tie.digitraffic.fi/api/v1/data/traffic-disorders-datex2'
             response_read = urllib2.urlopen(url, timeout=50).read()
             xml_root = ET.fromstring(response_read)
             if save_alert_sample:
@@ -437,7 +437,7 @@ def traffic_disorder_request():
             return None
 
     try:
-        for disorder in list(xml_root.find('soap:Body', ns).find('sju:TrafficDisordersDatex2Response', ns)):
+        for disorder in xml_root:
             row = traffic_disorder_row(disorder.find('sju:d2LogicalModel', ns)
                                        .find('pp:payloadPublication', ns)
                                        .find('pp:situation', ns)
