@@ -52,7 +52,7 @@ _Note: `index_dudd.sql` includes a parameter for setting the last sequence eleme
 
 ## Create a blank waypoints table (with indexes)
 
-_Note: This is script is outdated as it doesn't create all the tables (e.g. roads_waypoints) required by the server code. Use the [instructions for generating waypoints](https://github.com/aalto-trafficsense/regular-routes-devops/blob/master/README.markdown#b-generating-waypoints-from-osm) in the devops repository instead.
+_Note: This is script is outdated as it doesn't create all the tables (e.g. roads_waypoints) required by the server code. Use the [instructions for generating waypoints](https://github.com/aalto-trafficsense/regular-routes-devops/blob/master/README.markdown#b-generating-waypoints-from-osm) in the devops repository instead._
 
 Setup an empty database as documented above or DROP the previous
 waypoints table.
