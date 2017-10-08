@@ -311,6 +311,22 @@ def common_path(request, db, where):
         start = datetime.now() - timedelta(hours=12)
     end = start + timedelta(hours=24)
 
+    # in the export link case, we get a date range
+    firstday = request.args.get("firstday")
+    firstday = firstday and datetime.strptime(firstday, '%Y-%m-%d')
+    firstday = firstday or datetime.now()
+
+    lastday = request.args.get("lastday")
+    lastday = lastday and datetime.strptime(lastday, '%Y-%m-%d')
+    lastday = lastday or firstday
+
+    date_start = firstday.replace(hour=0, minute=0, second=0, microsecond=0)
+    date_end = lastday.replace(hour=0, minute=0, second=0, microsecond=0) \
+        + timedelta(hours=24)
+
+    if request.args.get("firstday") or request.args.get("lastday"):
+        start, end = date_start, date_end
+
     # find end of user legs
     legsend = select(
         [func.max(legs.c.time_end).label("time_end")],
@@ -359,6 +375,7 @@ def common_path(request, db, where):
 
     # Sort also by leg start time so join point repeats adjacent to correct leg
     query = legsed.union_all(unlegsed).order_by(text("time, legstart"))
+    query = query.limit(35000) # sanity limit vs date range
     points = db.engine.execute(query)
 
     # re-split into legs, and the raw part

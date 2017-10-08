@@ -214,6 +214,7 @@ $(document).ready(function() {
         args = args.join("&");
         var qs = args ? "?" + args : "";
         $("#csvlink").attr("href", "trips_csv" + qs);
+        $("#gjlink").attr("href", "path_json" + qs);
 
 	content.css('opacity', 0.1);
 	$.getJSON("trips_json" + qs, eat);
