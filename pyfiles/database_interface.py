@@ -148,6 +148,17 @@ def init_db(app):
 
     Index('idx_device_data_snapping_time_null', device_data_table.c.snapping_time, postgresql_where=device_data_table.c.snapping_time == None)
 
+    global device_location_table
+    device_location_table = Table('device_location', metadata,
+                              Column('id', Integer, primary_key=True),
+                              Column('device_id', Integer, ForeignKey('devices.id'), nullable=False),
+                              Column('coordinate', ga2.Geography('point', 4326, spatial_index=False), nullable=False),
+                              Column('accuracy', DOUBLE_PRECISION, nullable=False),
+                              Column('time', TIMESTAMP(timezone=True), nullable=False),
+                              Index('idx_device_location_time', 'time'),
+                              Index('idx_device_location_device_id_time', 'device_id', 'time'))
+
+
     # device_data_table after filtering activities.
     # Deprecated by legs, below.
     global device_data_filtered_table
@@ -1575,6 +1586,11 @@ def devices_table_insert(
 
 def device_data_table_insert(batch):
     db.engine.execute(device_data_table.insert(batch))
+
+
+def device_location_table_insert(batch):
+    db.engine.execute(device_location_table.insert(batch))
+
 
 def device_data_filtered_table_insert(batch):
     db.engine.execute(device_data_filtered_table.insert(batch))

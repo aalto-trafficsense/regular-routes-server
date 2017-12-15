@@ -18,7 +18,7 @@ from pyfiles.constants import (
     INCLUDE_DESTINATIONS_BETWEEN)
 
 from pyfiles.database_interface import (init_db, users_table_insert, users_table_update, devices_table_insert, device_data_table_insert,
-                                        verify_user_id, update_last_activity, update_messaging_token, get_device_table_id,
+                                        device_location_table_insert, verify_user_id, update_last_activity, update_messaging_token, get_device_table_id,
                                         get_device_table_id_for_session, get_users_table_id, get_session_token_for_device, get_user_id_from_device_id,
                                         activity_types,
     client_log_table_insert, get_svg)
@@ -258,6 +258,42 @@ def data_post():
     for chunk in batch_chunks(data_points):
         batch = [prepare_point(x) for x in chunk]
         device_data_table_insert(batch)
+    return jsonify({
+    })
+
+
+@app.route('/locationdata', methods=['POST'])
+def location_post():
+    session_token = request.args['sessionToken']
+    if session_token is None or session_token == '':
+        abort(403)  # not authenticated user
+
+    device_id = get_device_table_id_for_session(session_token)
+    if device_id < 0:
+        abort(403)  # not registered user
+
+    data_points = request.json['locations']
+    # Remember, if a single point fails, the whole batch fails
+    batch_size = 1024
+
+    def batch_chunks(x):
+        for i in xrange(0, len(x), batch_size):
+            yield x[i:i + batch_size]
+
+    def prepare_point(point):
+        # location = point['location']
+
+        result = {
+            'device_id': device_id,
+            'coordinate': 'POINT(%f %f)' % (float(point['longitude']), float(point['latitude'])),
+            'accuracy': float(point['accuracy']),
+            'time': datetime.datetime.fromtimestamp(long(point['time']) / 1000.0)
+        }
+        return result
+
+    for chunk in batch_chunks(data_points):
+        batch = [prepare_point(x) for x in chunk]
+        device_location_table_insert(batch)
     return jsonify({
     })
 
