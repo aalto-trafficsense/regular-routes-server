@@ -159,6 +159,21 @@ def init_db(app):
                               Index('idx_device_location_device_id_time', 'device_id', 'time'))
 
 
+    global device_activity_table
+    device_activity_table = Table('device_activity', metadata,
+                              Column('id', Integer, primary_key=True),
+                              Column('device_id', Integer, ForeignKey('devices.id'), nullable=False),
+                              Column('time', TIMESTAMP(timezone=True), nullable=False),
+                              Column('activity_1', activity_type_enum),
+                              Column('activity_1_conf', Integer),
+                              Column('activity_2', activity_type_enum),
+                              Column('activity_2_conf', Integer),
+                              Column('activity_3', activity_type_enum),
+                              Column('activity_3_conf', Integer),
+                              Index('idx_device_activity_time', 'time'),
+                              Index('idx_device_activity_device_id_time', 'device_id', 'time'))
+
+
     # device_data_table after filtering activities.
     # Deprecated by legs, below.
     global device_data_filtered_table
@@ -1590,6 +1605,10 @@ def device_data_table_insert(batch):
 
 def device_location_table_insert(batch):
     db.engine.execute(device_location_table.insert(batch))
+
+
+def device_activity_table_insert(batch):
+    db.engine.execute(device_activity_table.insert(batch))
 
 
 def device_data_filtered_table_insert(batch):
