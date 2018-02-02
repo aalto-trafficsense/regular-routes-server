@@ -298,6 +298,7 @@ def location_post():
 
     # Process activities
     activityEntries = data.get('activityEntries') # Optional - not included e.g. while using the simulator
+    print 'activityEntries: ' + str(activityEntries)
 
     if activityEntries:
         # Remember, if a single point fails, the whole batch fails
@@ -319,7 +320,7 @@ def location_post():
             sorted_activities = sorted(parse_activities(), key=lambda x: x['confidence'], reverse=True)
             result = {}
             result['device_id'] = device_id
-            result['time'] = datetime.datetime.fromtimestamp(long(point['time']) / 1000.0)
+            result['time'] = datetime.datetime.fromtimestamp(long(activitydata['time']) / 1000.0)
 
             if len(sorted_activities) > 0:
                 result['activity_1'] = sorted_activities[0]['type']
