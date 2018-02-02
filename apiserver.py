@@ -305,6 +305,8 @@ def location_post():
 
         def prepare_activity(activitydata):
 
+            print 'activitydata: ' + activitydata
+
             activities = activitydata['activities']
 
             def parse_activities():
