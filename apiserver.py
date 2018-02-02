@@ -297,7 +297,8 @@ def location_post():
         device_location_table_insert(batch)
 
     # Process activities
-    activityEntries = data.get('activityEntries') # Optional - not included e.g. while using the simulator
+    # activityEntries = data.get('activityEntries') # Optional - not included e.g. while using the simulator
+    activityEntries = data['activityEntries'] # Optional - not included e.g. while using the simulator
     print 'activityEntries: ' + str(activityEntries)
 
     if activityEntries:
