@@ -297,8 +297,7 @@ def location_post():
         device_location_table_insert(batch)
 
     # Process activities
-    # activityEntries = data.get('activityEntries') # Optional - not included e.g. while using the simulator
-    activityEntries = data['activityEntries'] # Optional - not included e.g. while using the simulator
+    activityEntries = data.get('activityEntries') # Optional - not included e.g. while using the simulator
     print 'activityEntries: ' + str(activityEntries)
 
     if activityEntries:
@@ -309,7 +308,7 @@ def location_post():
 
             print 'activitydata: ' + str(activitydata)
 
-            activities = activitydata['activities']
+            activities = activitydata.get('activities')
 
             def parse_activities():
                 for activity in activities:
@@ -318,28 +317,30 @@ def location_post():
                         'confidence': int(activity['confidence'])
                     }
 
-            sorted_activities = sorted(parse_activities(), key=lambda x: x['confidence'], reverse=True)
             result = {}
-            result['device_id'] = device_id
-            result['time'] = datetime.datetime.fromtimestamp(long(activitydata['time']) / 1000.0)
+            if activities:
 
-            if len(sorted_activities) > 0:
-                result['activity_1'] = sorted_activities[0]['type']
-                result['activity_1_conf'] = sorted_activities[0]['confidence']
-                if len(sorted_activities) > 1:
-                    result['activity_2'] = sorted_activities[1]['type']
-                    result['activity_2_conf'] = sorted_activities[1]['confidence']
-                    if len(sorted_activities) > 2:
-                        result['activity_3'] = sorted_activities[2]['type']
-                        result['activity_3_conf'] = sorted_activities[2]['confidence']
+                sorted_activities = sorted(parse_activities(), key=lambda x: x['confidence'], reverse=True)
+                result['device_id'] = device_id
+                result['time'] = datetime.datetime.fromtimestamp(long(activitydata['time']) / 1000.0)
+
+                if len(sorted_activities) > 0:
+                    result['activity_1'] = sorted_activities[0]['type']
+                    result['activity_1_conf'] = sorted_activities[0]['confidence']
+                    if len(sorted_activities) > 1:
+                        result['activity_2'] = sorted_activities[1]['type']
+                        result['activity_2_conf'] = sorted_activities[1]['confidence']
+                        if len(sorted_activities) > 2:
+                            result['activity_3'] = sorted_activities[2]['type']
+                            result['activity_3_conf'] = sorted_activities[2]['confidence']
+                        else:
+                            result['activity_3'] = 'UNKNOWN'
+                            result['activity_3_conf'] = 0
                     else:
+                        result['activity_2'] = 'UNKNOWN'
+                        result['activity_2_conf'] = 0
                         result['activity_3'] = 'UNKNOWN'
                         result['activity_3_conf'] = 0
-                else:
-                    result['activity_2'] = 'UNKNOWN'
-                    result['activity_2_conf'] = 0
-                    result['activity_3'] = 'UNKNOWN'
-                    result['activity_3_conf'] = 0
             return result
 
         for chunk in batch_chunks(activityEntries):
