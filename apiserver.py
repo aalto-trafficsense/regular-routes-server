@@ -305,7 +305,7 @@ def location_post():
 
         def prepare_activity(activitydata):
 
-            print 'activitydata: ' + activitydata
+            print 'activitydata: ' + str(activitydata)
 
             activities = activitydata['activities']
 
