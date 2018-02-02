@@ -15,13 +15,14 @@ from pyfiles.common_helpers import stop_clusters
 from pyfiles.constants import (
     DEST_RADIUS_MAX,
     DESTINATIONS_LIMIT,
-    INCLUDE_DESTINATIONS_BETWEEN)
+    INCLUDE_DESTINATIONS_BETWEEN,
+    int_activities)
 
 from pyfiles.database_interface import (init_db, users_table_insert, users_table_update, devices_table_insert, device_data_table_insert,
-                                        device_location_table_insert, verify_user_id, update_last_activity, update_messaging_token, get_device_table_id,
-                                        get_device_table_id_for_session, get_users_table_id, get_session_token_for_device, get_user_id_from_device_id,
-                                        activity_types,
-    client_log_table_insert, get_svg)
+                                        device_location_table_insert, device_activity_table_insert, verify_user_id, update_last_activity,
+                                        update_messaging_token, get_device_table_id, get_device_table_id_for_session, get_users_table_id,
+                                        get_session_token_for_device, get_user_id_from_device_id, activity_types, client_log_table_insert,
+                                        get_svg)
 
 from pyfiles.server_common import common_setlegmode, common_path
 
@@ -272,7 +273,9 @@ def location_post():
     if device_id < 0:
         abort(403)  # not registered user
 
-    data_points = request.json['locations']
+    data = request.json
+    # Process locations
+    data_points = data['locations']
     # Remember, if a single point fails, the whole batch fails
     batch_size = 1024
 
@@ -281,8 +284,6 @@ def location_post():
             yield x[i:i + batch_size]
 
     def prepare_point(point):
-        # location = point['location']
-
         result = {
             'device_id': device_id,
             'coordinate': 'POINT(%f %f)' % (float(point['longitude']), float(point['latitude'])),
@@ -294,6 +295,54 @@ def location_post():
     for chunk in batch_chunks(data_points):
         batch = [prepare_point(x) for x in chunk]
         device_location_table_insert(batch)
+
+    # Process activities
+    activityEntries = data.get('activityEntries') # Optional - not included e.g. while using the simulator
+
+    if activityEntries:
+        # Remember, if a single point fails, the whole batch fails
+        batch_size = 1024
+
+        def prepare_activity(activitydata):
+
+            activities = activitydata['activities']
+
+            def parse_activities():
+                for activity in activities:
+                    yield {
+                        'type': int_activities[int(activity['activity'])],
+                        'confidence': int(activity['confidence'])
+                    }
+
+            sorted_activities = sorted(parse_activities(), key=lambda x: x['confidence'], reverse=True)
+            result = {}
+            result['device_id'] = device_id
+            result['time'] = datetime.datetime.fromtimestamp(long(point['time']) / 1000.0)
+
+            if len(sorted_activities) > 0:
+                result['activity_1'] = sorted_activities[0]['type']
+                result['activity_1_conf'] = sorted_activities[0]['confidence']
+                if len(sorted_activities) > 1:
+                    result['activity_2'] = sorted_activities[1]['type']
+                    result['activity_2_conf'] = sorted_activities[1]['confidence']
+                    if len(sorted_activities) > 2:
+                        result['activity_3'] = sorted_activities[2]['type']
+                        result['activity_3_conf'] = sorted_activities[2]['confidence']
+                    else:
+                        result['activity_3'] = 'UNKNOWN'
+                        result['activity_3_conf'] = 0
+                else:
+                    result['activity_2'] = 'UNKNOWN'
+                    result['activity_2_conf'] = 0
+                    result['activity_3'] = 'UNKNOWN'
+                    result['activity_3_conf'] = 0
+            return result
+
+        for chunk in batch_chunks(activityEntries):
+            batch = [prepare_activity(x) for x in chunk]
+            device_activity_table_insert(batch)
+
+
     return jsonify({
     })
 

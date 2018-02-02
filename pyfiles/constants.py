@@ -79,6 +79,18 @@ jore_bus_replace_regex = re.compile("^.0*")
 DEST_DURATION_MIN = 300
 DEST_RADIUS_MAX = 100
 
+# Activity mapping from integer values (RNTravelSenseService / ActivityData.h)
+int_activities = {
+    0: 'UNKNOWN', # NOT_SET not in the current enum
+    1: 'IN_VEHICLE',
+    2: 'ON_BICYCLE',
+    3: 'ON_FOOT',
+    4: 'RUNNING',
+    5: 'STILL',
+    6: 'TILTING',
+    7: 'UNKNOWN',
+    8: 'WALKING' }
+
 # GTFS Route Types
 gtfs_route_types = {    0: 'Tram, Light Rail, Streetcar',
                         1: 'Subway, Metro',
