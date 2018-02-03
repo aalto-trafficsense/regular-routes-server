@@ -392,7 +392,7 @@ def datav2_post():
                     act_time = activityEntries[actFollow.index]['time']
                     interval = abs(loc_time - act_time)
                     print "testing index: " + str(actFollow.index) + " interval: " + str(interval) + " minInterval: " + str(minInterval.x)
-                    if interval < minInterval.x:
+                    if interval <= minInterval.x:
                         minInterval.x = interval
                         actFollow.index += 1
                         if actFollow.index >= len(activityEntries):
