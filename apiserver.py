@@ -298,16 +298,9 @@ def location_post():
 
     # Process activities
     activityEntries = data.get('activityEntries') # Optional - not included e.g. while using the simulator
-    print 'activityEntries: ' + str(activityEntries)
 
     if activityEntries:
-        # Remember, if a single point fails, the whole batch fails
-        batch_size = 1024
-
         def prepare_activity(activitydata):
-
-            print 'activitydata: ' + str(activitydata)
-
             activities = activitydata.get('activities')
 
             def parse_activities():
@@ -347,6 +340,108 @@ def location_post():
             batch = [prepare_activity(x) for x in chunk]
             device_activity_table_insert(batch)
 
+
+    return jsonify({
+    })
+
+@app.route('/datav2', methods=['POST'])
+def datav2_post():
+    session_token = request.args['sessionToken']
+    if session_token is None or session_token == '':
+        abort(403)  # not authenticated user
+
+    device_id = get_device_table_id_for_session(session_token)
+    if device_id < 0:
+        abort(403)  # not registered user
+
+    data = request.json
+    # Process locations
+    data_points = data['locations']
+    activityEntries = data.get('activityEntries') # Optional - not included e.g. while using the simulator
+    # Remember, if a single point fails, the whole batch fails
+    batch_size = 1024
+    class prevTime: pass
+    prevTime.x = -1
+    class actFollow: pass
+    actFollow.index = 0
+
+    def batch_chunks(x):
+        for i in xrange(0, len(x), batch_size):
+            yield x[i:i + batch_size]
+
+    def prepare_point(point):
+        loc_time = point['time']
+        if loc_time != prevTime.x:
+            prevTime.x = loc_time
+            result = {
+                'device_id': device_id,
+                'coordinate': 'POINT(%f %f)' % (float(point['longitude']), float(point['latitude'])),
+                'accuracy': float(point['accuracy']),
+                'time': datetime.datetime.fromtimestamp(long(loc_time) / 1000.0)
+            }
+            if activityEntries:
+                continue_loop = True
+                actFollow.last_element = False
+                class minInterval: pass
+                minInterval.x = 999999999
+                while continue_loop:
+                    act_time = activityEntries[actFollow.index]['time']
+                    interval = abs(loc_time - act_time)
+                    # print "testing index: " + str(actFollow.index) + " interval: " + str(interval) + " minInterval: " + str(minInterval.x)
+                    if interval < minInterval.x:
+                        minInterval.x = interval
+                        actFollow.index += 1
+                        if actFollow.index >= len(activityEntries):
+                            actFollow.last_element = True
+                    if (interval > minInterval.x) | (actFollow.last_element == True):
+                        continue_loop = False
+                        actFollow.index -= 1  # back up one
+                        if minInterval.x > 60000:  # Reject locations with no activity info
+                            print "/datav2 skipping location due to no activity, minInterval: " + str(minInterval.x)
+                            result = None
+                        else:
+                            actEntry = activityEntries[actFollow.index]
+                            # print "Best match index: " + str(actFollow.index)
+                            activities = actEntry.get('activities')
+
+                            def parse_activities():
+                                for activity in activities:
+                                    yield {
+                                        'type': int_activities[int(activity['activity'])],
+                                        'confidence': int(activity['confidence'])
+                                    }
+
+                            if activities:
+
+                                sorted_activities = sorted(parse_activities(), key=lambda x: x['confidence'],
+                                                           reverse=True)
+
+                                if len(sorted_activities) > 0:
+                                    result['activity_1'] = sorted_activities[0]['type']
+                                    result['activity_1_conf'] = sorted_activities[0]['confidence']
+                                    if len(sorted_activities) > 1:
+                                        result['activity_2'] = sorted_activities[1]['type']
+                                        result['activity_2_conf'] = sorted_activities[1]['confidence']
+                                        if len(sorted_activities) > 2:
+                                            result['activity_3'] = sorted_activities[2]['type']
+                                            result['activity_3_conf'] = sorted_activities[2]['confidence']
+                                        else:
+                                            result['activity_3'] = 'UNKNOWN'
+                                            result['activity_3_conf'] = 0
+                                    else:
+                                        result['activity_2'] = 'UNKNOWN'
+                                        result['activity_2_conf'] = 0
+                                        result['activity_3'] = 'UNKNOWN'
+                                        result['activity_3_conf'] = 0
+
+            return result
+
+    for chunk in batch_chunks(data_points):
+        batch = []
+        for x in chunk:
+            res = prepare_point(x)
+            if res: batch.append(res)
+        device_data_table_insert(batch)
 
     return jsonify({
     })
