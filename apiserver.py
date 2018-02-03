@@ -391,7 +391,7 @@ def datav2_post():
                 while continue_loop:
                     act_time = activityEntries[actFollow.index]['time']
                     interval = abs(loc_time - act_time)
-                    print "testing index: " + str(actFollow.index) + " interval: " + str(interval) + " minInterval: " + str(minInterval.x)
+                    # print "testing index: " + str(actFollow.index) + " interval: " + str(interval) + " minInterval: " + str(minInterval.x)
                     if interval <= minInterval.x:
                         minInterval.x = interval
                         actFollow.index += 1
@@ -405,7 +405,7 @@ def datav2_post():
                             result = None
                         else:
                             actEntry = activityEntries[actFollow.index]
-                            print "Best match index: " + str(actFollow.index)
+                            # print "Best match index: " + str(actFollow.index)
                             activities = actEntry.get('activities')
 
                             def parse_activities():
