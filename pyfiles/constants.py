@@ -79,6 +79,9 @@ jore_bus_replace_regex = re.compile("^.0*")
 DEST_DURATION_MIN = 300
 DEST_RADIUS_MAX = 100
 
+# Maximum time interval (ms) between incoming location point and activity detection
+MAX_LOCATION_ACTIVITY_INTERVAL_MS = 60000 # +- one minute
+
 # Activity mapping from integer values (RNTravelSenseService / ActivityData.h)
 int_activities = {
     0: 'UNKNOWN', # NOT_SET not in the current enum

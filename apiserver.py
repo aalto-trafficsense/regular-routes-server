@@ -16,6 +16,7 @@ from pyfiles.constants import (
     DEST_RADIUS_MAX,
     DESTINATIONS_LIMIT,
     INCLUDE_DESTINATIONS_BETWEEN,
+    MAX_LOCATION_ACTIVITY_INTERVAL_MS,
     int_activities)
 
 from pyfiles.database_interface import (init_db, users_table_insert, users_table_update, devices_table_insert, device_data_table_insert,
@@ -362,6 +363,11 @@ def datav2_post():
     # Process locations
     data_points = data['locations']
     activityEntries = data.get('activityEntries') # Optional - not included e.g. while using the simulator
+
+    # TODO: Consider whether the whole batch should be skipped, if there are no activity entries
+    # Currently if the batch has activity entries, only locations within +- MAX_LOCATION_ACTIVITY_INTERVAL_MS are kept
+    # But if there are no activity entries at all, all locations (with unique timestamps) are kept
+
     # Remember, if a single point fails, the whole batch fails
     batch_size = 1024
     class prevTime: pass
@@ -397,10 +403,10 @@ def datav2_post():
                         actFollow.index += 1
                         if actFollow.index >= len(activityEntries):
                             actFollow.last_element = True
-                    if (interval > minInterval.x) | (actFollow.last_element == True):
+                    if (interval > minInterval.x) | (actFollow.last_element == True): # Interval started to increase or last activityEntry reached
                         continue_loop = False
-                        actFollow.index -= 1  # back up one
-                        if minInterval.x > 60000:  # Reject locations with no activity info
+                        actFollow.index -= 1  # step back one
+                        if minInterval.x > MAX_LOCATION_ACTIVITY_INTERVAL_MS:  # Reject locations with no activity info
                             print "/datav2 skipping location due to no activity, minInterval: " + str(minInterval.x)
                             result = None
                         else:
