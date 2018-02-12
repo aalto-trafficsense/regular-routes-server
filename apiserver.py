@@ -451,8 +451,7 @@ def datav2_post():
         for x in chunk:
             res = prepare_point(x)
             if res: batch.append(res)
-        print "Batch length: " + str(len(batch))
-        device_data_table_insert(batch)
+        if len(batch)>0: device_data_table_insert(batch)
 
     return jsonify({
     })
