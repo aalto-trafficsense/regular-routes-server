@@ -356,6 +356,7 @@ def datav2_post():
         abort(403)  # not authenticated user
 
     device_id = get_device_table_id_for_session(session_token)
+    print "datav2 received device_id as: " + str(device_id)
     if device_id < 0:
         abort(403)  # not registered user
 
@@ -383,6 +384,7 @@ def datav2_post():
         loc_time = point['time']
         if loc_time != prevTime.x:
             prevTime.x = loc_time
+            print "datav2 appending device_id as: " + str(device_id)
             result = {
                 'device_id': device_id,
                 'coordinate': 'POINT(%f %f)' % (float(point['longitude']), float(point['latitude'])),
