@@ -356,7 +356,6 @@ def datav2_post():
         abort(403)  # not authenticated user
 
     device_id = get_device_table_id_for_session(session_token)
-    print "datav2 received device_id as: " + str(device_id)
     if device_id < 0:
         abort(403)  # not registered user
 
@@ -384,7 +383,6 @@ def datav2_post():
         loc_time = point['time']
         if loc_time != prevTime.x:
             prevTime.x = loc_time
-            print "datav2 appending device_id as: " + str(device_id)
             result = {
                 'device_id': device_id,
                 'coordinate': 'POINT(%f %f)' % (float(point['longitude']), float(point['latitude'])),
@@ -453,6 +451,7 @@ def datav2_post():
         for x in chunk:
             res = prepare_point(x)
             if res: batch.append(res)
+        print "Batch length: " + str(len(batch))
         device_data_table_insert(batch)
 
     return jsonify({
