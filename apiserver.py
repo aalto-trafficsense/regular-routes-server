@@ -407,7 +407,7 @@ def datav2_post():
                         continue_loop = False
                         actFollow.index -= 1  # step back one
                         if minInterval.x > MAX_LOCATION_ACTIVITY_INTERVAL_MS:  # Reject locations with no activity info
-                            print "/datav2 skipping location due to no activity, minInterval: " + str(minInterval.x)
+                            print "/datav2 skipping location without activity, minInterval: " + str(minInterval.x) + " loc_time: " + str(loc_time) + " ending act_time: " + str(act_time)
                             result = None
                         else:
                             actEntry = activityEntries[actFollow.index]
