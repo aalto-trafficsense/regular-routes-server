@@ -379,7 +379,7 @@ def datav2_post():
         for i in xrange(0, len(x), batch_size):
             yield x[i:i + batch_size]
 
-    def prepare_point(point):
+    def prepare_point_timesync(point):
         loc_time = point['time']
         if loc_time != prevTime.x:
             prevTime.x = loc_time
@@ -393,7 +393,7 @@ def datav2_post():
                 continue_loop = True
                 actFollow.last_element = False
                 class minInterval: pass
-                minInterval.x = 999999999
+                minInterval.x = 9999999999
                 while continue_loop:
                     act_time = activityEntries[actFollow.index]['time']
                     interval = abs(loc_time - act_time)
@@ -449,9 +449,65 @@ def datav2_post():
     for chunk in batch_chunks(data_points):
         batch = []
         for x in chunk:
-            res = prepare_point(x)
+            res = prepare_point_timesync(x)
             if res: batch.append(res)
         if len(batch)>0: device_data_table_insert(batch)
+
+    # Replica of /locationdata for testing purposes (to save both kinds)
+    def prepare_point(point):
+        result = {
+            'device_id': device_id,
+            'coordinate': 'POINT(%f %f)' % (float(point['longitude']), float(point['latitude'])),
+            'accuracy': float(point['accuracy']),
+            'time': datetime.datetime.fromtimestamp(long(point['time']) / 1000.0)
+        }
+        return result
+
+    for chunk in batch_chunks(data_points):
+        batch = [prepare_point(x) for x in chunk]
+        device_location_table_insert(batch)
+
+    if activityEntries:
+        def prepare_activity(activitydata):
+            activities = activitydata.get('activities')
+
+            def parse_activities():
+                for activity in activities:
+                    yield {
+                        'type': int_activities[int(activity['activity'])],
+                        'confidence': int(activity['confidence'])
+                    }
+
+            result = {}
+            if activities:
+
+                sorted_activities = sorted(parse_activities(), key=lambda x: x['confidence'], reverse=True)
+                result['device_id'] = device_id
+                result['time'] = datetime.datetime.fromtimestamp(long(activitydata['time']) / 1000.0)
+
+                if len(sorted_activities) > 0:
+                    result['activity_1'] = sorted_activities[0]['type']
+                    result['activity_1_conf'] = sorted_activities[0]['confidence']
+                    if len(sorted_activities) > 1:
+                        result['activity_2'] = sorted_activities[1]['type']
+                        result['activity_2_conf'] = sorted_activities[1]['confidence']
+                        if len(sorted_activities) > 2:
+                            result['activity_3'] = sorted_activities[2]['type']
+                            result['activity_3_conf'] = sorted_activities[2]['confidence']
+                        else:
+                            result['activity_3'] = 'UNKNOWN'
+                            result['activity_3_conf'] = 0
+                    else:
+                        result['activity_2'] = 'UNKNOWN'
+                        result['activity_2_conf'] = 0
+                        result['activity_3'] = 'UNKNOWN'
+                        result['activity_3_conf'] = 0
+            return result
+
+        for chunk in batch_chunks(activityEntries):
+            batch = [prepare_activity(x) for x in chunk]
+            device_activity_table_insert(batch)
+
 
     return jsonify({
     })
