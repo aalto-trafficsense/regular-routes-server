@@ -81,7 +81,7 @@ DEST_RADIUS_MAX = 100
 
 # Maximum time interval (ms) between incoming location point and activity detection
 # MAX_LOCATION_ACTIVITY_INTERVAL_MS = 60000 # +- one minute
-MAX_LOCATION_ACTIVITY_INTERVAL_MS = 180000 # testing +- three minutes hour
+MAX_LOCATION_ACTIVITY_INTERVAL_MS = 600000 # testing +- ten minutes (looks like iOS occasionally takes 15-minute breaks in recognition during activity)
 
 # Activity mapping from integer values (RNTravelSenseService / ActivityData.h)
 int_activities = {
