@@ -264,6 +264,13 @@ def data_post():
     })
 
 
+@app.route('/testdata', methods=['POST'])
+def location_test():
+    print "testdata args: " + str(request.args)
+    print "data: " + str(request.json)
+    return jsonify({})
+
+
 @app.route('/locationdata', methods=['POST'])
 def location_post():
     session_token = request.args['sessionToken']
