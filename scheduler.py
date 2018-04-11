@@ -48,6 +48,7 @@ settings_dir_path = os.path.abspath(os.path.dirname(os.getenv(SETTINGS_FILE_ENV_
 CLIENT_SECRET_FILE = os.path.join(settings_dir_path, CLIENT_SECRET_FILE_NAME)
 
 app = Flask(__name__)
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 env_var_value = os.getenv(SETTINGS_FILE_ENV_VAR, None)
 if env_var_value is not None:

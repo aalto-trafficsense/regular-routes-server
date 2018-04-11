@@ -42,7 +42,7 @@ CLIENT_SECRET_FILE = os.path.join(settings_dir_path, CLIENT_SECRET_FILE_NAME)
 CLIENT_ID = json.loads(open(CLIENT_SECRET_FILE, 'r').read())['web']['client_id']
 
 app = Flask(__name__)
-
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 # Memory-resident session storage, see the simplekv documentation for details
 # store = DictStore()
 

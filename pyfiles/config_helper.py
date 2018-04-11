@@ -11,6 +11,7 @@ APPLICATION_NAME = 'TrafficSense'
 SETTINGS_FILE_ENV_VAR = 'REGULARROUTES_SETTINGS'
 
 app = Flask(__name__)
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 env_var_value = os.getenv(SETTINGS_FILE_ENV_VAR, None)
 if env_var_value is not None:
