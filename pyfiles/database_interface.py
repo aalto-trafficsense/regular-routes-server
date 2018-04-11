@@ -7,7 +7,7 @@ import json
 
 import geoalchemy2 as ga2
 from flask import abort
-from flask.ext.sqlalchemy import SQLAlchemy
+from flask_sqlalchemy import SQLAlchemy
 
 from sqlalchemy import (
     BigInteger, Column, Enum, Float, ForeignKey, Index, Integer, String, Table,
