@@ -9,7 +9,7 @@
 from numpy import *
 set_printoptions(precision=5, suppress=True)
 
-from db_utils import get_cursor
+from .db_utils import get_cursor
 
 def dev_ids(cur):
 
@@ -32,10 +32,10 @@ def num_trace(cur, d_id):
 
 cur = get_cursor(False)
 IDs = dev_ids(cur)
-print str(IDs)
+print(str(IDs))
 
 for i in IDs:
     i_d = i[0]
     c = num_trace(cur,i_d)[0]
-    print "[%d] trace: %d" % (i_d, c)
+    print("[%d] trace: %d" % (i_d, c))
 

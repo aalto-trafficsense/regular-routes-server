@@ -28,8 +28,8 @@ if len(sys.argv) > 2:
 if len(sys.argv) > 1:
     DEV_ID = int(sys.argv[1])
 else:
-    print "specify device id, and 'test' if you want to use the test server"
-    print "e.g.: python run_demo.py 45 test"
+    print("specify device id, and 'test' if you want to use the test server")
+    print("e.g.: python run_demo.py 45 test")
     exit(1)
 
 T_p = 3            # how far to predict (route) into the future
@@ -38,7 +38,7 @@ T_g = 5            # how far ahead to predict (destination) in the future
 T_b = 20           # number of steps (minutes) to consider a break in trasport
 min_metres = 30    # relative movement threshold for not-filtering
 
-from FF import FF
+from .FF import FF
 
 ##################################################################################
 #
@@ -56,15 +56,15 @@ if DEV_ID > 90:
     FILE_I = './dat/Helsinki_98.png' #'+str(DEV_ID)+'_
 
 #bx = (min(nodes[:,0]), min(nodes[:,1]), max(nodes[:,0]), max(nodes[:,1]))
-print "Get Map. Checking for file:", FILE_I, "..."
+print("Get Map. Checking for file:", FILE_I, "...")
 import smopy
 import joblib
 if not os.path.isfile(FILE_M):
-    print "Creating Map..."
+    print("Creating Map...")
     map = smopy.Map(bx,z=12)
-    print "Saving Map..."
+    print("Saving Map...")
     joblib.dump(map,  FILE_M)
-    print "Saving Map Image ..."
+    print("Saving Map Image ...")
     map.save_png(FILE_I)
 map = joblib.load(FILE_M)
 
@@ -113,7 +113,7 @@ def conf2mark(c):
     return c * 5.
 
 
-from db_utils import get_conn, get_cursor
+from .db_utils import get_conn, get_cursor
 
 ##################################################################################
 #
@@ -131,12 +131,12 @@ if not os.path.isfile(FILE_X):
     c = conn.cursor()
 
     if not use_test_server:
-        print "Building averaged_location table with new data."
+        print("Building averaged_location table with new data.")
         sql = open('../..//sql/make_average_table.sql', 'r').read()
         c.execute(sql)
         conn.commit()
 
-    print "Extracting trace"
+    print("Extracting trace")
     c.execute('SELECT hour,minute,day_of_week,longitude,latitude FROM averaged_location WHERE device_id = %s', (str(DEV_ID),))
     dat = array(c.fetchall(),dtype={'names':['H', 'M', 'DoW', 'lon', 'lat'], 'formats':['f4', 'f4', 'i4', 'f4','f4']})
     XXX = column_stack([dat['lon'],dat['lat'],dat['H']+(dat['M']/60.),dat['DoW']])
@@ -146,7 +146,7 @@ XXX = genfromtxt(FILE_X, skip_header=0, delimiter=',')
 T,D = XXX.shape
 
 
-from pred_utils import do_cluster, do_snapping, do_movement_filtering, do_feature_filtering 
+from .pred_utils import do_cluster, do_snapping, do_movement_filtering, do_feature_filtering 
 
 def do_process_segment(X):
     '''
@@ -201,7 +201,7 @@ def do_process_segment(X):
 ############################
 # Setup
 ############################
-print "Setup"
+print("Setup")
 # Multi-output Regressior
 from sklearn.linear_model import SGDRegressor, SGDClassifier
 from sklearn.neighbors import KNeighborsRegressor
@@ -223,7 +223,7 @@ h = RandomForestClassifier(n_estimators=100)
 X,Z = do_process_segment(copy(XXX)) # everything
 T,D = X.shape
 Y = zeros(T) 
-print "Processed everything from ", XXX.shape, "to", X.shape, Z.shape
+print("Processed everything from ", XXX.shape, "to", X.shape, Z.shape)
 t_0 = get_end_of_first_day(X)
 
 #g = tree.DecisionTreeClassifier()
@@ -266,7 +266,7 @@ legend()
 #figManager.window.showMaximized()
 show()
 
-print "Go"
+print("Go")
 day_count = 1
 
 import matplotlib.animation as animation
@@ -286,7 +286,7 @@ with writer.saving(fig, "dat/Regular_Routes_Dev_"+str(DEV_ID)+".mp4", 100):
         writer.grab_frame()
 
     tx2.set_visible(True)
-    print "---INITIAL BUILD--- (end of day ",(X[t,3]),", i.e., ", d2day(X[t,3]),")"
+    print("---INITIAL BUILD--- (end of day ",(X[t,3]),", i.e., ", d2day(X[t,3]),")")
     pause(0.1)
     nodes = do_cluster(X[0:t_0])
     Y[0:t_0] = do_snapping(X[0:t_0],nodes)
@@ -307,7 +307,7 @@ with writer.saving(fig, "dat/Regular_Routes_Dev_"+str(DEV_ID)+".mp4", 100):
     tx3.set_visible(True)
 
     for t in range(t_0,T-1):
-        print "[%d] (%3.2f %%) " % (t, t*100./T), Z[t,1:5], X[t,0:4]
+        print("[%d] (%3.2f %%) " % (t, t*100./T), Z[t,1:5], X[t,0:4])
 
         #######################
         # Plot the trace
@@ -376,8 +376,8 @@ with writer.saving(fig, "dat/Regular_Routes_Dev_"+str(DEV_ID)+".mp4", 100):
             l_30.set_xdata(0)
             l_30.set_ydata(0)
             pause(0.1)
-            print "---TRAINING--- (end of day ",(X[t,3]),", i.e., ", d2day(X[t,3]),")"
-            print 0,t_0,t, 
+            print("---TRAINING--- (end of day ",(X[t,3]),", i.e., ", d2day(X[t,3]),")")
+            print(0,t_0,t, end=' ') 
             for iii in range(30):
                 writer.grab_frame()
             tx2.set_text("UPDATING NODES")

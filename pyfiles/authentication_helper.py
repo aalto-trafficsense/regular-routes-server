@@ -38,7 +38,7 @@ def authenticate_with_google_oauth(redirect_uri, client_secret_file, client_id, 
             json.dumps('Failed to upgrade the authorization code.'), 401)
         response.headers['Content-Type'] = 'application/json'
         # invalid token
-        print 'invalid token: ' + one_time_token + ". error: " + err.message
+        print('invalid token: ' + one_time_token + ". error: " + err.message)
         return response
 
     return verify_and_get_account_id(client_id, credentials)
@@ -56,10 +56,10 @@ def verify_and_read_id_token(id_token, client_id):
             data['google_id'] = jwt['sub']
 
         except AppIdentityError as error:
-            print 'verify: AppIdentityError: ' + error.message
+            print('verify: AppIdentityError: ' + error.message)
             data['valid_id_token'] = False
     else:
-        print 'verify: credentials.id_token is None'
+        print('verify: credentials.id_token is None')
 
     return data
 
@@ -68,7 +68,7 @@ def verify_id_token_values(true_client_id, id_token):
     # true_client_id = json.loads(open(CLIENT_SECRET_FILE, 'r').read())['web']['client_id']
     server_client_id = str(id_token['aud'])
     if server_client_id != true_client_id:
-        print 'invalid server client id returned'
+        print('invalid server client id returned')
         abort(403)
 
 

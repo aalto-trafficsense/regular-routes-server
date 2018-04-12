@@ -54,10 +54,10 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 env_var_value = os.getenv(SETTINGS_FILE_ENV_VAR, None)
 if env_var_value is not None:
-    print 'loading settings from: "' + str(env_var_value) + '"'
+    print('loading settings from: "' + str(env_var_value) + '"')
     app.config.from_envvar(SETTINGS_FILE_ENV_VAR)
 else:
-    print 'Environment variable "SETTINGS_FILE_ENV_VAR" was not defined -> using debug mode'
+    print('Environment variable "SETTINGS_FILE_ENV_VAR" was not defined -> using debug mode')
     # assume debug environment
     app.config.from_pyfile('regularroutes.cfg')
     app.debug = True
@@ -411,8 +411,8 @@ def logtest():
     #     users_table_insert, devices_table_insert)
     # users_table_insert("user", "foobar", "barfoo")
     # devices_table_insert(1, "foobar", "a5b8ef8f-73b1-4197-ade9-29141c0ed6e9", "model", "a5b8ef8f-73b1-4197-ade9-29141c0ed6e9")
-    print 'get_user_id_from_device_id: ' + str(get_user_id_from_device_id(device_id))
-    print 'get_max_devices_table_id_from_users_table_id: ' + str(get_max_devices_table_id_from_users_table_id(user_id))
+    print('get_user_id_from_device_id: ' + str(get_user_id_from_device_id(device_id)))
+    print('get_max_devices_table_id_from_users_table_id: ' + str(get_max_devices_table_id_from_users_table_id(user_id)))
     client_log_table_insert(device_id, get_user_id_from_device_id(device_id), "WEB-PATH", "Kukkuluuruu")
     response = make_response(json.dumps('Logtest successfully executed.'), 200)
     response.headers['Content-Type'] = 'application/json'

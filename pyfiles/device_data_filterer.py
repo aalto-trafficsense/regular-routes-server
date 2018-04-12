@@ -72,7 +72,7 @@ class DeviceDataFilterer:
         # reconstructing legs with changed algorithm or parameters.
         matches = self._match_mass_transit_legs(activity, device_data_queue)
         if matches is not None: # matched same start/end/activity
-            print matches,
+            print(matches, end=' ')
             return {x[0]: x[1:] for x in matches}
 
         if activity != "IN_VEHICLE":
@@ -201,12 +201,12 @@ class DeviceDataFilterer:
 
             self.user_invehicle_triplegs += 1
             trip_leg_points = len(device_data_queue)                                  
-            print ""
+            print("")
             line_name_str = "None"
             if line_name: line_name_str = line_name.encode('utf-8')
-            print "----- TRIP-LEG (in_vehicle) #", self.user_invehicle_triplegs ,"(from first filter detection): ", user_id, activity, line_type, line_name_str
-            print "trip-leg starts. ends: ", device_data_queue[0]['time'], " --> ", device_data_queue[trip_leg_points-1]['time'] \
-                    , "(poitns in this trip leg:", trip_leg_points, ")"
+            print("----- TRIP-LEG (in_vehicle) #", self.user_invehicle_triplegs ,"(from first filter detection): ", user_id, activity, line_type, line_name_str)
+            print("trip-leg starts. ends: ", device_data_queue[0]['time'], " --> ", device_data_queue[trip_leg_points-1]['time'] \
+                    , "(poitns in this trip leg:", trip_leg_points, ")")
 
             line_type = line_name = None
             line_name_str = "None"
@@ -223,7 +223,7 @@ class DeviceDataFilterer:
             distance = get_distance_between_coordinates(start_location, end_location) # TODO: should get 'distance' value from the calculated more realistic traveled distances
             duration = end_time - start_time
             avgspeed = distance/duration.total_seconds()
-            print "duration:", duration, ",   ", "point-to-point straight-line distance:", distance, "(meters)  =>  ", "straigh-line avgspeed:",avgspeed, "(m/s)"
+            print("duration:", duration, ",   ", "point-to-point straight-line distance:", distance, "(meters)  =>  ", "straigh-line avgspeed:",avgspeed, "(m/s)")
             
             # mehrdad: trip-leg matching logic *:
 
@@ -240,8 +240,8 @@ class DeviceDataFilterer:
                 res, matchres = match_tripleg_with_publictransport(start_location_str, end_location_str, start_time, end_time, device_data_queue)
                 
                 if res == HSL_ERROR_CODE_DATE_TOO_FAR: # second try (adjust the old weekday to current week)
-                    print ""
-                    print "failed because: HSL_ERROR_CODE_DATE_TOO_FAR !, trying second time with current week..."
+                    print("")
+                    print("failed because: HSL_ERROR_CODE_DATE_TOO_FAR !, trying second time with current week...")
                     starttime_thisweek = find_same_journey_time_this_week(start_time)
                     endtime_thisweek = find_same_journey_time_this_week(end_time)
                     res, matchres = match_tripleg_with_publictransport(start_location_str, end_location_str, starttime_thisweek, endtime_thisweek, device_data_queue)
@@ -257,14 +257,14 @@ class DeviceDataFilterer:
                         self.user_invehicle_triplegs_updated += 1
                         tripleg_updated = 1
                         if line_name: line_name_str = line_name.encode('utf-8')                    
-                        print "> TRIP-LEG UPDATED (from second filter detection): ", user_id, activity, line_type, line_name_str
+                        print("> TRIP-LEG UPDATED (from second filter detection): ", user_id, activity, line_type, line_name_str)
 
             # other filters: 
             
             # if movement very slow ... probably this is not in_vehicle
             # TODO: but why such slow moevment was detected as 'in_vehicle' in the first place?!
             if (line_type==None or (line_name=='' or line_name==None)) and avgspeed < minSpeeds['walk']:
-                print "trip's avg. speed:", avgspeed, "m/s", ": too slow! probably NOT IN_VEHICLE!"
+                print("trip's avg. speed:", avgspeed, "m/s", ": too slow! probably NOT IN_VEHICLE!")
         
             # save the trip-leg records in file *:
             # file columns: 
@@ -334,15 +334,15 @@ class DeviceDataFilterer:
             NUMBER_OF_MASS_TRANSIT_MATCH_SAMPLES)
 
         if matches is None:
-            print "no vehicle data available"
+            print("no vehicle data available")
             return None
 
         matches = matches.fetchall()
 
-        print "d"+str(device), str(tstart)[:16], str(tend)[11:16], \
+        print("d"+str(device), str(tstart)[:16], str(tend)[11:16], \
             str(len(device_data_queue))+"p:", ", ".join("%.2f %i %s" % (
                 x[1], x[0], " ".join(x[2:])) for x in matches) \
-            or "no nearby vehicles"
+            or "no nearby vehicles")
 
         hitreq = ((1.0*
                 NUMBER_OF_MASS_TRANSIT_MATCH_SAMPLES
@@ -499,9 +499,9 @@ class DeviceDataFilterer:
         fileline = "{0};{1};{2};{3}".format(user_id, self.user_invehicle_triplegs, self.user_invehicle_triplegs_updated, updated_fraction)
         self.file_finalstats.write(fileline + "\n")
         self.file_finalstats.close()
-        print ""
-        print "--------- STATS FOR user", user_id, "---------"         
-        print "total trip-legs (in_vehicle) for this user:", self.user_invehicle_triplegs
-        print "updated trip-legs (in_vehicle) to public transport:", self.user_invehicle_triplegs_updated
-        print "ratio:", updated_fraction, "%"
-        print ""
+        print("")
+        print("--------- STATS FOR user", user_id, "---------")         
+        print("total trip-legs (in_vehicle) for this user:", self.user_invehicle_triplegs)
+        print("updated trip-legs (in_vehicle) to public transport:", self.user_invehicle_triplegs_updated)
+        print("ratio:", updated_fraction, "%")
+        print("")

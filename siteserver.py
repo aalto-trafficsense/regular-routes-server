@@ -51,10 +51,10 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 env_var_value = os.getenv(SETTINGS_FILE_ENV_VAR, None)
 if env_var_value is not None:
-    print 'loading settings from: "' + str(env_var_value) + '"'
+    print('loading settings from: "' + str(env_var_value) + '"')
     app.config.from_envvar(SETTINGS_FILE_ENV_VAR)
 else:
-    print 'Environment variable "SETTINGS_FILE_ENV_VAR" was not defined -> using debug mode'
+    print('Environment variable "SETTINGS_FILE_ENV_VAR" was not defined -> using debug mode')
     # assume debug environment
     app.config.from_pyfile('regularroutes.cfg')
     app.debug = True
@@ -71,7 +71,7 @@ def index():
   # Create a state token to prevent request forgery.
   # Store it in the session for later validation.
   state = ''.join(random.choice(string.ascii_uppercase + string.digits)
-                  for x in xrange(32))
+                  for x in range(32))
   session['state'] = state
   # Set the Client ID, Token State, and Application Name in the HTML while
   # serving it.
@@ -99,7 +99,7 @@ def connect():
   if request.args.get('state', '') != session.get('state'):
     response = make_response(json.dumps('Invalid state parameter.'), 401)
     response.headers['Content-Type'] = 'application/json'
-    print '401 due to invalid state parameter.'
+    print('401 due to invalid state parameter.')
     return response
   # Delete the one-time token - page refresh required to re-connect
   del session['state']
@@ -114,7 +114,7 @@ def connect():
     credentials = oauth_flow.step2_exchange(code)
   except FlowExchangeError as err:
     # invalid token
-    print 'Invalid token: ' + code + ". error: " + err.message
+    print('Invalid token: ' + code + ". error: " + err.message)
     response = make_response(
         json.dumps('Failed to upgrade the authorization code.'), 401)
     response.headers['Content-Type'] = 'application/json'
@@ -145,7 +145,7 @@ def connect():
   user_id = get_users_table_id(user_hash_id)
   if user_id < 0:
       # No data for the user -> show the nodata -page
-      print 'No data found for the current user.'
+      print('No data found for the current user.')
       response = make_response(json.dumps('Nodata.'), 200)
       response.headers['Content-Type'] = 'application/json'
       return response
@@ -225,13 +225,13 @@ def cancel_participation():
       import yagmail
       yag = yagmail.SMTP(app.config['GMAIL_FROM'], app.config['GMAIL_PWD'])
       msgBody = ['User id: ' + str(user_id)]
-      print 'Trying to send participation cancellation email with message body: ' + msgBody[0]
+      print('Trying to send participation cancellation email with message body: ' + msgBody[0])
       yag.send(app.config['EMAIL_TO'], 'CANCEL request from user', msgBody)
       response = make_response(json.dumps('TrafficSense project informed of participation cancellation.'), 200)
       response.headers['Content-Type'] = 'application/json'
       return response
   except Exception as e:
-      print 'Exception' + e.message
+      print('Exception' + e.message)
       response = make_response(json.dumps('Error in informing the TrafficSense project: ' + e.message), 500)
       response.headers['Content-Type'] = 'application/json'
       return response

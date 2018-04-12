@@ -5,7 +5,7 @@
 # Created by: mikko.rinne@aalto.fi 14.11.2016
 #
 import json
-import urllib2
+import urllib.request, urllib.error, urllib.parse
 import datetime
 from datetime import timedelta
 import re
@@ -39,7 +39,7 @@ def hsl_alert_request():
         alert_feed.ParseFromString(sample_str)
     else:
         url = 'http://api.digitransit.fi/realtime/service-alerts/v1/'
-        response = urllib2.urlopen(url, timeout=50)
+        response = urllib.request.urlopen(url, timeout=50)
         alert_feed.ParseFromString(response.read())
         if save_alert_sample:
             with open(debug_input_filename, "w") as data_file:
@@ -106,7 +106,7 @@ def hsl_alert_request():
                         duplicate_alert = True
                 # duplicate_alert = False  # TODO: Comment out this line - it is for debugging purposes!!
                 if not duplicate_alert:
-                    fi_description = u"Ei viestiä"
+                    fi_description = "Ei viestiä"
                     sv_description = "Ingen meddelande"
                     en_description = "No message"
                     for language_variant in alert.description_text.translation:
@@ -147,7 +147,7 @@ def retrieve_hsl_disruptions():
         if save_alert_sample:
             with open(debug_input_filename, "w") as data_file:
                 json.dump(json_data, data_file)
-    print json.dumps(json_data)
+    print(json.dumps(json_data))
 
 
 def fmi_forecast_request():
@@ -243,7 +243,7 @@ def fmi_request(query_id, start_time, end_time, weather_params, time_row_label):
     else:
         fmi_wfs = WebFeatureService(url='http://data.fmi.fi/fmi-apikey/' + get_config('FMI_API_KEY') + '/wfs',
                                     version='2.0.0')
-        keys = ",".join(weather_params.keys())
+        keys = ",".join(list(weather_params.keys()))
         query_params = {'place': 'helsinki',
                        'starttime': start_time,
                        'endtime': end_time,
@@ -256,7 +256,7 @@ def fmi_request(query_id, start_time, end_time, weather_params, time_row_label):
                 with open(debug_input_filename, "w") as data_file:
                     data_file.write(bytes(feature_read))
         except Exception as e:
-            print "fmi_forecast_request exception: ", e
+            print("fmi_forecast_request exception: ", e)
     time_retrieved = xml_root.get('timeStamp')
     response_table = []
     first_name = None
@@ -289,9 +289,9 @@ def graphql_request(urlstr, querystr):
         json_data = response.json()
         response.close()
     except requests.exceptions.ConnectionError as e:
-        print "graphql_request / requests.exceptions.ConnectionError: ", e
+        print("graphql_request / requests.exceptions.ConnectionError: ", e)
     except Exception as e:
-        print "graphql_request / exception: ", e
+        print("graphql_request / exception: ", e)
     return json_data
 
 
@@ -309,13 +309,13 @@ def traffic_disorder_request():
     else:
         try:
             url = 'https://tie.digitraffic.fi/api/v1/data/traffic-disorders-datex2'
-            response_read = urllib2.urlopen(url, timeout=50).read()
+            response_read = urllib.request.urlopen(url, timeout=50).read()
             xml_root = ET.fromstring(response_read)
             if save_alert_sample:
                 with open(debug_input_filename, "w") as data_file:
                     data_file.write(bytes(response_read))
         except Exception as e:
-            print "Traffic disorder fetch exception: ", e
+            print("Traffic disorder fetch exception: ", e)
 
     new_disorders = []
     max_creation_time = traffic_disorder_max_creation()
@@ -433,7 +433,7 @@ def traffic_disorder_request():
                 'en_description': en_description
             }
         except Exception as e:
-            print "Traffic disorder row build exception: ", e
+            print("Traffic disorder row build exception: ", e)
             return None
 
     try:
@@ -444,7 +444,7 @@ def traffic_disorder_request():
                                        .find('pp:situationRecord', ns))
             if row: new_disorders.append(row)
     except Exception as e:
-        print "Traffic disorder loop exception: ", e
+        print("Traffic disorder loop exception: ", e)
         new_disorders = []
     return new_disorders
 
@@ -474,7 +474,7 @@ def getAlertC(version, location):
                 coords = geom.get('coordinates')
         return coords[1], coords[0]
     except Exception as e:
-        print "getAlertC was unable to fetch coordinates: ", e
+        print("getAlertC was unable to fetch coordinates: ", e)
         return None, None
 
         # hsl_alert_request()

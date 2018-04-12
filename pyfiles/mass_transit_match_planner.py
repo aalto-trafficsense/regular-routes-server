@@ -11,7 +11,7 @@ import time
 # mehrdad - new
 #import urllib
 import requests
-import urllib2
+import urllib.request, urllib.error, urllib.parse
 import polyline
 
 from pyfiles.common_helpers import (get_distance_between_coordinates, point_distance, point_coordinates)
@@ -26,10 +26,10 @@ def HttpRequestWithGet(apiurl, querystr):
 	
 	#params = urllib.urlencode(querystr)
 	params = querystr
-	print "params: ", params
+	print("params: ", params)
 
 	apiurl_with_query = apiurl + "?" + params;
-	print "apiurl_with_query: ", apiurl_with_query
+	print("apiurl_with_query: ", apiurl_with_query)
 	
 	json_data = '{}'
 	try:
@@ -39,12 +39,12 @@ def HttpRequestWithGet(apiurl, querystr):
 		json_data = json.loads(response.content)
 		#print "json_data:", json_data
 		response.close()
-	except urllib2.HTTPError as e:
-		print "(!) EXCEPTION catched: ", e
+	except urllib.error.HTTPError as e:
+		print("(!) EXCEPTION catched: ", e)
 	except requests.exceptions.ConnectionError as e:
-		print "(!) EXCEPTION catched: ", e
+		print("(!) EXCEPTION catched: ", e)
 	except Exception as e:
-		print "(!) EXCEPTION catched: ", e
+		print("(!) EXCEPTION catched: ", e)
 
 	return json_data
 
@@ -66,7 +66,7 @@ def find_same_journey_time_this_week(starttime):
     # find date of the same weekday, but for current week (to avoid querying old dates that results in error from HSL)
     date_thisweek = datetime.today() + timedelta(days = (starttime.weekday() - datetime.today().weekday()))
     time_thisweek = datetime.combine(date_thisweek.date(), starttime.time())
-    print "same_journey_time_this_week :: ", time_thisweek
+    print("same_journey_time_this_week :: ", time_thisweek)
     return time_thisweek
 
 class PlannedTrip:
@@ -97,9 +97,9 @@ minSpeeds = {"walk":1.34112, "bus": 3.0, "tram":2.5, "train":5.0, "ferry":5.0} #
 
 
 def match_tripleg_with_publictransport(fromPlace, toPlace, trip_starttime, trip_endtime, all_recorded_trip_points):
-    print "Input Trip ...:"
-    print "trip_starttime:", trip_starttime
-    print "trip_endtime:", trip_endtime
+    print("Input Trip ...:")
+    print("trip_starttime:", trip_starttime)
+    print("trip_endtime:", trip_endtime)
 
     tripmatchres = TripMatchedWithPlannerResult()
 
@@ -142,12 +142,12 @@ def match_tripleg_with_publictransport(fromPlace, toPlace, trip_starttime, trip_
     
     legstartshift = timedelta(seconds = round(MAX_MODE_DETECTION_DELAY/minSpeeds['walk']))  # default: 4 minutes (*) or CALC: e.g: MAX_MODE_DETECTION_DELAY/minSpeeds['walk']        
     trip_starttime_earlier = trip_starttime - legstartshift
-    print "legstartshift:",legstartshift
-    print "trip_starttime_earlier:", trip_starttime_earlier , " (note: WE'LL GIVE THIS TO JOURNEY PLANNER QUERY *)"
-    print ""
+    print("legstartshift:",legstartshift)
+    print("trip_starttime_earlier:", trip_starttime_earlier , " (note: WE'LL GIVE THIS TO JOURNEY PLANNER QUERY *)")
+    print("")
     
     # query journey planner ----------:
-    print "Query to journey planner:"
+    print("Query to journey planner:")
     # TODO: use Interface / Abstract class *:
     #   later planner match for the whole finland*: https://api.digitransit.fi/routing/v1/routers/finland/
     #   later plannermatch for all possible countries: ??? OTP API interfance	
@@ -171,8 +171,8 @@ def match_tripleg_with_publictransport(fromPlace, toPlace, trip_starttime, trip_
         else:
             return 0, tripmatchres
 
-    print ""
-    print "Working on the routes suggested by journey planner ...:"
+    print("")
+    print("Working on the routes suggested by journey planner ...:")
     itin_index = 0
     matchcount = 0
     plannedmatches = []
@@ -182,8 +182,8 @@ def match_tripleg_with_publictransport(fromPlace, toPlace, trip_starttime, trip_
         duration = HSLDurationToNormalDuration(itin['duration'])        # duration of planned trip
         starttime = HSLTimeStampToNormalDateTime(itin['startTime'])    # start time of planned trip
         endtime = HSLTimeStampToNormalDateTime(itin['endTime'])         # ...
-        print "\n#", itin_index+1, ": This journey planner trip's duration, start & ends time: ", \
-                duration,"(",starttime , "-->", endtime,")\t"#, itin['duration'], " seconds", "(",itin['startTime'], itin['endTime'],")" 
+        print("\n#", itin_index+1, ": This journey planner trip's duration, start & ends time: ", \
+                duration,"(",starttime , "-->", endtime,")\t")#, itin['duration'], " seconds", "(",itin['startTime'], itin['endTime'],")" 
 
         # prepare the adjuster params TODO (instead of 'bus', it could be 'train', 'tram' ... depending on planned results) *
         maxdeltaW = timedelta(seconds = round(maxDError/minSpeeds['walk']))   # max acceptable diff, result of walking to the stop        
@@ -192,7 +192,7 @@ def match_tripleg_with_publictransport(fromPlace, toPlace, trip_starttime, trip_
         maxI = timedelta(minutes = maxIntervals['bus']) # in minutes
         maxdeltaSlowness = timedelta(minutes = maxSlowness['bus'])    
         # maxdeltaSlowness = timedelta(minutes = 0) # TODO !!!! temp. , remove this 
-        print "maxdeltaW, maxdeltaB, maxdeltaT, maxI: ", maxdeltaW, maxdeltaB, maxdeltaT, maxI, "maxdeltaB/2 + maxdeltaSlowness:",maxdeltaB/2 + maxdeltaSlowness
+        print("maxdeltaW, maxdeltaB, maxdeltaT, maxI: ", maxdeltaW, maxdeltaB, maxdeltaT, maxI, "maxdeltaB/2 + maxdeltaSlowness:",maxdeltaB/2 + maxdeltaSlowness)
 
         deltaT = abs(duration - trip_duration)
         deltaTsign = ""
@@ -209,18 +209,18 @@ def match_tripleg_with_publictransport(fromPlace, toPlace, trip_starttime, trip_
             if leg['transitLeg']:
                 transitlegs_count += 1                
         if transitlegs_count != 1: #TODO: support multi-leg match later asap! *
-            print "number of planned transit legs:", transitlegs_count, " (should be 1) => ignoring this journey planner trip (!)"                         
+            print("number of planned transit legs:", transitlegs_count, " (should be 1) => ignoring this journey planner trip (!)")                         
         # COND: compare original trip's total duration WITH planned trip total duration
         elif duration < trip_duration and deltaT > maxdeltaSlowness: #TODO: ideally, maxdeltaSlowness should depend on current mode of transport        
-            print "original trip_duration:",trip_duration, "planned trip duration:", duration, "duration < trip_duration", " (deltaT:- ", deltaT,")", \
-                    "=> how come planned trip is this much shorter than original trip ??!! => ignoring this journey planner trip (!)" # one reason could be: maybe the bus or tram ran faster this time!
+            print("original trip_duration:",trip_duration, "planned trip duration:", duration, "duration < trip_duration", " (deltaT:- ", deltaT,")", \
+                    "=> how come planned trip is this much shorter than original trip ??!! => ignoring this journey planner trip (!)") # one reason could be: maybe the bus or tram ran faster this time!
         elif deltaT > maxdeltaT:
-            print "original trip_duration:",trip_duration, "planned trip duration:", duration, "(deltaT:",deltaT,"maxdeltaT:",maxdeltaT,")", \
-                    "=> too much difference! ignoring this journey planner trip (!)"
+            print("original trip_duration:",trip_duration, "planned trip duration:", duration, "(deltaT:",deltaT,"maxdeltaT:",maxdeltaT,")", \
+                    "=> too much difference! ignoring this journey planner trip (!)")
         else: 
         # now look at legs of this itin to maybe find a match *
             legsreviewed = True
-            print "Legs > > > > > > : "
+            print("Legs > > > > > > : ")
             planlegs = itin['legs']
             legindex = 0
             for leg in planlegs:
@@ -264,22 +264,22 @@ def match_tripleg_with_publictransport(fromPlace, toPlace, trip_starttime, trip_
                             ridematched_str = ":::::: this leg might be a match (time-based)!!"                                                                    
                                                    
                         if not deltaStartPassed:
-                            print "planned trip-leg starts too late => ignoring this leg !!!"                                                             
+                            print("planned trip-leg starts too late => ignoring this leg !!!")                                                             
                 #END if is_transit
 
                 #line name encoding, now considered utf-8 #TODO
                 line_name_str = "None"
                 if line: 
                     line_name_str = line.encode('utf-8')                
-                print mode, line_name_str, ", is transit:", istransit, "| Duration: ", \
-                        legdurationnormal, "(",legstarttime,"-->",legendtime,")", istransitstr, ridematched_str
+                print(mode, line_name_str, ", is transit:", istransit, "| Duration: ", \
+                        legdurationnormal, "(",legstarttime,"-->",legendtime,")", istransitstr, ridematched_str)
 
                 matched_fraction = 0      
                 longest_serialunmatch = 0              
                 if matchedbytime and deltaStartPassed: # if this leg is matched (time-based), then  # TODO refactor conditions
                     #now check location-based
-                    print ""
-                    print "trying to match location-based as well ..."
+                    print("")
+                    print("trying to match location-based as well ...")
                     # TODO NOTICE!
                     #   there are so many bus and trams in city that for every car-ride there can be a similar bus/tram ride
                     #   how to solve this without live data ??!!
@@ -310,7 +310,7 @@ def match_tripleg_with_publictransport(fromPlace, toPlace, trip_starttime, trip_
                                         
                     # extract the recorded points which most probably are only the transit part ("good points") (B' section in paper notes)
                     MIN_NUMBER_OF_GOODPOINTS = 4 # TODO ***
-                    print "Extracting the goodpoints from recorded points ..."
+                    print("Extracting the goodpoints from recorded points ...")
                     prewalktime = timedelta(seconds=0)
                     postwalktime = timedelta(seconds=0)                   
                     if legindex>0:
@@ -320,9 +320,9 @@ def match_tripleg_with_publictransport(fromPlace, toPlace, trip_starttime, trip_
                     if legindex<len(planlegs)-1:
                         if planlegs[legindex+1]['mode'] == 'WALK':
                             postwalktime = timedelta(seconds = planlegs[legindex+1]['duration'])                         
-                    print "prewalktime:", prewalktime, "prewalktime_to_ridetime:", prewalktime_to_ridetime, "postwalktime:", postwalktime
+                    print("prewalktime:", prewalktime, "prewalktime_to_ridetime:", prewalktime_to_ridetime, "postwalktime:", postwalktime)
                     
-                    print "recorded points (n=",len(recordedpoints),"):"
+                    print("recorded points (n=",len(recordedpoints),"):")
                     goodpoints = []  
                     hasgoodpoints = False
                     start_recordedpoint = recordedpoints[0]                                                              
@@ -352,13 +352,13 @@ def match_tripleg_with_publictransport(fromPlace, toPlace, trip_starttime, trip_
                                 goodpoints.append(point)                                                
                                 isgoodpoint = ""
                                 
-                        print point_location_str, point_time, isgoodpoint, moved, "(m) moved since last goodpoint"
+                        print(point_location_str, point_time, isgoodpoint, moved, "(m) moved since last goodpoint")
                     #END loop ..........
 
                     if len(goodpoints) >= MIN_NUMBER_OF_GOODPOINTS:
                         hasgoodpoints = True
                     else:
-                        print "not enough number of goodpoints extracted (no. of goodpoints=",len(goodpoints),"<",MIN_NUMBER_OF_GOODPOINTS,") !!!!!!"                        
+                        print("not enough number of goodpoints extracted (no. of goodpoints=",len(goodpoints),"<",MIN_NUMBER_OF_GOODPOINTS,") !!!!!!")                        
 
                                                 
                     # COND 2 -------------------:
@@ -369,7 +369,7 @@ def match_tripleg_with_publictransport(fromPlace, toPlace, trip_starttime, trip_
                             goodtrip_avgspeed = goodtripdistance/goodtripduration.total_seconds()
                         else:
                             goodtrip_avgspeed = 0
-                        print "@@ good part of recorded trip: d=", goodtripdistance, ", duration=",goodtripduration, ", goodtrip_avgspeed=", goodtrip_avgspeed
+                        print("@@ good part of recorded trip: d=", goodtripdistance, ", duration=",goodtripduration, ", goodtrip_avgspeed=", goodtrip_avgspeed)
                                                             
                         legdistance = leg['distance']
                         legduration = leg['duration']
@@ -380,7 +380,7 @@ def match_tripleg_with_publictransport(fromPlace, toPlace, trip_starttime, trip_
                         legheadway = None
                         if 'headway' in leg: 
                             legheadway = leg['headway']                    
-                        print "@@ planned leg: d=", legdistance, ", duration=",timedelta(seconds=legduration), ", avg-speed=", legavgspeed, "headway:", legheadway
+                        print("@@ planned leg: d=", legdistance, ", duration=",timedelta(seconds=legduration), ", avg-speed=", legavgspeed, "headway:", legheadway)
                         # TODO check distances , check average speeds, ... 
                     
                                        
@@ -398,7 +398,7 @@ def match_tripleg_with_publictransport(fromPlace, toPlace, trip_starttime, trip_
                     
                     if hasgoodpoints:                                  
                         serialunmatchcount = 0 # number of consecutive goodpoints with no match in planned points
-                        print "Matching goodpoints n=",len(goodpoints)," with plannedpoints m=",len(plannedpoints), "..."
+                        print("Matching goodpoints n=",len(goodpoints)," with plannedpoints m=",len(plannedpoints), "...")
                         # TODO make more efficient, make less than O(n^2)                  
                         # traverse goodpoints and try to match each with a planpoint:      
                         for point in goodpoints:
@@ -423,7 +423,7 @@ def match_tripleg_with_publictransport(fromPlace, toPlace, trip_starttime, trip_
                                         matchpair.point1 = point
                                         matchpair.point2 = planpoint                                
 
-                            print "min delta for this goodpoint:", min(deltas)
+                            print("min delta for this goodpoint:", min(deltas))
                             if matchfound:
                                 matchedpointpairs.append(matchpair)
                                 if serialunmatchcount > 0:
@@ -433,44 +433,44 @@ def match_tripleg_with_publictransport(fromPlace, toPlace, trip_starttime, trip_
                                 unmatchedpoints.append(point)
                                 serialunmatchcount += 1
                         #END for, traverse goodpoints -----------
-                        print "serialunmatches:", serialunmatches
+                        print("serialunmatches:", serialunmatches)
                                             
                         matched_fraction = round( 100 * ( len(matchedpointpairs)/float(len(goodpoints)) ) )
                         longest_serialunmatch = max(serialunmatches)                 
                         if matched_fraction >= MIN_MATCH_RATIO and longest_serialunmatch <= MAX_SERIAL_UNMATCH:
                             matchedbyroute = True   # this itin has a match also geoloc&route-based *
                             ridematched_str = ":::::: this leg might be a match (time-based & route-based) !!"                                        
-                        print "matched_fraction", matched_fraction, "%,  MIN_MATCH_RATIO:", MIN_MATCH_RATIO,"%"
-                        print "longest_serialunmatch:",longest_serialunmatch, "points,  MAX_SERIAL_UNMATCH:", MAX_SERIAL_UNMATCH
+                        print("matched_fraction", matched_fraction, "%,  MIN_MATCH_RATIO:", MIN_MATCH_RATIO,"%")
+                        print("longest_serialunmatch:",longest_serialunmatch, "points,  MAX_SERIAL_UNMATCH:", MAX_SERIAL_UNMATCH)
 
 
                     # TODO: just print for debug ---------------------------------------          
                     if LOG_DETAILS:          
-                        print "@@@ printing recorded points (n=",len(recordedpoints),"): "                         
+                        print("@@@ printing recorded points (n=",len(recordedpoints),"): ")                         
                         for point in recordedpoints:
                             point_location = json.loads(point["geojson"])["coordinates"]
                             point_location_str='{1},{0}'.format(point_location[0],point_location[1])                       
-                            print point_location_str
-                        print "@@@ printing goodpoints (n=",len(goodpoints),"): "                         
+                            print(point_location_str)
+                        print("@@@ printing goodpoints (n=",len(goodpoints),"): ")                         
                         for point in goodpoints:
                             point_location = json.loads(point["geojson"])["coordinates"]
                             point_location_str='{1},{0}'.format(point_location[0],point_location[1])
-                            print point_location_str
+                            print(point_location_str)
                         
-                        print "@@@ printing planned trip (n=",len(plannedpoints),"):"
+                        print("@@@ printing planned trip (n=",len(plannedpoints),"):")
                         for point in plannedpoints:
                             point_location = point
                             point_location_str='{0},{1}'.format(point_location[0],point_location[1])
-                            print point_location_str                                        
+                            print(point_location_str)                                        
                         intermstops = leg['intermediateStops']
-                        print "@@@ printing intermediate stops of planned trip (n=",len(intermstops),"):"
+                        print("@@@ printing intermediate stops of planned trip (n=",len(intermstops),"):")
                         for stop in intermstops: 
                             stopname = stop['name'].encode('utf-8')
-                            print "stop[{3}][{4}]: {0}, @{1} .. @{2}".format(stopname, \
+                            print("stop[{3}][{4}]: {0}, @{1} .. @{2}".format(stopname, \
                                     HSLTimeStampToNormalDateTime(stop['arrival']), HSLTimeStampToNormalDateTime(stop['departure']), \
-                                    stop['stopIndex'], stop['stopSequence'])
+                                    stop['stopIndex'], stop['stopSequence']))
 
-                        print "@@@ matched goodpoints (n=",len(matchedpointpairs),"):"
+                        print("@@@ matched goodpoints (n=",len(matchedpointpairs),"):")
                         for pointpair in matchedpointpairs:
                             point = pointpair.point1
                             point_location = json.loads(point["geojson"])["coordinates"]
@@ -479,12 +479,12 @@ def match_tripleg_with_publictransport(fromPlace, toPlace, trip_starttime, trip_
                             point_location = point
                             point_location_str2='{0},{1}'.format(point_location[0],point_location[1])
                             point_location_str='{0} --> {1}'.format(point_location_str1, point_location_str2)
-                            print point_location_str                                        
-                        print "@@@ unmatched goodpoints (n=",len(unmatchedpoints),"):"
+                            print(point_location_str)                                        
+                        print("@@@ unmatched goodpoints (n=",len(unmatchedpoints),"):")
                         for point in unmatchedpoints:
                             point_location = json.loads(point["geojson"])["coordinates"]
                             point_location_str='{1},{0}'.format(point_location[0],point_location[1])
-                            print point_location_str                                        
+                            print(point_location_str)                                        
                     
                     
                 if matchedbytime: #and matchedbyroute: # save this leg as a match * # TODO!!! check both!
@@ -532,7 +532,7 @@ def match_tripleg_with_publictransport(fromPlace, toPlace, trip_starttime, trip_
             donothing = None # TODO
         
         if not legsreviewed: # TODO ***
-            print "Legs > > > > > > : "
+            print("Legs > > > > > > : ")
             for leg in itin['legs']:
                 mode = leg['mode']
                 line = leg['route']
@@ -546,29 +546,29 @@ def match_tripleg_with_publictransport(fromPlace, toPlace, trip_starttime, trip_
                 line_name_str = "None"
                 if line: 
                     line_name_str = line.encode('utf-8')                
-                print mode, line_name_str, ", is transit:", istransit, "| Duration: ", \
-                        legdurationnormal, "(",legstarttime,"-->",legendtime,")"
+                print(mode, line_name_str, ", is transit:", istransit, "| Duration: ", \
+                        legdurationnormal, "(",legstarttime,"-->",legendtime,")")
         
         itin_index += 1
     # LOOP END --- traverse next planned itin
     
-    print ""
-    print "from all planned itins ==>"
-    print "matchcount:", matchcount    
+    print("")
+    print("from all planned itins ==>")
+    print("matchcount:", matchcount)    
     bestmatchindex = 0
     # refining the matched legs from all planned itins, choosing the best match: 
     # assumption: HSL journey planner returns the best match first!
     if len(plannedmatches)>0:
-        print "Refining the matched planned trips ..."
+        print("Refining the matched planned trips ...")
         min_deltaStarttime = plannedmatches[0].deltaStarttime
         matchindex = 0
         for match in plannedmatches:
-            print "[",matchindex,"]: match.deltaStarttime:", match.deltaStarttime    
+            print("[",matchindex,"]: match.deltaStarttime:", match.deltaStarttime)    
             if match.deltaStarttime < min_deltaStarttime:
                 min_deltaStarttime = plannedmatches[matchindex].deltaStarttime
                 bestmatchindex = matchindex
             matchindex += 1    
-        print "bestmatchindex:", bestmatchindex
+        print("bestmatchindex:", bestmatchindex)
 
     if len(plannedmatches)>0:
         tripmatchres.trip = plannedmatches[bestmatchindex]        

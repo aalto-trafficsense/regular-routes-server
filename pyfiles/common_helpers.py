@@ -2,7 +2,7 @@ import json
 
 from datetime import timedelta
 from heapq import heapify, heappop, heappush
-from itertools import izip, tee
+from itertools import tee
 from math import cos, pi
 from pyfiles.constants import *
 
@@ -91,7 +91,7 @@ def simplify_geometry(
         Point(p).distance(LineString(l).interpolate(par, True))
         """
 
-        dim = range(len(p))
+        dim = list(range(len(p)))
         p_l0 = [p[i] - l[0][i] for i in dim]
         l1_l0 = [l[1][i] - l[0][i] for i in dim]
         dot = sum(a * b for a, b in zip(p_l0, l1_l0))
@@ -536,7 +536,7 @@ def pairwise(iterable):
     "s -> (s0,s1), (s1,s2), (s2, s3), ..."
     a, b = tee(iterable)
     next(b, None)
-    return izip(a, b)
+    return zip(a, b)
 
 
 def timedelta_str(td):

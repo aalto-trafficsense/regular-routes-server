@@ -1,6 +1,6 @@
 from numpy import *
 
-from FF import FF
+from .FF import FF
 
 def cdistance2metres(p1,p2):
     from geopy.distance import vincenty
@@ -14,7 +14,7 @@ def do_cluster(X, N_clusters=10):
         ----------------------------------------
     """
     from sklearn.cluster import KMeans
-    print "Clustering", len(X),"points into", N_clusters, "personal nodes"
+    print("Clustering", len(X),"points into", N_clusters, "personal nodes")
     h = KMeans(N_clusters, max_iter=100, n_init=1)
     h.fit(X[:,0:2])
     labels = h.labels_
@@ -43,8 +43,8 @@ def do_snapping(X, nodes):
         -----------------------------------------------------------------
         NOTE: it would also be a possibility to create and use an extra column in X (instead of Y).
     """
-    print "Snapping trace to these ", len(nodes)," waypoints"
-    print X.shape,nodes.shape
+    print("Snapping trace to these ", len(nodes)," waypoints")
+    print(X.shape,nodes.shape)
     Y = snap(X[:,0:2],nodes).astype(int)
 
     return Y
@@ -57,7 +57,7 @@ def do_movement_filtering(X,min_metres,b=10):
         (Also for a demo we don't want to watch an animation where nothing is animated).
     """
 
-    print "Filter out stationary segments ...", 
+    print("Filter out stationary segments ...", end=' ') 
 
     T,D = X.shape
 
@@ -84,7 +84,7 @@ def do_movement_filtering(X,min_metres,b=10):
 
     X = X_[0:i,:]
     T,D = X.shape
-    print "... We filtered down from", T, "examples to", i, "consisting of around ", (T*100./(len(breaks)+T)), "% travelling."
+    print("... We filtered down from", T, "examples to", i, "consisting of around ", (T*100./(len(breaks)+T)), "% travelling.")
     return X
 
 

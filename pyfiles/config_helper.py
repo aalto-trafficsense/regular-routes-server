@@ -15,10 +15,10 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 env_var_value = os.getenv(SETTINGS_FILE_ENV_VAR, None)
 if env_var_value is not None:
-    print 'loading settings from: "' + str(env_var_value) + '"'
+    print('loading settings from: "' + str(env_var_value) + '"')
     app.config.from_envvar(SETTINGS_FILE_ENV_VAR)
 else:
-    print 'Environment variable "SETTINGS_FILE_ENV_VAR" was not defined -> using debug mode'
+    print('Environment variable "SETTINGS_FILE_ENV_VAR" was not defined -> using debug mode')
     # assume debug environment
     app.config.from_pyfile('../regularroutes.cfg')
     app.debug = True

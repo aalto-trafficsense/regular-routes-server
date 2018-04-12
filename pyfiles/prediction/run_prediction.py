@@ -32,7 +32,7 @@ def predict(DEV_ID,use_test_server=False):
     #
     ##################################################################################
 
-    print "Load model(s) from disk ..."
+    print("Load model(s) from disk ...")
     import joblib
     model_minutes = [5,15,30]
     h = {}
@@ -45,34 +45,34 @@ def predict(DEV_ID,use_test_server=False):
     #
     ##################################################################################
 
-    from db_utils import get_conn, get_cursor
+    from .db_utils import get_conn, get_cursor
 
     conn = get_conn(use_test_server) 
     c = conn.cursor()
 
-    print "Updating averaged location table"
+    print("Updating averaged location table")
     sql = open('./sql/update_averaged_location.sql', 'r').read()
     c.execute(sql)
     conn.commit()
 
-    print "Extracting trace:"
+    print("Extracting trace:")
     c.execute('SELECT hour,minute,day_of_week,longitude,latitude FROM averaged_location WHERE device_id = %s ORDER BY time_stamp DESC limit 10', (str(DEV_ID),))
     dat = array(c.fetchall(),dtype={'names':['H', 'M', 'DoW', 'lon', 'lat'], 'formats':['f4', 'f4', 'i4', 'f4','f4']})
     X = flipud(column_stack([dat['lon'],dat['lat'],dat['H']+(dat['M']/60.),dat['DoW']])) # <--- the flipup function is important to restor time ordering
 
-    print X
+    print(X)
 
     ##################################################################################
     #
     # 3. Filtering
     #
     ##################################################################################
-    print "Filtering ..."
+    print("Filtering ...")
 
-    from pred_utils import do_feature_filtering
+    from .pred_utils import do_feature_filtering
 
     Z = do_feature_filtering(X)
-    print "... filtered to ", len(Z), "points"
+    print("... filtered to ", len(Z), "points")
 
     ##################################################################################
     #
@@ -80,7 +80,7 @@ def predict(DEV_ID,use_test_server=False):
     #
     ##################################################################################
 
-    print "Prediction(s) (node): " ,
+    print("Prediction(s) (node): ", end=' ')
 
     yp = {} # store predictions
     py = {} # store confidences on the predictions
@@ -89,7 +89,7 @@ def predict(DEV_ID,use_test_server=False):
     for i in model_minutes:
         yp[i] = h[i].predict(z).astype(int)[0]
         py[i] = max(h[i].predict_proba(z)[0])
-    print yp, py
+    print(yp, py)
 
     ##################################################################################
     #
@@ -100,7 +100,7 @@ def predict(DEV_ID,use_test_server=False):
     c.execute('SELECT max(time_stamp) as current FROM averaged_location WHERE device_id = %s', (str(DEV_ID),))
     current = c.fetchall()[0][0]
 
-    print "Getting coordinates for prediction (from cluster_centers table), turning into geojson ... ", 
+    print("Getting coordinates for prediction (from cluster_centers table), turning into geojson ... ", end=' ') 
     import json
 
     features = []
@@ -148,7 +148,7 @@ def predict(DEV_ID,use_test_server=False):
     #
     ##################################################################################
 
-    print "Commit prediction"
+    print("Commit prediction")
     sql = "INSERT INTO predictions (device_id, cluster_id, time_stamp, time_index) VALUES (%s, %s, NOW(), %s)"
     for i in model_minutes:
         c.execute(sql, (DEV_ID, yp[i], i,))
@@ -188,12 +188,12 @@ if __name__ == '__main__':
         use_test_server = (sys.argv[2] == 'test')
     if len(sys.argv) > 1:
         DEV_ID = int(sys.argv[1])
-        print str(predict(DEV_ID,use_test_server))
+        print(str(predict(DEV_ID,use_test_server)))
     else: 
-        print """Use: python run_prediction.py <DEV_ID> [test]
+        print("""Use: python run_prediction.py <DEV_ID> [test]
     where 'test' indicates to use the test server, and DEV_ID is the device ID,
        e.g., python run_prediction.py 45 test
-       e.g., python run_prediction.py 45"""
+       e.g., python run_prediction.py 45""")
 
 
 

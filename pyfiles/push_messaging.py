@@ -94,7 +94,7 @@ def push_ptp_alert(alert_type, device_alert):
                                'time_to_live': ttl})
         firebase_request(fire_msg)
     except Exception as e:
-        print "push_ptp_pubtrans / exception: ", e
+        print("push_ptp_pubtrans / exception: ", e)
 
 
 def get_lat_lng(crd):
@@ -108,7 +108,7 @@ def get_lat_lng(crd):
         else:
             return False, "", ""
     except Exception as e:
-        print "get_lat_lng exception: ", e
+        print("get_lat_lng exception: ", e)
         return False, "", ""
 
 
@@ -118,12 +118,12 @@ def firebase_request(fire_msg):
         json_response = response.json()
         response.close()
         if json_response["success"]<1:
-            print "firebase_request appears not to have succeeded: ", fire_msg
-            print "response: ", json_response
+            print("firebase_request appears not to have succeeded: ", fire_msg)
+            print("response: ", json_response)
     except requests.exceptions.ConnectionError as e:
-        print "firebase_request / requests.exceptions.ConnectionError: ", e
+        print("firebase_request / requests.exceptions.ConnectionError: ", e)
     except Exception as e:
-        print "firebase_request / exception: ", e
+        print("firebase_request / exception: ", e)
 
 
 # Test data - comment out for releases

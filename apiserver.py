@@ -55,10 +55,10 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 env_var_value = os.getenv(SETTINGS_FILE_ENV_VAR, None)
 if env_var_value is not None:
-    print 'loading settings from: "' + str(env_var_value) + '"'
+    print('loading settings from: "' + str(env_var_value) + '"')
     app.config.from_envvar(SETTINGS_FILE_ENV_VAR)
 else:
-    print 'Environment variable "SETTINGS_FILE_ENV_VAR" was not defined -> using debug mode'
+    print('Environment variable "SETTINGS_FILE_ENV_VAR" was not defined -> using debug mode')
     # assume debug environment
     app.config.from_pyfile('regularroutes.cfg')
     app.debug = True
@@ -108,7 +108,7 @@ def register_post():
     if users_table_id is None:
         users_table_id = users_table_insert(str(user_id), str(validation_data['refresh_token']), str(validation_data['access_token']))
     else:
-        print 're-registration for same user detected -> using existing user account'
+        print('re-registration for same user detected -> using existing user account')
         users_table_update(str(users_table_id), str(validation_data['refresh_token']), str(validation_data['access_token']))
 
     # 5. Create/update device to db
@@ -122,7 +122,7 @@ def register_post():
             session_token,
             client_version)
     else:
-        print 'device re-registration detected -> using same device'
+        print('device re-registration detected -> using same device')
         update_last_activity(devices_table_id, client_version)
         session_token = get_session_token_for_device(devices_table_id)
 
@@ -154,7 +154,7 @@ def authenticate_post():
         users_table_id, device_id, installation_id)
     session_token = get_session_token_for_device(devices_table_id)
     if session_token is None:
-        print 'User is not registered. userId=' + user_id
+        print('User is not registered. userId=' + user_id)
         abort(403)
 
     # 2. Update messaging token, if included
@@ -207,7 +207,7 @@ def data_post():
     batch_size = 1024
 
     def batch_chunks(x):
-        for i in xrange(0, len(x), batch_size):
+        for i in range(0, len(x), batch_size):
             yield x[i:i + batch_size]
 
     def prepare_point(point):
@@ -217,7 +217,7 @@ def data_post():
             'device_id': device_id,
             'coordinate': 'POINT(%f %f)' % (float(location['longitude']), float(location['latitude'])),
             'accuracy': float(location['accuracy']),
-            'time': datetime.datetime.fromtimestamp(long(point['time']) / 1000.0)
+            'time': datetime.datetime.fromtimestamp(int(point['time']) / 1000.0)
         }
         result.update(prepare_point_activities(point))
         return result
@@ -267,8 +267,8 @@ def data_post():
 
 @app.route('/testdata', methods=['POST'])
 def location_test():
-    print "testdata args: " + str(request.args)
-    print "data: " + str(request.json)
+    print("testdata args: " + str(request.args))
+    print("data: " + str(request.json))
     return jsonify({})
 
 
@@ -289,7 +289,7 @@ def location_post():
     batch_size = 1024
 
     def batch_chunks(x):
-        for i in xrange(0, len(x), batch_size):
+        for i in range(0, len(x), batch_size):
             yield x[i:i + batch_size]
 
     def prepare_point(point):
@@ -297,7 +297,7 @@ def location_post():
             'device_id': device_id,
             'coordinate': 'POINT(%f %f)' % (float(point['longitude']), float(point['latitude'])),
             'accuracy': float(point['accuracy']),
-            'time': datetime.datetime.fromtimestamp(long(point['time']) / 1000.0)
+            'time': datetime.datetime.fromtimestamp(int(point['time']) / 1000.0)
         }
         return result
 
@@ -324,7 +324,7 @@ def location_post():
 
                 sorted_activities = sorted(parse_activities(), key=lambda x: x['confidence'], reverse=True)
                 result['device_id'] = device_id
-                result['time'] = datetime.datetime.fromtimestamp(long(activitydata['time']) / 1000.0)
+                result['time'] = datetime.datetime.fromtimestamp(int(activitydata['time']) / 1000.0)
 
                 if len(sorted_activities) > 0:
                     result['activity_1'] = sorted_activities[0]['type']
@@ -384,7 +384,7 @@ def datav2_post():
     actFollow.index = 0
 
     def batch_chunks(x):
-        for i in xrange(0, len(x), batch_size):
+        for i in range(0, len(x), batch_size):
             yield x[i:i + batch_size]
 
     def prepare_point_timesync(point):
@@ -395,7 +395,7 @@ def datav2_post():
                 'device_id': device_id,
                 'coordinate': 'POINT(%f %f)' % (float(point['longitude']), float(point['latitude'])),
                 'accuracy': float(point['accuracy']),
-                'time': datetime.datetime.fromtimestamp(long(loc_time) / 1000.0)
+                'time': datetime.datetime.fromtimestamp(int(loc_time) / 1000.0)
             }
             if activityEntries:
                 continue_loop = True
@@ -415,7 +415,7 @@ def datav2_post():
                         continue_loop = False
                         actFollow.index -= 1  # step back one
                         if minInterval.x > MAX_LOCATION_ACTIVITY_INTERVAL_MS:  # Reject locations with no activity info
-                            print "/datav2 skipping location without activity, minInterval: " + str(minInterval.x) + " loc_time: " + str(loc_time) + " ending act_time: " + str(act_time)
+                            print("/datav2 skipping location without activity, minInterval: " + str(minInterval.x) + " loc_time: " + str(loc_time) + " ending act_time: " + str(act_time))
                             result = None
                         else:
                             actEntry = activityEntries[actFollow.index]
@@ -467,7 +467,7 @@ def datav2_post():
             'device_id': device_id,
             'coordinate': 'POINT(%f %f)' % (float(point['longitude']), float(point['latitude'])),
             'accuracy': float(point['accuracy']),
-            'time': datetime.datetime.fromtimestamp(long(point['time']) / 1000.0)
+            'time': datetime.datetime.fromtimestamp(int(point['time']) / 1000.0)
         }
         return result
 
@@ -491,7 +491,7 @@ def datav2_post():
 
                 sorted_activities = sorted(parse_activities(), key=lambda x: x['confidence'], reverse=True)
                 result['device_id'] = device_id
-                result['time'] = datetime.datetime.fromtimestamp(long(activitydata['time']) / 1000.0)
+                result['time'] = datetime.datetime.fromtimestamp(int(activitydata['time']) / 1000.0)
 
                 if len(sorted_activities) > 0:
                     result['activity_1'] = sorted_activities[0]['type']
@@ -621,7 +621,7 @@ def device(session_token):
         device_id = get_device_table_id_for_session(session_token)
 
     except Exception as e:
-        print 'Device-query - exception: ' + e.message
+        print('Device-query - exception: ' + e.message)
         device_id = -1
 
     if device_id >= 0:

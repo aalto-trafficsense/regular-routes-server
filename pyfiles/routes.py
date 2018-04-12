@@ -59,7 +59,7 @@ def get_routes(db, threshold, user, start=None, end=None):
         sel = sel.where(legs.c.time_start < end)
 
     trippoints = group_unsorted(db.engine.execute(sel), lambda x: x.trip)
-    for tid, titem in tripitems.items():
+    for tid, titem in list(tripitems.items()):
         # No time limit on tripitems query so drop those without points now
         points = trippoints.get(tid, [])
         if not points:
@@ -69,7 +69,7 @@ def get_routes(db, threshold, user, start=None, end=None):
 
     # Group by origin/destination
     odgroups = group_unsorted(
-       tripitems.itervalues(), lambda x: (x["origin"], x["destination"]))
+       iter(tripitems.values()), lambda x: (x["origin"], x["destination"]))
 
     # Cluster within OD groups by waypoint/mode similarity
     def route_merge(*routes):
@@ -78,21 +78,21 @@ def get_routes(db, threshold, user, start=None, end=None):
         for route in routes:
             trips = len(route["trips"])
             total += trips
-            for point, prob in route["probs"].iteritems():
+            for point, prob in route["probs"].items():
                 weights[point] += trips * prob
         return {
-            "probs": {p: 1.0*c/total for p, c in weights.iteritems()},
+            "probs": {p: 1.0*c/total for p, c in weights.items()},
             "trips": sum((x["trips"] for x in routes), [])}
 
     def proto_distance(p0, p1):
         p0, p1 = p0["probs"], p1["probs"]
-        keys = set(p0.keys() + p1.keys())
+        keys = set(list(p0.keys()) + list(p1.keys()))
         union = sum(max(p0.get(x, 0), p1.get(x, 0)) for x in keys)
         intersection = sum(min(p0.get(x, 0), p1.get(x, 0)) for x in keys)
         return 1.0 - 1.0 * intersection / union if union else 1
 
     counter = Counter()
-    for od, group in odgroups.iteritems():
+    for od, group in odgroups.items():
         clusters = [
             {   "probs": Counter({p: 1 for p in x.get("points", [])}),
                 "trips": [x]}

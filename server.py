@@ -52,10 +52,10 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 env_var_value = os.getenv(SETTINGS_FILE_ENV_VAR, None)
 if env_var_value is not None:
-    print 'loading settings from: "' + str(env_var_value) + '"'
+    print('loading settings from: "' + str(env_var_value) + '"')
     app.config.from_envvar(SETTINGS_FILE_ENV_VAR)
 else:
-    print 'Environment variable "SETTINGS_FILE_ENV_VAR" was not defined -> using debug mode'
+    print('Environment variable "SETTINGS_FILE_ENV_VAR" was not defined -> using debug mode')
     # assume debug environment
     app.config.from_pyfile('regularroutes.cfg')
     app.debug = True
@@ -232,7 +232,7 @@ def register_post():
     device_id = data['deviceId']
     installation_id = data['installationId']
     device_model = data['deviceModel']
-    print 'deviceModel=' + str(device_model)
+    print('deviceModel=' + str(device_model))
 
     # 1. authenticate with Google
     validation_data = authenticate_with_google_oauth(google_one_time_token)
@@ -257,10 +257,10 @@ def register_post():
         if ext_user_id_for_device >= 0:
             if ext_user_id_for_device != ext_users_table_id:
                 # same device+installation is registered to other user
-                print 'Re-registration attempt for different user'
+                print('Re-registration attempt for different user')
                 abort(403)
 
-            print 'device re-registration detected -> using same device'
+            print('device re-registration detected -> using same device')
             devices_table_id = get_device_table_id(device_id, installation_id)
 
     # 4. create/update user to db
@@ -271,7 +271,7 @@ def register_post():
         db.engine.execute(stmt)
         users_table_id = get_users_table_id(str(user_id))
     else:
-        print 're-registration for same user detected -> using existing user account'
+        print('re-registration for same user detected -> using existing user account')
         stmt = users_table.update().values({'google_refresh_token': str(validation_data['refresh_token']),
                                             'google_server_access_token': str(
                                                 validation_data['access_token'])}).where(text(
@@ -312,7 +312,7 @@ def authenticate_post():
     devices_table_id = get_device_table_id(device_id, installation_id)
     session_token = get_session_token_for_device(devices_table_id)
     if session_token is None:
-        print 'User is not registered. userId=' + user_id
+        print('User is not registered. userId=' + user_id)
         abort(403)
 
     update_last_activity(devices_table_id)
@@ -338,7 +338,7 @@ def data_post():
     batch_size = 1024
 
     def batch_chunks(x):
-        for i in xrange(0, len(x), batch_size):
+        for i in range(0, len(x), batch_size):
             yield x[i:i + batch_size]
 
     def prepare_point(point):
@@ -348,7 +348,7 @@ def data_post():
             'device_id': device_id,
             'coordinate': 'POINT(%f %f)' % (float(location['longitude']), float(location['latitude'])),
             'accuracy': float(location['accuracy']),
-            'time': datetime.datetime.fromtimestamp(long(point['time']) / 1000.0)
+            'time': datetime.datetime.fromtimestamp(int(point['time']) / 1000.0)
         }
         result.update(prepare_point_activities(point))
         return result
@@ -423,7 +423,7 @@ def device(session_token):
         device_id = get_device_table_id_for_session(session_token)
 
     except Exception as e:
-        print 'Device-query - exception: ' + e.message
+        print('Device-query - exception: ' + e.message)
         device_id = -1
 
     if device_id >= 0:
@@ -573,7 +573,7 @@ def index():
   # Create a state token to prevent request forgery.
   # Store it in the session for later validation.
   state = ''.join(random.choice(string.ascii_uppercase + string.digits)
-                  for x in xrange(32))
+                  for x in range(32))
   session['state'] = state
   # Set the Client ID, Token State, and Application Name in the HTML while
   # serving it.
@@ -601,7 +601,7 @@ def connect():
   if request.args.get('state', '') != session.get('state'):
     response = make_response(json.dumps('Invalid state parameter.'), 401)
     response.headers['Content-Type'] = 'application/json'
-    print '401 due to invalid state parameter.'
+    print('401 due to invalid state parameter.')
     return response
   # Delete the one-time token - page refresh required to re-connect
   del session['state']
@@ -616,7 +616,7 @@ def connect():
     credentials = oauth_flow.step2_exchange(code)
   except FlowExchangeError as err:
     # invalid token
-    print 'Invalid token: ' + code + ". error: " + err.message
+    print('Invalid token: ' + code + ". error: " + err.message)
     response = make_response(
         json.dumps('Failed to upgrade the authorization code.'), 401)
     response.headers['Content-Type'] = 'application/json'
@@ -647,7 +647,7 @@ def connect():
   user_id = get_users_table_id(user_hash_id)
   if user_id < 0:
       # No data for the user -> show the nodata -page
-      print 'No data found for the current user.'
+      print('No data found for the current user.')
       response = make_response(json.dumps('Nodata.'), 200)
       response.headers['Content-Type'] = 'application/json'
       return response
@@ -943,7 +943,7 @@ def data_points_filtered(user_id, datetime_start, datetime_end):
 
 def verify_user_id(user_id):
     if user_id is None or user_id == '':
-        print 'empty user_id'
+        print('empty user_id')
         abort(403)
     try:
         # TODO: Fix SQL injection
@@ -951,11 +951,11 @@ def verify_user_id(user_id):
         row = db.engine.execute(query).first()
 
         if not row:
-            print 'auth: no return value'
+            print('auth: no return value')
             abort(403)
         return row[0]
     except DataError as e:
-        print 'Exception: ' + e.message
+        print('Exception: ' + e.message)
         abort(403)
 
 
@@ -969,7 +969,7 @@ def verify_device_token(token):
             abort(403)
         return row[0]
     except DataError as e:
-        print 'Exception: ' + e.message
+        print('Exception: ' + e.message)
         abort(403)
 
 
@@ -989,7 +989,7 @@ def get_users_table_id_for_device(device_id, installation_id):
             return -1
         return int(row[0])
     except DataError as e:
-        print 'Exception: ' + e.message
+        print('Exception: ' + e.message)
 
     return -1
 
@@ -1004,7 +1004,7 @@ def get_device_table_id(device_id, installation_id):
             return -1
         return int(row[0])
     except DataError as e:
-        print 'Exception: ' + e.message
+        print('Exception: ' + e.message)
 
     return -1
 
@@ -1035,7 +1035,7 @@ def get_users_table_id(user_id):
             return -1
         return int(row[0])
     except DataError as e:
-        print 'Exception: ' + e.message
+        print('Exception: ' + e.message)
 
     return -1
 
@@ -1051,7 +1051,7 @@ def get_session_token_for_device(devices_table_id):
             return None
         return row[0]
     except DataError as e:
-        print 'Exception: ' + e.message
+        print('Exception: ' + e.message)
 
     return None
 
@@ -1075,7 +1075,7 @@ def authenticate_with_google_oauth(one_time_token):
             json.dumps('Failed to upgrade the authorization code.'), 401)
         response.headers['Content-Type'] = 'application/json'
         # invalid token
-        print 'invalid token: ' + one_time_token + ". error: " + err.message
+        print('invalid token: ' + one_time_token + ". error: " + err.message)
         return response
 
     return verify_and_get_account_id(credentials)
@@ -1093,10 +1093,10 @@ def verify_and_read_id_token(id_token, client_id):
             data['google_id'] = jwt['sub']
 
         except AppIdentityError as error:
-            print 'verify: AppIdentityError: ' + error.message
+            print('verify: AppIdentityError: ' + error.message)
             data['valid_id_token'] = False
     else:
-        print 'verify: credentials.id_token is None'
+        print('verify: credentials.id_token is None')
 
     return data
 
@@ -1105,7 +1105,7 @@ def verify_id_token_values(id_token):
     true_client_id = CLIENT_ID # json.loads(open(CLIENT_SECRET_FILE, 'r').read())['web']['client_id']
     server_client_id = str(id_token['aud'])
     if server_client_id != true_client_id:
-        print 'invalid server client id returned'
+        print('invalid server client id returned')
         abort(403)
 
 

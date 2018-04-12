@@ -4,7 +4,7 @@ from collections import namedtuple
 from csv import DictWriter
 from datetime import datetime, timedelta
 from itertools import groupby
-from StringIO import StringIO
+from io import StringIO
 
 from flask import abort, jsonify, make_response
 
@@ -84,12 +84,12 @@ def common_trips_csv(request, db, user):
     # so not buffering the whole thing isn't convenient
     buf = StringIO()
     _, rows = common_trips_rows(request, db, user)
-    print rows.keys()
-    csv = DictWriter(buf, rows.keys())
+    print(list(rows.keys()))
+    csv = DictWriter(buf, list(rows.keys()))
     csv.writeheader()
     for r in rows:
-        r = {k: v.encode("utf8") if isinstance(v, unicode) else v
-             for k, v in r.items()}
+        r = {k: v.encode("utf8") if isinstance(v, str) else v
+             for k, v in list(r.items())}
         csv.writerow(r)
 
     response = make_response(buf.getvalue())
@@ -113,9 +113,9 @@ def common_routes_json(request, db, user):
     clustered = list(get_routes(db, 1.0/3, user, date_start, date_end))
     for od, routes in clustered:
         for route in routes:
-            print "probs", route["probs"]
+            print("probs", route["probs"])
             for trip in route["trips"]:
-                print "trip", trip["id"]
+                print("trip", trip["id"])
 
     tids = [
         trip["id"]
@@ -138,12 +138,12 @@ def common_routes_json(request, db, user):
             # Sort oldest trip first
             route["trips"].sort(key=lambda x: bytrip[x["id"]][0].time_start)
             # Make probs jsonifiable, tuple keys aren't so
-            route["probs"] = route["probs"].items()
+            route["probs"] = list(route["probs"].items())
 
     bytrip = {
         x: {"date": y[0].time_start.strftime("%Y-%m-%d"),
             "render": render_trips_day(y)}
-        for x, y in bytrip.iteritems()}
+        for x, y in bytrip.items()}
 
     return json.dumps({
         "clustered": clustered,
@@ -235,9 +235,9 @@ def render_trips_day(legrows):
     if pplace1:
         step(place=pplace1)
 
-    pivot = zip(*steps)
+    pivot = list(zip(*steps))
     rle = [[(y, len(list(z))) for y, z in groupby(x)] for x in pivot]
-    named = zip(State._fields, rle)
+    named = list(zip(State._fields, rle))
 
     return named
 

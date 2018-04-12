@@ -961,7 +961,7 @@ def get_waypoint_id_from_coordinate(coordinate):
             return None
         return int(row[0])
     except DataError as e:
-        print 'Exception in get_waypoint_id_from_coordinate: ' + e.message
+        print('Exception in get_waypoint_id_from_coordinate: ' + e.message)
     return None
 
 
@@ -1146,7 +1146,7 @@ def hsl_alerts_get_max():
             max_alert_end = row[0]
         return max_alert_id, max_alert_end
     except DataError as e:
-        print 'Exception in hsl_alerts_get_max: ' + e.message
+        print('Exception in hsl_alerts_get_max: ' + e.message)
     return -1, -1
 
 
@@ -1174,7 +1174,7 @@ def match_legs_traffic_disorder(selection, disorder):
             start=disorder["start_time"],
             coordinate=disorder["coordinate"]).fetchall()
     except Exception as e:
-        print "match_legs_traffic_disorder exception: ", e
+        print("match_legs_traffic_disorder exception: ", e)
         return None
 
 
@@ -1234,7 +1234,7 @@ def match_traffic_disorder(disorder):
                             db.engine.execute(stmt)
                             yield device_alert
     except Exception as e:
-        print "match_traffic_disorder exception: ", e
+        print("match_traffic_disorder exception: ", e)
         raise
 
 
@@ -1259,7 +1259,7 @@ def match_legs_pubtrans_alert(selection, alert):
             line_type=alert["line_type"],
             line_name=alert["line_name"]).fetchall()
     except Exception as e:
-        print "match_legs_pubtrans_alert exception: ", e
+        print("match_legs_pubtrans_alert exception: ", e)
         return None
 
 
@@ -1315,7 +1315,7 @@ def match_pubtrans_alert(alert):
                             db.engine.execute(stmt)
                             yield device_alert
     except Exception as e:
-        print "match_pubtrans_alert exception: ", e
+        print("match_pubtrans_alert exception: ", e)
 
 
 # A test procedure to push all incoming alerts to a hardcoded client
@@ -1339,7 +1339,7 @@ def match_pubtrans_alert_test(alert):
                             'info': alert["line_type"] + ": " + alert["line_name"]}
             yield device_alert
     except Exception as e:
-        print "match_pubtrans_alert_test exception: ", e
+        print("match_pubtrans_alert_test exception: ", e)
 
 
 def todays_alert_text_matches(devices_table_id, fi_text):
@@ -1357,7 +1357,7 @@ def todays_alert_text_matches(devices_table_id, fi_text):
             time > date_trunc('day', now()) AND
             fi_text = :fi_text ;"""), devices_table_id=devices_table_id, fi_text=fi_text).fetchall()
     except DataError as e:
-        print 'Exception in todays_alert_text_matches: ' + e.message
+        print('Exception in todays_alert_text_matches: ' + e.message)
     return -1
 
 
@@ -1384,7 +1384,7 @@ def traffic_disorder_max_creation():
             max_time = row[0]
         return max_time
     except DataError as e:
-        print 'Exception in traffic_disorder_max_creation: ' + e.message
+        print('Exception in traffic_disorder_max_creation: ' + e.message)
     return -1
 
 
@@ -1395,7 +1395,7 @@ def traffic_disorder_insert(disorders):
 
 def verify_user_id(user_id):
     if user_id is None or user_id == '':
-        print 'empty user_id'
+        print('empty user_id')
         abort(403)
     try:
         query = select([users_table.c.id]) \
@@ -1403,11 +1403,11 @@ def verify_user_id(user_id):
         row = db.engine.execute(query).first()
 
         if not row:
-            print 'auth: no return value'
+            print('auth: no return value')
             abort(403)
         return row[0]
     except DataError as e:
-        print 'Exception: ' + e.message
+        print('Exception: ' + e.message)
         abort(403)
 
 
@@ -1421,7 +1421,7 @@ def verify_device_token(token):
             abort(403)
         return row[0]
     except DataError as e:
-        print 'Exception: ' + e.message
+        print('Exception: ' + e.message)
         abort(403)
 
 
@@ -1475,7 +1475,7 @@ def get_user_id_from_device_id(device_id):
             return None
         return int(row[0])
     except DataError as e:
-        print 'Exception in get_user_id_from_device_id: ' + e.message
+        print('Exception in get_user_id_from_device_id: ' + e.message)
     return -1
 
 
@@ -1492,7 +1492,7 @@ def get_max_devices_table_id_from_users_table_id(users_table_id):
             return None
         return int(row[0])
     except DataError as e:
-        print 'Exception in get_max_devices_table_id_from_users_table_id: ' + e.message
+        print('Exception in get_max_devices_table_id_from_users_table_id: ' + e.message)
     return -1
 
 
@@ -1527,7 +1527,7 @@ def get_active_device_info_from_users_table_id(users_table_id, coordinate):
             return None
         return row
     except DataError as e:
-        print 'Exception in get_active_devices_table_id_from_users_table_id: ' + e.message
+        print('Exception in get_active_devices_table_id_from_users_table_id: ' + e.message)
     return None
 
 
@@ -1544,7 +1544,7 @@ def get_users_table_id(user_id):
             return -1
         return int(row[0])
     except DataError as e:
-        print 'Exception: ' + e.message
+        print('Exception: ' + e.message)
 
     return -1
 
@@ -1561,7 +1561,7 @@ def get_session_token_for_device(devices_table_id):
             return None
         return row[0]
     except DataError as e:
-        print 'Exception: ' + e.message
+        print('Exception: ' + e.message)
 
     return None
 

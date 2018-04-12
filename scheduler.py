@@ -7,7 +7,7 @@ import os
 import re
 import sys
 import time
-import urllib2
+import urllib.request, urllib.error, urllib.parse
 
 from pyfiles.database_interface import (
     init_db, data_points_by_user_id_after, device_data_delete_duplicates,
@@ -52,10 +52,10 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 env_var_value = os.getenv(SETTINGS_FILE_ENV_VAR, None)
 if env_var_value is not None:
-    print 'loading settings from: "' + str(env_var_value) + '"'
+    print('loading settings from: "' + str(env_var_value) + '"')
     app.config.from_envvar(SETTINGS_FILE_ENV_VAR)
 else:
-    print 'Environment variable "SETTINGS_FILE_ENV_VAR" was not defined -> using debug mode'
+    print('Environment variable "SETTINGS_FILE_ENV_VAR" was not defined -> using debug mode')
     # assume debug environment
     app.config.from_pyfile('regularroutes.cfg')
     app.debug = True
@@ -72,7 +72,7 @@ global_statistics_table = db.metadata.tables['global_statistics']
 
 
 def initialize():
-    print "initialising scheduler"
+    print("initialising scheduler")
     scheduler = BackgroundScheduler()
     scheduler.start()
     scheduler.add_job(retrieve_hsl_data, "cron", second="*/30")
@@ -81,7 +81,7 @@ def initialize():
     scheduler.add_job(run_daily_tasks, "cron", hour="3")
     scheduler.add_job(retrieve_transport_alerts, "cron", minute="*/5")
     scheduler.add_job(retrieve_weather_info, "cron", hour="6")
-    print "scheduler init done"
+    print("scheduler init done")
 
 
 def run_daily_tasks():
@@ -114,7 +114,7 @@ def generate_legs(keepto=None, maxtime=None, repair=False):
     if not maxtime:
         maxtime = now
 
-    print "generate_legs up to", maxtime
+    print("generate_legs up to", maxtime)
 
     dd = db.metadata.tables["device_data"]
     legs = db.metadata.tables["legs"]
@@ -193,8 +193,8 @@ def generate_legs(keepto=None, maxtime=None, repair=False):
 
         points = db.engine.execute(query).fetchall()
 
-        print "d"+str(device), "resume", str(start)[:19], \
-            "rewind", str(rewind)[:19], str(len(points))+"p"
+        print("d"+str(device), "resume", str(start)[:19], \
+            "rewind", str(rewind)[:19], str(len(points))+"p")
 
         filterer = DeviceDataFilterer() # not very objecty rly
         lastend = None
@@ -207,11 +207,11 @@ def generate_legs(keepto=None, maxtime=None, repair=False):
 
             lastend = leg["time_end"]
 
-            print " ".join([
+            print(" ".join([
                 "d"+str(device),
                 str(leg["time_start"])[:19],
                 str(leg["time_end"])[:19],
-                leg["activity"]]),
+                leg["activity"]]), end=' ')
 
             # Adjust leg for db entry
             gj0 = leg.pop("geojson_start", None)
@@ -224,9 +224,9 @@ def generate_legs(keepto=None, maxtime=None, repair=False):
             # Deal with overlapping legs on rewind/repair
             legid = t.execute(select(
                 [legs.c.id],
-                and_(*(legs.c[c] == leg[c] for c in leg.keys())))).scalar()
+                and_(*(legs.c[c] == leg[c] for c in list(leg.keys()))))).scalar()
             if legid:
-                print "-> unchanged",
+                print("-> unchanged", end=' ')
             else:
                 overlapstart = prevleg and prevleg["time_end"] or start
                 overlaps = [x[0] for x in t.execute(select(
@@ -239,14 +239,14 @@ def generate_legs(keepto=None, maxtime=None, repair=False):
                 if overlaps:
                     legid, dels = overlaps[0], overlaps[1:]
                     t.execute(legs.update(legs.c.id == legid, leg))
-                    print "-> update",
+                    print("-> update", end=' ')
                     if dels:
                         t.execute(legs.delete(legs.c.id.in_(dels)))
-                        print "-> delete %d" % len(dels)
+                        print("-> delete %d" % len(dels))
                 else:
                     ins = legs.insert(leg).returning(legs.c.id)
                     legid = t.execute(ins).scalar()
-                    print "-> insert",
+                    print("-> insert", end=' ')
 
             # Delete mismatching modes, add new modes
             modes = db.metadata.tables["modes"]
@@ -259,15 +259,15 @@ def generate_legs(keepto=None, maxtime=None, repair=False):
                 if nu == ex:
                     continue
                 if ex is not None:
-                    print "-> del", src, ex,
+                    print("-> del", src, ex, end=' ')
                     t.execute(modes.delete(and_(
                         modes.c.leg == legid, modes.c.source == src)))
                 if nu is not None:
-                    print "-> ins", src, nu,
+                    print("-> ins", src, nu, end=' ')
                     t.execute(modes.insert().values(
                         leg=legid, source=src, mode=nu[0], line=nu[1]))
 
-            print
+            print()
 
         # Emit null activity terminator leg to mark trailing undecided points,
         # if any, to avoid unnecessary reprocessing on resume.
@@ -341,7 +341,7 @@ def generate_legs(keepto=None, maxtime=None, repair=False):
         if user == 0:
             continue
 
-        print "u"+str(user), "start attach", start
+        print("u"+str(user), "start attach", start)
 
         # Get legs from user's devices in end time order, so shorter
         # legs get attached in favor of longer legs from a more idle device.
@@ -355,22 +355,22 @@ def generate_legs(keepto=None, maxtime=None, repair=False):
 
         lastend = None
         for lid, lstart, lend, luser in db.engine.execute(s):
-            print " ".join(["u"+str(user), str(lstart)[:19], str(lend)[:19]]),
+            print(" ".join(["u"+str(user), str(lstart)[:19], str(lend)[:19]]), end=' ')
             if lastend and lstart < lastend:
                 if luser is None:
-                    print "-> detached"
+                    print("-> detached")
                     continue
                 db.engine.execute(legs.update(
                     legs.c.id==lid).values(user_id=None)) # detach
-                print "-> detach"
+                print("-> detach")
                 continue
             lastend = lend
             if luser == user:
-                print "-> attached"
+                print("-> attached")
                 continue
             db.engine.execute(legs.update(
                 legs.c.id==lid).values(user_id=user)) # attach
-            print "-> attach"
+            print("-> attach")
 
     # Cluster backlog in batches
     cluster_legs(1000)
@@ -383,7 +383,7 @@ def cluster_legs(limit):
     """New leg ends and places are clustered live by triggers; this can be used
     to cluster data created earlier."""
 
-    print "cluster_legs up to", limit
+    print("cluster_legs up to", limit)
 
     with db.engine.begin() as t:
         t.execute(text("SELECT legs_cluster(:limit)"), limit=limit)
@@ -400,7 +400,7 @@ def label_places(timeout):
     REVERSE_GEOCODING_URI_TEMPLATE = 'https://search.mapzen.com/v1/reverse?api_key=API_KEY&sources=osm&size=20&point.lat={lat}&point.lon={lon}'
     REVERSE_GEOCODING_QUERIES_PER_SECOND = 6"""
 
-    print "label_places up to %ds" % timeout
+    print("label_places up to %ds" % timeout)
 
     url_template = app.config.get('REVERSE_GEOCODING_URI_TEMPLATE')
     qps = app.config.get('REVERSE_GEOCODING_QUERIES_PER_SECOND')
@@ -421,7 +421,7 @@ def label_places(timeout):
             order_by=nullsfirst(desc(labdist)))):
         lon, lat = point_coordinates(p)
         url = url_template.format(lat=lat, lon=lon)
-        response = json.loads(urllib2.urlopen(url, timeout=timeout).read())
+        response = json.loads(urllib.request.urlopen(url, timeout=timeout).read())
         names, nameslower = [], set()
         for prop in ["street", "name"]:
             for feat in response["features"]:
@@ -436,7 +436,7 @@ def label_places(timeout):
         label = label or coordstr # fallback
 
         # Show progress due to rate limiting. Force encoding in case of pipe
-        print coordstr, label.encode("utf-8")
+        print(coordstr, label.encode("utf-8"))
 
         db.engine.execute(places.update(
             places.c.id == p.id,
@@ -453,7 +453,7 @@ def filter_device_data(maxtime=None):
     if not maxtime:
         maxtime = datetime.datetime.now()
 
-    print "filter_device_data up to", maxtime
+    print("filter_device_data up to", maxtime)
 
     #TODO: Don't check for users that have been inactive for a long time.
     user_ids =  db.engine.execute(text("SELECT id FROM users;"))
@@ -513,7 +513,7 @@ def generate_trips():
     rowcount = db.engine.execute(trips.delete(or_(
         trips.c.id.in_(userless_od), trips.c.id.in_(userless_intra)))).rowcount
     if rowcount:
-        print "Deleted %d trips with userless legs" % rowcount
+        print("Deleted %d trips with userless legs" % rowcount)
 
     # Find tripless user moves
     untripped = select([legs.c.user_id, legs.c.time_start]) \
@@ -573,8 +573,8 @@ def generate_trips():
                     trips.c.id.in_(overlap_intra))).returning(trips.c.id)) \
                 .fetchall()
             if dels:
-                print "Deleted overlap trips %s" % " ".join(
-                    str(x[0]) for x in dels)
+                print("Deleted overlap trips %s" % " ".join(
+                    str(x[0]) for x in dels))
 
             # Find and associate trip legs
             sel = select([legs.c.id]) \
@@ -590,8 +590,8 @@ def generate_trips():
             trip = t.execute(ins).scalar()
             upd = legs.update().values(trip=trip).where(legs.c.id.in_(intra))
             t.execute(upd)
-            print "u"+str(user), "t"+str(trip), "ostart", str(ostart)[:16], \
-                "dstart", str(dstart)[:16], orig, intra, dest
+            print("u"+str(user), "t"+str(trip), "ostart", str(ostart)[:16], \
+                "dstart", str(dstart)[:16], orig, intra, dest)
 
 
 def mass_transit_cleanup():
@@ -631,7 +631,7 @@ def mass_transit_cleanup():
 
 def retrieve_hsl_data():
     url = "http://api.digitransit.fi/realtime/vehicle-positions/v1/siriaccess/vm/json"
-    response = urllib2.urlopen(url, timeout=50)
+    response = urllib.request.urlopen(url, timeout=50)
     json_data = json.loads(response.read())
     vehicle_data = json_data["Siri"]["ServiceDelivery"]["VehicleMonitoringDelivery"][0]["VehicleActivity"]
 
@@ -706,14 +706,14 @@ def retrieve_weather_info():
 
 def delete_device_data_duplicates():
     rowcount = device_data_delete_duplicates()
-    print '%d duplicate device_data points were deleted' % rowcount
+    print('%d duplicate device_data points were deleted' % rowcount)
 
 
 def set_device_data_waypoints():
     t = time.time()
     rowcount = device_data_waypoint_snapping()
-    print "set_device_data_waypoints on %d points in %.2g seconds" % (
-        rowcount, time.time() - t)
+    print("set_device_data_waypoints on %d points in %.2g seconds" % (
+        rowcount, time.time() - t))
 
 
 def set_leg_waypoints():
@@ -742,8 +742,8 @@ def set_leg_waypoints():
 
     ins = glue.insert().from_select(["leg", "waypoint", "first"], newitems)
     rowcount = db.engine.execute(ins).rowcount
-    print "set_leg_waypoints on %d rows in %.2g seconds" % (
-        rowcount, time.time() - t)
+    print("set_leg_waypoints on %d rows in %.2g seconds" % (
+        rowcount, time.time() - t))
 
 
 def main_loop():
@@ -754,7 +754,7 @@ if __name__ == "__main__":
     try:
         main_loop()
     except KeyboardInterrupt:
-        print >> sys.stderr, '\nExiting by user request.\n'
+        print('\nExiting by user request.\n', file=sys.stderr)
         sys.exit(0)
 
 
