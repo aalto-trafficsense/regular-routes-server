@@ -632,7 +632,8 @@ def mass_transit_cleanup():
 def retrieve_hsl_data():
     url = "http://api.digitransit.fi/realtime/vehicle-positions/v1/siriaccess/vm/json"
     response = urllib.request.urlopen(url, timeout=50)
-    json_data = json.loads(response.read())
+    # json_data = json.loads(response.read())
+    json_data = response.json()
     vehicle_data = json_data["Siri"]["ServiceDelivery"]["VehicleMonitoringDelivery"][0]["VehicleActivity"]
 
     all_vehicles = []
