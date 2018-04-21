@@ -7,6 +7,7 @@ import os
 import re
 import sys
 import time
+import requests
 import urllib.request, urllib.error, urllib.parse
 
 from pyfiles.database_interface import (
@@ -631,8 +632,9 @@ def mass_transit_cleanup():
 
 def retrieve_hsl_data():
     url = "http://api.digitransit.fi/realtime/vehicle-positions/v1/siriaccess/vm/json"
-    response = urllib.request.urlopen(url, timeout=50)
+    # response = urllib.request.urlopen(url, timeout=50)
     # json_data = json.loads(response.read())
+    response = requests.get(url, timeout=50)
     json_data = response.json()
     vehicle_data = json_data["Siri"]["ServiceDelivery"]["VehicleMonitoringDelivery"][0]["VehicleActivity"]
 
