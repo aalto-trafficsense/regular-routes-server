@@ -8,7 +8,7 @@ import re
 import sys
 import time
 import requests
-import urllib.request, urllib.error, urllib.parse
+# import urllib.request, urllib.error, urllib.parse
 
 from pyfiles.database_interface import (
     init_db, data_points_by_user_id_after, device_data_delete_duplicates,
@@ -422,7 +422,8 @@ def label_places(timeout):
             order_by=nullsfirst(desc(labdist)))):
         lon, lat = point_coordinates(p)
         url = url_template.format(lat=lat, lon=lon)
-        response = json.loads(urllib.request.urlopen(url, timeout=timeout).read())
+#        response = json.loads(urllib.request.urlopen(url, timeout=timeout).read())
+        response = requests.get(url, timeout=timeout).json()
         names, nameslower = [], set()
         for prop in ["street", "name"]:
             for feat in response["features"]:

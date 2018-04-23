@@ -5,7 +5,8 @@
 # Created by: mikko.rinne@aalto.fi 14.11.2016
 #
 import json
-import urllib.request, urllib.error, urllib.parse
+# import urllib.request, urllib.error, urllib.parse
+import requests
 import datetime
 from datetime import timedelta
 import re
@@ -39,8 +40,10 @@ def hsl_alert_request():
         alert_feed.ParseFromString(sample_str)
     else:
         url = 'http://api.digitransit.fi/realtime/service-alerts/v1/'
-        response = urllib.request.urlopen(url, timeout=50)
-        alert_feed.ParseFromString(response.read())
+#         response = urllib.request.urlopen(url, timeout=50)
+#         alert_feed.ParseFromString(response.read())
+        response = requests.get(url, timeout=50)
+        alert_feed.ParseFromString(response)
         if save_alert_sample:
             with open(debug_input_filename, "w") as data_file:
                 data_file.write(alert_feed.SerializeToString())
@@ -309,7 +312,8 @@ def traffic_disorder_request():
     else:
         try:
             url = 'https://tie.digitraffic.fi/api/v1/data/traffic-disorders-datex2'
-            response_read = urllib.request.urlopen(url, timeout=50).read()
+#            response_read = urllib.request.urlopen(url, timeout=50).read()
+            response_read = requests.get(url, timeout=50)
             xml_root = ET.fromstring(response_read)
             if save_alert_sample:
                 with open(debug_input_filename, "w") as data_file:
@@ -464,7 +468,8 @@ def getAlertC(version, location):
     try:
         coords = None
         response = requests.get('http://tie-test.digitraffic.fi/api/v1/metadata/locations/' + location + '?version=' + version)
-        json_response = json.loads(response.text)
+        # json_response = json.loads(response.text)
+        json_response = response.json()
         response.close()
         features = json_response.get('features')
         if features:
