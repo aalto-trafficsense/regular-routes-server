@@ -174,6 +174,7 @@ def render_trips_day(legrows):
         return h and "{}h{:02}".format(h, m) or "{}min".format(m)
 
     def fmt_distance(km):
+        if km is None: km = 0.0
         if km >= 9.95:
             return "%.0fkm" % km
         if km >= 0.05:
