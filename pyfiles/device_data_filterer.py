@@ -469,7 +469,7 @@ class DeviceDataFilterer:
 
             if consecutive_differences == CONSECUTIVE_DIFFERENCE_LIMIT:
                 #split the transition points, first half is previous activity, latter half is new activity
-                splitting_point = CONSECUTIVE_DIFFERENCE_LIMIT + (different_activity_counter - CONSECUTIVE_DIFFERENCE_LIMIT) / 2
+                splitting_point = int(CONSECUTIVE_DIFFERENCE_LIMIT + (different_activity_counter - CONSECUTIVE_DIFFERENCE_LIMIT) / 2)
                 yield device_data_queue[:-splitting_point], chosen_activity
                 device_data_queue = device_data_queue[-splitting_point:]
                 consecutive_differences = 0
