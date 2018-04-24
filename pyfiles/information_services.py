@@ -36,14 +36,14 @@ def hsl_alert_request():
     alert_feed = gtfs_realtime_pb2.FeedMessage()
     if debug_input:
         with open(debug_input_filename) as data_file:
-            sample_str = file.read(data_file)
+            sample_str = data_file.read()
         alert_feed.ParseFromString(sample_str)
     else:
         url = 'http://api.digitransit.fi/realtime/service-alerts/v1/'
 #         response = urllib.request.urlopen(url, timeout=50)
 #         alert_feed.ParseFromString(response.read())
         response = requests.get(url, timeout=50)
-        alert_feed.ParseFromString(response)
+        alert_feed.ParseFromString(response.content)
         if save_alert_sample:
             with open(debug_input_filename, "w") as data_file:
                 data_file.write(alert_feed.SerializeToString())
@@ -314,10 +314,10 @@ def traffic_disorder_request():
             url = 'https://tie.digitraffic.fi/api/v1/data/traffic-disorders-datex2'
 #            response_read = urllib.request.urlopen(url, timeout=50).read()
             response_read = requests.get(url, timeout=50)
-            xml_root = ET.fromstring(response_read)
+            xml_root = ET.fromstring(response_read.content)
             if save_alert_sample:
                 with open(debug_input_filename, "w") as data_file:
-                    data_file.write(bytes(response_read))
+                    data_file.write(response_read.content)
         except Exception as e:
             print("Traffic disorder fetch exception: ", e)
 
