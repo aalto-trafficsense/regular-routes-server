@@ -225,7 +225,7 @@ def cancel_participation():
       import yagmail
       yag = yagmail.SMTP(app.config['GMAIL_FROM'], app.config['GMAIL_PWD'])
       msgBody = ['User id: ' + str(user_id)]
-      print('Trying to send participation cancellation email with message body: ' + msgBody[0])
+      print('Sending participation cancellation email with message body: ' + msgBody[0])
       yag.send(app.config['EMAIL_TO'], 'CANCEL request from user', msgBody)
       response = make_response(json.dumps('TrafficSense project informed of participation cancellation.'), 200)
       response.headers['Content-Type'] = 'application/json'
