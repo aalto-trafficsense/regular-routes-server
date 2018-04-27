@@ -20,7 +20,7 @@ This is the procedure for setting up a new client-server pair to run the Traffic
 
 This is the procedure to set up an environment for developing server software on any local machine.
 
-1. Since the addition of python libraries used by prediction (numpy, scipy etc.), some extra installations are required for the successful installation of the python libraries. On Ubuntu: `$ sudo apt-get install build-essential python-pip python-dev gfortran libatlas-base-dev libblas-dev liblapack-dev`. On Mac OS X others are included in Xcode, but a fortran compiler is required. It belongs to the gcc package, on brew: `$ brew install gcc`.
+1. Since the addition of python libraries used by prediction (numpy, scipy etc.), some extra installations are required for the successful installation of the python libraries. On Ubuntu: `$ sudo apt-get install build-essential python3-pip python3-dev python3-venv gfortran libatlas-base-dev libblas-dev liblapack-dev libssl-dev`. On Mac OS X others are included in Xcode, but a fortran compiler is required. It belongs to the gcc package, on brew: `$ brew install gcc`.
 1. If using a local database, install [postgresql](http://www.postgresql.org/) and [postgis](http://postgis.net/). Available for Debian Linuxes (Ubuntu) via `apt-get`, and [homebrew](http://brew.sh/) on Mac OS X. An alternative would be to tunnel onto a database on another server, but the installation of the `psycopg2` python library below fails if `pg_config`, a part of postgresql, is not available.
 1. Create a regularroutes database - empty or populated - as [instructed] (https://github.com/aalto-trafficsense/regular-routes-server/tree/master/sql_admin). Leave a postgresql server running (`postgres -D rrdb`, where `rrdb` is the path to the directory with your database). If the postgresql server is on another machine, arrange tunnels accordingly.
 1. Clone this (regular-routes-server) repo to a directory where development is to be carried out. Go (`cd`) into your repository root directory and start a local branch (`git branch my_test`) if practical.
@@ -37,6 +37,8 @@ This is the procedure to set up an environment for developing server software on
           GMAIL_FROM = 'gmail-from-username@gmail.com'
           GMAIL_PWD = 'password-for-the-above'
           EMAIL_TO = 'email-to-recipient@somewhere.com'
+          REVERSE_GEOCODING_URI_TEMPLATE = 'https://api.digitransit.fi/geocoding/v1/reverse?sources=osm&size=20&point.lat={lat}&point.lon={lon}'
+          REVERSE_GEOCODING_QUERIES_PER_SECOND = 6
 
     Some explanations:
     * `SQLALCHEMY_DATABASE_URI`: `qwerty` is the password for the `regularroutes` role created [here](https://github.com/aalto-trafficsense/regular-routes-server/blob/master/sql_admin/init_rr.sql).
@@ -47,20 +49,21 @@ This is the procedure to set up an environment for developing server software on
     * `FIREBASE_KEY` is found from [Firebase console](https://console.firebase.google.com/) Settings -> Project Settings -> Cloud messaging -> Project Credentials -> Server key. Note that they `google-services.json` file from the console is needed for the corresponding [client](https://github.com/aalto-trafficsense/trafficsense-android).
     * `MASS_TRANSIT_LIVE_KEEP_DAYS` is the number of days vehicle data obtained from Helsinki Regional Traffic will be stored in the database before removal. Recognised public transportation trips are stored indefinitely. A value of 1 is enough.
     * The current participation cancellation function (in siteserver.py) sends an email with the user_id to the configured EMAIL_TO address. The 'yagmail' library uses the gmail server, so a gmail account is needed (GMAIL_FROM and GMAIL_PWD) for sending.
-    
+    * `REVERSE_GEOCODING_URI_TEMPLATE` is the URI of a Pelias instance for reverse geocoding in regularroutes-site.
+
     _Note: When creating a new server using chef as instructed in [devops](https://github.com/aalto-trafficsense/regular-routes-devops), the `regularroutes.cfg` file is automatically generated using parameters from a `regularroutes-srvr.json` file._
-    
+
 1. Save the `client_secrets.json` file for your project to the root of your repo. Instructions for generating it are in the [devops readme](https://github.com/aalto-trafficsense/regular-routes-devops). This file is required in server startup and used in mobile client authentication, but to access this local dev environment from a mobile client also a web server and a routable IP address for the local machine are needed, not covered by these setup instructions.
-1. Optional?: Install [virtualenv](http://docs.python-guide.org/en/latest/dev/virtualenvs/), which in addition to `pip` should be the only global python packages. Can be installed e.g. via pip, easy_install, apt-get. E.g. `pip install virtualenv`. (_MJR Note: May not be necessary, if using PyCharm built-in virtualenv-support._)
+1. Optional: Install [virtualenv](http://docs.python-guide.org/en/latest/dev/virtualenvs/), which in addition to `pip` should be the only global python packages. Can be installed e.g. via pip, easy_install, apt-get. E.g. `pip install virtualenv`. (_Note: Not needed if using PyCharm built-in virtualenv._)
 1. Install and run [PyCharm IDE](https://www.jetbrains.com/pycharm/) for web server / flask development (_Note: There is an educational license available for Intellij-Idea and PyCharm ultimate versions._)
 1. `File` `Open` your regular-routes-repository root folder. If offered, deny package installations from `requirements.txt` so they don't install into the global environment.
-1. Create a virtualenv from: `PyCharm`/ `Preferences` / `Project: regular-routes-server` / `Project Interpreter` (on Mac, `File` / `Settings` / ... in Linux). Click the wheel on the upper right, select `Create virtualenv` and create a virtualenv named e.g. `regular-routes-server` with Python v. 2.7.x. Select your virtualenv from the drop-down box next to the wheel. (_MJR Note: Currently using 2.7.10_)
-1. If the packages in `requirements.txt` don't start installing otherwise, open one of the root-directory python-files on the editor (e.g. `apiserver.py`) 
+1. Create a virtualenv from: `PyCharm`/ `Preferences` / `Project: regular-routes-server` / `Project Interpreter` (on Mac, `File` / `Settings` / ... in Linux). Click the wheel on the upper right, select `Create virtualenv` and create a virtualenv named e.g. `regular-routes-server` with Python v. 3.x.y. Select your virtualenv from the drop-down box next to the wheel. (_MJR Note: Currently using 3.5.2_)
+1. If the packages in `requirements.txt` don't start installing otherwise, open one of the root-directory python-files on the editor (e.g. `apiserver.py`)
 1. Install [Flask-classy](https://pythonhosted.org/Flask-Classy/)  (REST extension package; found from python repo & PyCharm package download list). Under PyCharm installations are done under `Preferences` (or `Settings`) / `Project` / `Project Interpreter` and currently appear to be included with the packages in the `requirements.txt`.
-1. Install any other packages, which might be missing from requirements.txt (_MJR Note: Newer OS X:s currently do not install the required old scipy 0.9.0 due to header problems. Installing the latest scipy instead is fine, since scipy is only needed for prediction, which is not currently used._).
+1. Install any other packages, which might be missing from requirements.txt.
 1. Under `Run` `Edit configurations` set the working directory to point to your repository root. Also check the `Script:`, which can be `siteserver.py`, `devserver.py`, `apiserver.py` or `scheduler.py` depending on which component is to be run.
 1. `Run 'regular-routes-server'`
-1. If no major problems occurred in startup, open a browser window and test. E.g. `http://localhost:5000/maintenance/duplicates` (from `apiserver`) should receive a `0 duplicate data points were deleted` response. Other commands in the [command reference](https://github.com/aalto-trafficsense/regular-routes-server/wiki/Command-Reference).
+1. If no major problems occurred in startup, open a browser window and test. E.g. `http://localhost:5000` from `siteserver` should show the login page.
 
 ## Python virtualenv
 
@@ -79,4 +82,3 @@ Sometimes it is necessary to regenerate the virtualenv for cleanup purposes. Thi
 1. Rename the old virtualenv to some other name
 1. Create a new virtualenv: `$ virtualenv virtualenv`
 1. Install the requirements: `pip install -r requirements.txt`
-    
