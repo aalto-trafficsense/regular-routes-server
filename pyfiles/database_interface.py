@@ -312,11 +312,11 @@ def init_db(app):
     global mass_transit_data_table
     mass_transit_data_table = Table('mass_transit_data', metadata,
                               Column('id', Integer, primary_key=True),
-                              Column('coordinate',
-            ga2.Geography('point', 4326, spatial_index=False), nullable=False),
+                              Column('coordinate', ga2.Geography('point', 4326, spatial_index=False), nullable=False),
                               Column('time', TIMESTAMP, nullable=False),
                               Column('line_type', mass_transit_type_enum, nullable=False),
                               Column('line_name', String, nullable=False),
+                              Column('direction', Integer),
                               Column('vehicle_ref', String, nullable=False),
                               UniqueConstraint('time', 'vehicle_ref', name="unique_vehicle_and_timestamp"),
                               Index('idx_mass_transit_data_time', 'time'),
@@ -468,7 +468,24 @@ def init_db(app):
     # Sample line to add new enum values to client_function_enum:
     # ALTER TYPE client_function_enum ADD VALUE 'MOBILE-FCM-TOKEN' ;
 
+    # A table for the database version number
+    # used for upgrades
+    global migrate_version_table
+    migrate_version_table = Table('migrate_version', metadata,
+                              Column('id', Integer, primary_key=True),
+                              Column('version', Integer, nullable=False))
+
+
     metadata.create_all(checkfirst=True)
+
+    # Database upgrade operations
+    db_version = get_database_version()
+    if (db_version == None):
+        db_version = init_database_version()
+    if (db_version < 1):
+        db.engine.execute(text('ALTER TABLE mass_transit_data ADD COLUMN direction integer;'))
+    upgrade_database_version(1)
+
 
     conn = db.engine.connect().execution_options(isolation_level="AUTOCOMMIT")
     conn.execute("""ALTER TYPE client_function_enum
@@ -558,6 +575,7 @@ CREATE OR REPLACE VIEW leg_modes AS SELECT
     with open("sql/places.sql") as f, db.engine.begin() as t:
         t.execute(text("lock places in access exclusive mode"))
         t.execute(text(f.read()), clustdist=2*DEST_RADIUS_MAX)
+
 
     return db, store
 
@@ -1635,3 +1653,25 @@ def device_data_delete_duplicates():
 def device_data_waypoint_snapping():
     with open('sql/snapping.sql') as sql_file:
         return db.engine.execute(text(sql_file.read())).rowcount
+
+# Database version helper functions
+
+def get_database_version():
+    query = select([migrate_version_table.c.version])
+    return db.engine.execute(query).scalar()
+
+def init_database_version():
+    try:
+        stmt = migrate_version_table.insert({'version': 0})
+        db.engine.execute(stmt)
+    except DataError as e:
+        print('Database version init exception: ' + e.message)
+    return 0
+
+
+def upgrade_database_version(new_db_version):
+    update = migrate_version_table.update() \
+        .values({
+            'version': new_db_version}) \
+        .where(migrate_version_table.c.id == 1)
+    db.engine.execute(update)
