@@ -9,6 +9,11 @@ import sys
 import time
 import requests
 # import urllib.request, urllib.error, urllib.parse
+import paho.mqtt.subscribe as subscribe
+import paho.mqtt.client as mqtt
+# import threading
+import ssl
+
 
 from pyfiles.database_interface import (
     init_db, data_points_by_user_id_after, device_data_delete_duplicates,
@@ -76,12 +81,16 @@ def initialize():
     print("initialising scheduler")
     scheduler = BackgroundScheduler()
     scheduler.start()
-    scheduler.add_job(retrieve_hsl_data, "cron", second="*/30")
+    # scheduler.add_job(retrieve_hsl_data, "cron", second="*/30")
     run_daily_tasks()
     scheduler.add_job(run_hourly_tasks, "cron", minute=24)
     scheduler.add_job(run_daily_tasks, "cron", hour="3")
     scheduler.add_job(retrieve_transport_alerts, "cron", minute="*/5")
     scheduler.add_job(retrieve_weather_info, "cron", hour="6")
+    # global mass_transit_thread
+    # mass_transit_thread = threading.Thread(target=init_mass_transit_live_reception)
+    # mass_transit_thread.start()
+    init_mass_transit_live_reception()
     print("scheduler init done")
 
 
@@ -630,7 +639,8 @@ def mass_transit_cleanup():
     # lower retention limit, use VACUUM FULL. Not done automatically due to
     # locking, additional temporary space usage, and potential OOM on reindex.
 
-
+# Retrieve vehicle positions from Siri real-time interface
+# As of Aug-2018 HSL no longer uses this, other cities available
 def retrieve_hsl_data():
     url = "http://api.digitransit.fi/realtime/vehicle-positions/v1/siriaccess/vm/json"
     # response = urllib.request.urlopen(url, timeout=50)
@@ -668,6 +678,50 @@ def retrieve_hsl_data():
     else:
         log.warning(
             "No mass transit data received at %s" % datetime.datetime.now())
+
+
+# Process High-Frequency Positioning (HFP) MQTT callback
+def handle_mass_transit(client, userdata, message):
+    # print("%s %s" % (message.topic, message.payload))
+    # b'{"VP":{"desi":"95","dir":"1","oper":22,"veh":888,"tst":"2018-08-12T19:15:01Z","tsi":1534101301,"spd":5.02,"hdg":277,"lat":60.219960,"long":25.099226,"acc":0.43,"dl":0,"odo":2053,"drst":0,"oday":"2018-08-12","jrn":463,"line":138,"start":"22:10"}}'
+    payload = json.loads(message.payload.decode('utf-8'))['VP']
+    longitude = payload['long']
+    latitude = payload['lat']
+    if (longitude != None) and (latitude != None):
+        topics = message.topic.split('/')
+        # print('topic', topic)
+        # print(payload)
+        vehicle_row = {'time': datetime.datetime.fromtimestamp(payload['tsi']),
+                       'line_name': payload['desi'],
+                       'line_type': topics[5].upper(),
+                       'direction': int(payload['dir']),
+                       'coordinate': 'POINT(%f %f)' % (longitude, latitude),
+                       'vehicle_ref': str(payload['oper']) + '/' + str(payload['veh'])}
+        db.engine.execute(mass_transit_data_table.insert([vehicle_row]))
+
+
+def mass_transit_disconnect(client, userdata, rc):
+    print("mass transit disconnect triggered")
+    init_mass_transit_live_reception()
+
+
+def init_mass_transit_live_reception():
+    hostname = "mqtt.hsl.fi"
+    port = 1883 # change to 443 for TLS
+    keepalive = 36000 # seconds, default = 60
+    global mass_transit_client
+    mass_transit_client = mqtt.Client()
+    mass_transit_client.on_message = handle_mass_transit
+    mass_transit_client.on_disconnect = mass_transit_disconnect
+    # ca_certs on Mac: "/etc/ssl/cert.pem"
+    # ca_certs on Linux: "/etc/ssl/certs/ca-certificates.crt"
+    # tls = { 'ca_certs': "/etc/ssl/cert.pem" }
+    # mass_transit_client.tls_set(**tls)
+    mass_transit_client.connect(hostname, port, keepalive)
+    mass_transit_client.loop_start()
+    mass_transit_client.subscribe("/hfp/v1/journey/ongoing/+/+/+/+/+/+/+/+/0/#")
+    # subscribe.callback would have been simpler, but runs loop_forever by default
+    # subscribe.callback(handle_mass_transit, "/hfp/v1/journey/ongoing/+/+/+/+/+/+/+/+/0/#", hostname="mqtt.hsl.fi", port=1883)
 
 
 def get_max_time_from_table(time_column_name, table_name, id_field_name, id):
@@ -759,6 +813,7 @@ if __name__ == "__main__":
         main_loop()
     except KeyboardInterrupt:
         print('\nExiting by user request.\n', file=sys.stderr)
+        mass_transit_client.loop_stop()
         sys.exit(0)
 
 
