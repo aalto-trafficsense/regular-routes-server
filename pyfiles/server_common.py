@@ -1,4 +1,6 @@
 import json
+import tempfile
+import zipfile
 
 from collections import namedtuple
 from csv import DictWriter
@@ -25,7 +27,7 @@ from pyfiles.constants import BAD_LOCATION_RADIUS
 from pyfiles.routes import get_routes
 
 from pyfiles.database_interface import (
-    mass_transit_types, update_user_distances)
+    mass_transit_types, update_user_distances, get_csv, get_device_table_ids)
 
 def common_trips_rows(request, db, user):
     firstday = request.args.get("firstday")
@@ -396,3 +398,29 @@ def common_path(request, db, where):
             'id', 'activity', 'line_name', 'time_start', 'time_end'))
 
     return jsonify({'type': 'FeatureCollection', 'features': features})
+
+
+def common_download_zip(user):
+    # Adapted from: https://stackoverflow.com/a/11971561/5528498
+    dev_ids = 'device_id in (' + get_device_table_ids(user) + ')'
+    user_id = str(user)
+    with tempfile.SpooledTemporaryFile() as tmp:
+        with zipfile.ZipFile(tmp, 'w', zipfile.ZIP_DEFLATED) as archive:
+            archive.writestr('users.csv', get_csv('SELECT id,register_timestamp FROM users WHERE id='+user_id))
+            archive.writestr('devices.csv', get_csv('SELECT id,user_id,device_model,created,last_activity,client_version FROM devices WHERE user_id='+user_id))
+            archive.writestr('client_log.csv', get_csv('SELECT * FROM client_log WHERE user_id='+user_id))
+            archive.writestr('device_alerts.csv', get_csv('SELECT * FROM device_alerts WHERE '+dev_ids))
+            archive.writestr('device_data.csv', get_csv('SELECT * FROM device_data WHERE '+dev_ids))
+            archive.writestr('device_data_filtered.csv', get_csv('SELECT * FROM device_data_filtered WHERE user_id='+user_id))
+            archive.writestr('leg_ends.csv', get_csv('SELECT * FROM leg_ends WHERE user_id='+user_id))
+            archive.writestr('leg_modes.csv', get_csv('SELECT * FROM leg_modes WHERE user_id='+user_id))
+            archive.writestr('legs.csv', get_csv('SELECT * FROM legs WHERE user_id='+user_id))
+            archive.writestr('travelled_distances.csv', get_csv('SELECT * FROM travelled_distances WHERE user_id='+user_id))
+
+        # Reset file pointer
+        tmp.seek(0)
+
+        # Write file data to response
+        response = make_response(tmp.read())
+        response.mimetype = 'application/x-zip-compressed'
+        return response

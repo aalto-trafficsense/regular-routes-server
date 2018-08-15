@@ -19,6 +19,9 @@ from sqlalchemy.exc import DataError, ProgrammingError
 from sqlalchemy.sql import (
     and_, between, column, exists, func, or_, select, text)
 
+from csv import DictWriter
+from io import StringIO
+
 from pyfiles.energy_rating import EnergyRating
 from pyfiles.config_helper import get_config
 
@@ -460,7 +463,7 @@ def init_db(app):
                  "MOBILE-DESTINATIONS", "MOBILE-DEST-HISTORY", "MOBILE-CERTIFICATE",
                  "MOBILE-SHARE-CERTIFICATE", "MOBILE-PATH-EDIT", "MOBILE-FCM-TOKEN",
                  "WEB-CONNECT", "WEB-PATH", "WEB-CERTIFICATE", "WEB-TRIP-COMPARISON", "WEB-DEST-HISTORY",
-                 "CANCEL-PARTICIPATION", "WEB-PATH-EDIT", "WEB-TRIPS-LIST",
+                 "CANCEL-PARTICIPATION", "WEB-PATH-EDIT", "WEB-TRIPS-LIST", "WEB-DOWNLOAD-DATA",
                  name="client_function_enum")),
         Column('info', String),
         Index('idx_client_log_time', 'time'))
@@ -480,18 +483,19 @@ def init_db(app):
 
     # Database upgrade operations
     db_version = get_database_version()
-    if (db_version == None):
+    if db_version == None:
         db_version = init_database_version()
-    if (db_version < 1):
+    if db_version < 1:
         db.engine.execute(text('ALTER TABLE mass_transit_data ADD COLUMN direction integer;'))
     upgrade_database_version(1)
-
 
     conn = db.engine.connect().execution_options(isolation_level="AUTOCOMMIT")
     conn.execute("""ALTER TYPE client_function_enum
             ADD VALUE IF NOT EXISTS 'WEB-PATH-EDIT'""")
     conn.execute("""ALTER TYPE client_function_enum
             ADD VALUE IF NOT EXISTS 'WEB-TRIPS-LIST'""")
+    conn.execute("""ALTER TYPE client_function_enum
+            ADD VALUE IF NOT EXISTS 'WEB-DOWNLOAD-DATA'""")
     conn.close()
 
     # Combined view of legs with migrated/detected/user modes and lines
@@ -1460,6 +1464,17 @@ def get_device_table_id(user_id, device_id, installation_id):
     return db.engine.execute(query).scalar()
 
 
+def get_device_table_ids(user_id):
+    query = select([devices_table.c.id]) \
+        .where(devices_table.c.user_id==user_id)
+    ids = db.engine.execute(query).fetchall()
+    id_list = ""
+    for id in ids:
+        id_list += str(id['id'])+','
+    id_list = id_list[:-1]
+    return id_list
+
+
 def update_messaging_token(devices_table_id, new_msg_token):
     update = devices_table.update() \
         .values({'last_activity': datetime.datetime.now()}) \
@@ -1656,9 +1671,11 @@ def device_data_waypoint_snapping():
 
 # Database version helper functions
 
+
 def get_database_version():
     query = select([migrate_version_table.c.version])
     return db.engine.execute(query).scalar()
+
 
 def init_database_version():
     try:
@@ -1675,3 +1692,18 @@ def upgrade_database_version(new_db_version):
             'version': new_db_version}) \
         .where(migrate_version_table.c.id == 1)
     db.engine.execute(update)
+
+
+# Query for CSV-strings
+
+
+def get_csv(query):
+    rows = db.engine.execute(query)
+    buf = StringIO()
+    csv = DictWriter(buf, list(rows.keys()))
+    csv.writeheader()
+    for r in rows:
+        r = {k: v.encode("utf8") if isinstance(v, str) else v
+             for k, v in list(r.items())}
+        csv.writerow(r)
+    return buf.getvalue()

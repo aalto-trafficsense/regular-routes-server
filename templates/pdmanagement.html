@@ -14,13 +14,15 @@
     <img src="../static/icon/trafficsense_icon_noborder.png"
     align="right" width=100></a></h1>
     <br>
-    <button id="download">Download personal data</button>
-    <br><br>
+    <form action="trafficsense_data">
+        <button id="download">Download personal data</button>
+    </form>
+    <br>
     <button id="cancel_participation">Cancel Participation</button>
     <br><br>
-        <form method="get" action="menu">
-          <button id="menu">Return to menu</button>
-        </form>
+    <form method="get" action="menu">
+        <button id="menu">Return to menu</button>
+    </form>
     <br><br>
     <p><a href="https://aaltotrafficsense.wordpress.com/about/">TrafficSense</a> is a research project at <a href="http://www.aalto.fi/en/">Aalto University</a>.</p>
     <p>Contact <a href="mailto:trafficsense.aalto@gmail.com?Subject=User%20feedback"
@@ -30,24 +32,8 @@
 <script type="text/javascript">
 
     $(document).ready(function() {
-        $('#download').click(downloadData);
         $('#cancel_participation').click(cancelParticipation);
     });
-
-	function downloadData() {
-      // Revoke the server tokens
-      $.ajax({
-        type: 'GET',
-        url: $(location).attr('origin') + '{{ RR_URL_PREFIX }}/download',
-        async: false,
-        success: function(result) {
-			console.log(result);
-        },
-        error: function(e) {
-          console.log(e);
-        }
-      });
-	}
 
     function cancelParticipation() {
         var r = confirm("Based on this request we will delete all the data you have collected so far and remove your account.");

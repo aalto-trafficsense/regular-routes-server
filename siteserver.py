@@ -25,7 +25,8 @@ from pyfiles.server_common import (
     common_routes_json,
     common_setlegmode,
     common_trips_csv,
-    common_trips_json)
+    common_trips_json,
+    common_download_zip)
 
 
 import logging
@@ -444,6 +445,20 @@ def trips_json():
             request.args.get("lastday", "")]))
 
     return common_trips_json(request, db, user_id)
+
+
+@app.route('/trafficsense_data')
+def download_dump():
+    user_id = session.get('rr_user_id')
+    if user_id == None:
+        response = make_response(json.dumps(
+            'No user data in current session.'), 401)
+        response.headers['Content-Type'] = 'application/json'
+        return response
+    client_log_table_insert(
+        get_max_devices_table_id_from_users_table_id(user_id),
+        user_id, "WEB-DOWNLOAD-DATA", "")
+    return common_download_zip(user_id)
 
 
 @app.route('/path_json')
