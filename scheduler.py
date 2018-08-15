@@ -8,11 +8,10 @@ import re
 import sys
 import time
 import requests
-# import urllib.request, urllib.error, urllib.parse
-import paho.mqtt.subscribe as subscribe
 import paho.mqtt.client as mqtt
-# import threading
-import ssl
+# import paho.mqtt.subscribe as subscribe
+import threading
+# import ssl # uncomment for using TLS with MQTT
 
 
 from pyfiles.database_interface import (
@@ -78,18 +77,19 @@ global_statistics_table = db.metadata.tables['global_statistics']
 
 
 def initialize():
+    global vehicle_push_lock
+    vehicle_push_lock = threading.Lock() # MQTT reception and DB write in separate threads
+    global push_vehicles
+    push_vehicles = []
     print("initialising scheduler")
     scheduler = BackgroundScheduler()
     scheduler.start()
-    # scheduler.add_job(retrieve_hsl_data, "cron", second="*/30")
+    scheduler.add_job(retrieve_hsl_data, "cron", second="*/30")
     run_daily_tasks()
     scheduler.add_job(run_hourly_tasks, "cron", minute=24)
     scheduler.add_job(run_daily_tasks, "cron", hour="3")
     scheduler.add_job(retrieve_transport_alerts, "cron", minute="*/5")
     scheduler.add_job(retrieve_weather_info, "cron", hour="6")
-    # global mass_transit_thread
-    # mass_transit_thread = threading.Thread(target=init_mass_transit_live_reception)
-    # mass_transit_thread.start()
     init_mass_transit_live_reception()
     print("scheduler init done")
 
@@ -643,17 +643,16 @@ def mass_transit_cleanup():
 # As of Aug-2018 HSL no longer uses this, other cities available
 def retrieve_hsl_data():
     url = "http://api.digitransit.fi/realtime/vehicle-positions/v1/siriaccess/vm/json"
-    # response = urllib.request.urlopen(url, timeout=50)
-    # json_data = json.loads(response.read())
     response = requests.get(url, timeout=50)
     json_data = response.json()
     vehicle_data = json_data["Siri"]["ServiceDelivery"]["VehicleMonitoringDelivery"][0]["VehicleActivity"]
 
-    all_vehicles = []
+    pull_vehicles = []
 
     def vehicle_row(vehicle):
         timestamp = datetime.datetime.fromtimestamp(vehicle["RecordedAtTime"] / 1000) #datetime doesn't like millisecond accuracy
         line_name, line_type = interpret_jore(vehicle["MonitoredVehicleJourney"]["LineRef"]["value"])
+        direction = int(vehicle["MonitoredVehicleJourney"]["DirectionRef"]["value"])
         longitude = vehicle["MonitoredVehicleJourney"]["VehicleLocation"]["Longitude"]
         latitude = vehicle["MonitoredVehicleJourney"]["VehicleLocation"]["Latitude"]
         coordinate = 'POINT(%f %f)' % (longitude, latitude)
@@ -663,22 +662,30 @@ def retrieve_hsl_data():
             'coordinate': coordinate,
             'line_name': line_name,
             'line_type': line_type,
+            'direction': direction,
             'time': timestamp,
             'vehicle_ref': vehicle_ref
         }
 
     for vehicle in vehicle_data:
         try:
-            all_vehicles.append(vehicle_row(vehicle))
+            pull_vehicles.append(vehicle_row(vehicle))
         except Exception:
             log.exception("Failed to handle vehicle record: %s" % vehicle)
 
-    if all_vehicles:
-        db.engine.execute(mass_transit_data_table.insert(all_vehicles))
+    if pull_vehicles:
+        db.engine.execute(mass_transit_data_table.insert(pull_vehicles))
     else:
         log.warning(
             "No mass transit data received at %s" % datetime.datetime.now())
 
+    global push_vehicles
+    if len(push_vehicles) > 0:
+        global vehicle_push_lock
+        vehicle_push_lock.acquire()
+        db.engine.execute(mass_transit_data_table.insert(push_vehicles))
+        push_vehicles = []
+        vehicle_push_lock.release()
 
 # Process High-Frequency Positioning (HFP) MQTT callback
 def handle_mass_transit(client, userdata, message):
@@ -697,7 +704,27 @@ def handle_mass_transit(client, userdata, message):
                        'direction': int(payload['dir']),
                        'coordinate': 'POINT(%f %f)' % (longitude, latitude),
                        'vehicle_ref': str(payload['oper']) + '/' + str(payload['veh'])}
-        db.engine.execute(mass_transit_data_table.insert([vehicle_row]))
+        # Check for duplicate time+vehicle_ref - the DB constraint borks if violated in a single insert
+        global push_vehicles
+        not_duplicate = True
+        if len(push_vehicles) > 0:
+            cont_loop = True
+            i = 0
+            while cont_loop:
+                row = push_vehicles[i]
+                if (row['time'] == vehicle_row['time']) and (row['vehicle_ref'] == vehicle_row['vehicle_ref']):
+                    cont_loop = False
+                    not_duplicate = False
+                else:
+                    i += 1
+                    if i == len(push_vehicles): cont_loop = False
+        if not_duplicate:
+            global vehicle_push_lock
+            vehicle_push_lock.acquire()
+            push_vehicles.append(vehicle_row)
+            vehicle_push_lock.release()
+        # DB writes currently done with retrieve_hsl_data
+        # db.engine.execute(mass_transit_data_table.insert([vehicle_row]))
 
 
 def mass_transit_disconnect(client, userdata, rc):
@@ -713,6 +740,7 @@ def init_mass_transit_live_reception():
     mass_transit_client = mqtt.Client()
     mass_transit_client.on_message = handle_mass_transit
     mass_transit_client.on_disconnect = mass_transit_disconnect
+    # TLS additions - uncomment if TLS needed:
     # ca_certs on Mac: "/etc/ssl/cert.pem"
     # ca_certs on Linux: "/etc/ssl/certs/ca-certificates.crt"
     # tls = { 'ca_certs': "/etc/ssl/cert.pem" }
@@ -720,7 +748,7 @@ def init_mass_transit_live_reception():
     mass_transit_client.connect(hostname, port, keepalive)
     mass_transit_client.loop_start()
     mass_transit_client.subscribe("/hfp/v1/journey/ongoing/+/+/+/+/+/+/+/+/0/#")
-    # subscribe.callback would have been simpler, but runs loop_forever by default
+    # subscribe.callback would have been simpler, but runs loop_forever by default (i.e. locks this thread here):
     # subscribe.callback(handle_mass_transit, "/hfp/v1/journey/ongoing/+/+/+/+/+/+/+/+/0/#", hostname="mqtt.hsl.fi", port=1883)
 
 
