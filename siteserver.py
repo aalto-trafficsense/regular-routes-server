@@ -208,6 +208,12 @@ def no_data():
     return render_template('nodata.html')
 
 
+@app.route('/pdmanagement')
+def personal_data_management():
+    """Personal data management submenu."""
+    return render_template('pdmanagement.html')
+
+
 @app.route('/cancelparticipation', methods=['POST'])
 def cancel_participation():
   """Cancel the current user's participation to the study."""
