@@ -240,6 +240,7 @@ def cancel_participation():
   # Send email to the maintainers about the cancellation
   try:
       import yagmail
+      print('Username: ', app.config['GMAIL_FROM'], 'Salat: ', app.config['GMAIL_PWD'])
       yag = yagmail.SMTP(app.config['GMAIL_FROM'], app.config['GMAIL_PWD'])
       msgBody = ['User id: ' + str(user_id)]
       print('Sending participation cancellation email with message body: ' + msgBody[0])
