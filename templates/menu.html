@@ -57,7 +57,7 @@
         // Revoke the server tokens
         $.ajax({
           type: 'POST',
-          url: '/disconnect',
+          url: 'disconnect',
           async: true,
           success: function(result) {
   			window.location='signedout';
