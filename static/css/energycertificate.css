@@ -1,4 +1,15 @@
 html, body, #map-canvas {
   height: 100%;
+  margin: 0;
 }
-#svg { max-height: 90% }
+button {
+  font-size: 1em;
+  margin-top: 12px;
+}
+#svg {
+  max-height: 80%;
+  max-width: 900px;
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+}

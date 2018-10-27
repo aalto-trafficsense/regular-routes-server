@@ -1,5 +1,22 @@
 @import url('https://fonts.googleapis.com/icon?family=Material+Icons');
 
+html, body, #map-canvas {
+  height: 100%;
+  margin: 0;
+}
+button {
+  font-size: 1em;
+  margin-top: 12px;
+  box-shadow: none;
+}
+@media screen and (min-width: 500px) {
+  body, button, input {
+    font-size: 1em;
+  }
+}
+
+
+
 #trip td {
     border: grey solid thin;
     text-align: center;

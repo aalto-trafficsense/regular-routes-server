@@ -85,9 +85,9 @@ def index():
   response.headers['Content-Type'] = 'text/html'
   return response
 
-@app.route('/signin', methods=['GET'])
-def sign_in():
-    return index()
+# @app.route('/signin', methods=['GET'])
+# def sign_in():
+#     return index()
 
 
 @app.route('/connect', methods=['POST'])
@@ -183,6 +183,7 @@ def disconnect():
     return response
   else:
     # For whatever reason, the given token was invalid.
+    print(result)
     response = make_response(
         json.dumps('Failed to revoke token for given user.'), 400)
     response.headers['Content-Type'] = 'application/json'
@@ -206,12 +207,20 @@ def regularroutes_menu():
 @app.route('/nodata')
 def no_data():
     """No data was found for this user account."""
+    user_id = session.get('rr_user_id')
+    if user_id == None:
+        # Not authenticated -> throw back to front page
+        return index()
     return render_template('nodata.html')
 
 
 @app.route('/pdmanagement')
 def personal_data_management():
     """Personal data management submenu."""
+    user_id = session.get('rr_user_id')
+    if user_id == None:
+        # Not authenticated -> throw back to front page
+        return index()
     return render_template('pdmanagement.html')
 
 
@@ -247,6 +256,10 @@ def cancel_participation():
 @app.route('/participationcancelled')
 def participation_cancelled():
     """Participation cancellation message has been sent."""
+    user_id = session.get('rr_user_id')
+    if user_id == None:
+        # Not authenticated -> throw back to front page
+        return index()
     return render_template('participationcancelled.html')
 
 
