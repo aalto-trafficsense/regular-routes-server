@@ -85,9 +85,9 @@ def index():
   response.headers['Content-Type'] = 'text/html'
   return response
 
-# @app.route('/signin', methods=['GET'])
-# def sign_in():
-#     return index()
+@app.route('/signin', methods=['GET'])
+def sign_in():
+    return index()
 
 
 @app.route('/connect', methods=['POST'])
