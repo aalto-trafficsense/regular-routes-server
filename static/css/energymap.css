@@ -2,15 +2,10 @@ html, body, #map-canvas {
   height: 100%;
   margin: 0;
 }
-button {
-  font-size: 1em;
-  margin-top: 12px;
-  box-shadow: none;
-}
 
 #trip-wrap {
     position: fixed;
-    top: 80px;
+    top: 70px;
     left: 0;
     right: 0;
     height: 180px;
@@ -22,7 +17,7 @@ button {
 #trip { margin-top: 0; margin-bottom: 0 }
 #trip table { margin-top: 0 }
 
-#map-wrap { position: fixed; top: 260px; left: 0; right: 0; bottom: 0 }
+#map-wrap { position: fixed; top: 250px; left: 0; right: 0; bottom: 0 }
 
 #controls-wrap { position: absolute }
 .daycell { display: none }

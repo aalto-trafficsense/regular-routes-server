@@ -4,7 +4,7 @@ html, body, #map-canvas {
 }
 button {
   font-size: 1em;
-  margin-top: 12px;
+  box-shadow: none;
 }
 #svg {
   max-height: 80%;
