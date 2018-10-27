@@ -139,7 +139,7 @@ var helper = (function() {
       // Revoke the server tokens
       $.ajax({
         type: 'POST',
-        url: '/disconnect',
+        url: 'disconnect',
         async: true,
         success: function(result) {
           console.log('revoke response: ' + result);
@@ -160,7 +160,7 @@ var helper = (function() {
       // console.log('connectServer called');
       $.ajax({
         type: 'POST',
-        url: '/connect?state={{ STATE }}',
+        url: 'connect?state={{ STATE }}',
         // url: '../../connect?state={{ STATE }}',
         contentType: 'application/octet-stream; charset=utf-8',
         success: function(result) {
