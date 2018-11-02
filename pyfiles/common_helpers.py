@@ -660,9 +660,8 @@ def do_cluster(items, mergefun, distfun, distlim):
 
     def heapitem(d0, dests):
         """Find nearest neighbor for d0 as sortable [distance, nearest, d0]"""
-        return (min([distfun(d0, d1),
-                     d1] for d1 in dests if d1 is not d0)
-                  + [d0])
+        dists = ([distfun(d0, d1), d1] for d1 in dests if d1 is not d0)
+        return min(dists, key=lambda a: a[0]) + [d0]
 
     heap = [[None, None, d] for d in items]
     d0 = d1 = merged = None
