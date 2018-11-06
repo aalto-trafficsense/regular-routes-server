@@ -183,6 +183,7 @@ def disconnect():
     return response
   else:
     # For whatever reason, the given token was invalid.
+    print(result)
     response = make_response(
         json.dumps('Failed to revoke token for given user.'), 400)
     response.headers['Content-Type'] = 'application/json'
@@ -191,7 +192,7 @@ def disconnect():
 @app.route('/signedout')
 def signed_out():
     """User disconnected from the service."""
-    return render_template('signedout.html')
+    return render_template('signedout.html', APPLICATION_NAME=APPLICATION_NAME)
 
 @app.route('/menu')
 def regularroutes_menu():
@@ -201,18 +202,27 @@ def regularroutes_menu():
         # Not authenticated -> throw back to front page
         return index()
     return render_template('menu.html',
-                           RR_URL_PREFIX=app.config['RR_URL_PREFIX'])
+                           RR_URL_PREFIX=app.config['RR_URL_PREFIX'],
+                           APPLICATION_NAME=APPLICATION_NAME)
 
 @app.route('/nodata')
 def no_data():
     """No data was found for this user account."""
-    return render_template('nodata.html')
+    user_id = session.get('rr_user_id')
+    if user_id == None:
+        # Not authenticated -> throw back to front page
+        return index()
+    return render_template('nodata.html', APPLICATION_NAME=APPLICATION_NAME)
 
 
 @app.route('/pdmanagement')
 def personal_data_management():
     """Personal data management submenu."""
-    return render_template('pdmanagement.html')
+    user_id = session.get('rr_user_id')
+    if user_id == None:
+        # Not authenticated -> throw back to front page
+        return index()
+    return render_template('pdmanagement.html', APPLICATION_NAME=APPLICATION_NAME)
 
 
 @app.route('/cancelparticipation', methods=['POST'])
@@ -243,11 +253,14 @@ def cancel_participation():
       response.headers['Content-Type'] = 'application/json'
       return response
 
-
 @app.route('/participationcancelled')
 def participation_cancelled():
     """Participation cancellation message has been sent."""
-    return render_template('participationcancelled.html')
+    user_id = session.get('rr_user_id')
+    if user_id == None:
+        # Not authenticated -> throw back to front page
+        return index()
+    return render_template('participationcancelled.html', APPLICATION_NAME=APPLICATION_NAME)
 
 
 @app.route('/energymap')
@@ -259,6 +272,7 @@ def energymap():
         return index()
     client_log_table_insert(get_max_devices_table_id_from_users_table_id(user_id), user_id, "WEB-PATH", "")
     return render_template('energymap.html',
+                           APPLICATION_NAME=APPLICATION_NAME,
                            RR_URL_PREFIX=app.config['RR_URL_PREFIX'],
                            api_key=app.config['MAPS_API_KEY'])
 
@@ -350,6 +364,7 @@ def energycertificate():
 
     return render_template(
         'energycertificate.html',
+        APPLICATION_NAME=APPLICATION_NAME,
         RR_URL_PREFIX=app.config['RR_URL_PREFIX'],
         firstday=firstday,
         lastday=lastday)
@@ -367,6 +382,7 @@ def routes():
 #    client_log_table_insert(get_max_devices_table_id_from_users_table_id(user_id), user_id, "WEB-PATH", "") XXX add me
     return render_template(
         'userroutes.html',
+        APPLICATION_NAME=APPLICATION_NAME,
         RR_URL_PREFIX=app.config['RR_URL_PREFIX'],
         api_key=app.config['MAPS_API_KEY'])
 
@@ -412,6 +428,7 @@ def trips():
         return index()
     return render_template(
         'usertrips.html',
+        APPLICATION_NAME=APPLICATION_NAME,
         RR_URL_PREFIX=app.config['RR_URL_PREFIX'],
         api_key=app.config['MAPS_API_KEY'])
 

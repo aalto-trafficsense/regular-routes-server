@@ -1,14 +1,21 @@
 <!DOCTYPE html>
-<html>
+<html lang="en-US">
   <head>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/meyer-reset/2.0/reset.css">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <link rel="stylesheet" src="//normalize-css.googlecode.com/svn/trunk/normalize.css" />
+    <!-- <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/meyer-reset/2.0/reset.css"> -->
     <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/pickadate.js/3.5.3/compressed/themes/default.css">
     <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/pickadate.js/3.5.3/compressed/themes/default.date.css">
-    <link rel="stylesheet" href="..{{ RR_URL_PREFIX }}/static/css/singledate.css">
-    <link rel="stylesheet" href="..{{ RR_URL_PREFIX }}/static/css/usertrips.css">
-    <link rel="stylesheet" href="..{{ RR_URL_PREFIX }}/static/css/energymap.css">
-    <link rel="icon" href="static/icon/favicon.ico">
+    <link rel="stylesheet" type="text/css" href="static/css/common.css">
+    <link rel="stylesheet" type="text/css" href="static/css/singledate.css">
+    <link rel="stylesheet" type="text/css" href="static/css/usertrips.css">
+    <link rel="stylesheet" type="text/css" href="static/css/energymap.css">
+    <link rel="icon" type="image/png" href="static/icon/favicon-16x16.png" sizes="16x16">
+    <link rel="icon" type="image/png" href="static/icon/favicon-32x32.png" sizes="32x32">
+    <link rel="icon" type="image/png" href="static/icon/favicon-96x96.png" sizes="96x96">
+    <link rel="icon" type="image/png" href="static/icon/appicon-192x192.png" sizes="192x192">
+    <title>{{ APPLICATION_NAME }} Routes on Map</title>
     <script type="text/javascript"
       src="https://maps.googleapis.com/maps/api/js?key={{ api_key }}">
     </script>
@@ -18,7 +25,6 @@
     <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.css">
     <script src="//cdnjs.cloudflare.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
     <script src="//cdnjs.cloudflare.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.js"></script>
-
     <script src="//cdnjs.cloudflare.com/ajax/libs/pickadate.js/3.5.3/picker.js"></script>
     <script src="//cdnjs.cloudflare.com/ajax/libs/pickadate.js/3.5.3/compressed/picker.date.js"></script>
   </head>
@@ -26,7 +32,7 @@
     <div id="controls-wrap">
       <div id="controls">
         <input id="date" value="2015-11-11" />
-        <button id="menu" >Return to menu</button>
+        <button id="menu" >Menu</button>
       </div>
     </div>
     <div id="trip-wrap"><div id="trip"></div></div>
@@ -99,9 +105,9 @@
     </div>
 
     <div id="map-wrap"><div id="map-canvas"></div></div>
-    <script src="..{{ RR_URL_PREFIX }}/static/js/common.js"></script>
-    <script src="..{{ RR_URL_PREFIX }}/static/js/singledate.js"></script>
-    <script src="..{{ RR_URL_PREFIX }}/static/js/energy.js"></script>
-    <script src="..{{ RR_URL_PREFIX }}/static/js/usertrips.js"></script>
+    <script src="static/js/common.js"></script>
+    <script src="static/js/singledate.js"></script>
+    <script src="static/js/energy.js"></script>
+    <script src="static/js/usertrips.js"></script>
   </body>
 </html>

@@ -1,3 +1,5 @@
+<!DOCTYPE html>
+<html lang="en-US">
 <!--
 
 /*
@@ -18,47 +20,89 @@
  */
 
 -->
-
-<html>
 <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link href="//www.aalto.fi/style2015/css/style.min.css" rel=stylesheet type="text/css"/>
-  <link rel="icon" href="static/icon/favicon.ico">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="The web service complement for the TrafficSense Aalto Android application.">
+  <meta name="keywords" content="traffic, finland, disruption, notification">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <link rel="stylesheet" src="//normalize-css.googlecode.com/svn/trunk/normalize.css" />
+  <script src="//cdnjs.cloudflare.com/ajax/libs/cookieconsent2/3.1.0/cookieconsent.min.js"></script>
+  <link rel="stylesheet" type="text/css" href="static/css/common.css">
+  <link rel="icon" type="image/png" href="static/icon/favicon-16x16.png" sizes="16x16">
+  <link rel="icon" type="image/png" href="static/icon/favicon-32x32.png" sizes="32x32">
+  <link rel="icon" type="image/png" href="static/icon/favicon-96x96.png" sizes="96x96">
+  <link rel="icon" type="image/png" href="static/icon/appicon-192x192.png" sizes="192x192">
   <title>{{ APPLICATION_NAME }}</title>
-    <meta name="google-signin-client_id" content='{{ CLIENT_ID }}'>
-    <script src="https://apis.google.com/js/platform.js" async defer></script>
-  <!-- JavaScript specific to this application that is not related to API
-     calls -->
-    <script src="//ajax.googleapis.com/ajax/libs/jquery/1.8.2/jquery.min.js" ></script>
+  <meta name="google-signin-client_id" content='{{ CLIENT_ID }}'>
+  <script src="https://apis.google.com/js/platform.js" async defer></script>
+  <!-- JavaScript specific to this application that is not related to API calls -->
+  <script src="//ajax.googleapis.com/ajax/libs/jquery/1.8.2/jquery.min.js" ></script>
+  <link rel="stylesheet" type="text/css" href="//cdnjs.cloudflare.com/ajax/libs/cookieconsent2/3.1.0/cookieconsent.min.css" />
 </head>
+
 <body>
-  <div class=container>
-    <h2>TrafficSense
-    <a href="https://aaltotrafficsense.wordpress.com/about/">
-    <img src="../static/icon/trafficsense_icon_noborder.png"
-    align="right" width=100></a></h2>
-      <p>Sign in with your Google<sup>TM</sup> account to view your TrafficSense data.</p>
-      <div class="g-signin2"
-           data-scope="profile"
-           data-onsuccess="onSignIn"
-           data-onfailure="onSignInFailure" data-accesstype="offline" data-theme="dark"></div><br><br>
-      <p><b>Note:</b> This service assumes that you have been running the TrafficSense Android<sup>TM</sup> application with the same account.
-	   Otherwise no data is available.</p>
-	   <a
-	   href='https://play.google.com/store/apps/details?id=fi.aalto.trafficsense.trafficsense&utm_source=global_co&utm_medium=prtnr&utm_content=Mar2515&utm_campaign=PartBadge&pcampaignid=MKT-Other-global-all-co-prtnr-py-PartBadge-Mar2515-1'><img
-	   alt='Get it on Google Play'
-	   src='https://play.google.com/intl/en_us/badges/images/generic/en_badge_web_generic.png'
-	   width=200 /></a><br><br>
-      <p><a
-	   href="https://aaltotrafficsense.wordpress.com/about/">TrafficSense</a>
-	   is a research project at <a href="http://www.aalto.fi/en/">Aalto University</a>.</p>
-      <br>
-      <p>Contact <a href="mailto:trafficsense.aalto@gmail.com?Subject=Web%20Front%20page%20contact"
-	   target="_top">trafficsense</a>.</p><br>
-	   <p>Android, Google Play, and the Google Play logo are trademarks of Google Inc.</p>
-  </div>
+  <header>
+    <a href="https://www.aalto.fi/department-of-built-environment/trafficsense">
+    <img src="static/icon/trafficsense_logo_87_87_86.png"></a>
+  </header>
+  <main>
+    <div class=container>
+      <h1>Sign in</h1>
+        <p>This web application belongs to the <a href="https://www.aalto.fi/department-of-built-environment/trafficsense">TrafficSense</a> service.
+          It is intended to be a desktop supplement to the TrafficSense Android<sup>TM</sup> application. It scales
+          to mobile, but the experience is optimized for desktop.</p>
+        <p>Sign in with your Google<sup>TM</sup> account to view your TrafficSense data.</p>
+        <div class="center-div">
+          <div class="g-signin2"
+               data-width="300px"
+               data-height="60px"
+               data-scope="profile"
+               data-onsuccess="onSignIn"
+               data-onfailure="onSignInFailure" data-accesstype="offline" data-theme="dark">
+          </div>
+        </div>
+        <p><strong>Note:</strong> It is assumed that you have been running the TrafficSense Android<sup>TM</sup> application with the same account.
+  	   Otherwise no data is available.</p>
+       <div class="center-div">
+         <a href='https://play.google.com/store/apps/details?id=fi.aalto.trafficsense.trafficsense&utm_source=global_co&utm_medium=prtnr&utm_content=Mar2515&utm_campaign=PartBadge&pcampaignid=MKT-Other-global-all-co-prtnr-py-PartBadge-Mar2515-1'>
+           <img id="google-play-badge" alt='Get it on Google Play' src='https://play.google.com/intl/en_us/badges/images/generic/en_badge_web_generic.png'/></a><br>
+       </div>
+    </div>
+  </main>
 </body>
-<script type="text/javascript">
+
+<footer>
+  <p><a href="https://www.aalto.fi/department-of-built-environment/trafficsense">TrafficSense</a>
+    is a research project at <a href="http://www.aalto.fi/en/">Aalto University</a>.</p>
+  <p>Contact <a href="mailto:trafficsense.aalto@gmail.com?Subject=Web%20Front%20page%20contact"
+    target="_top">trafficsense</a>.</p>
+  <p>Android, Google Play, and the Google Play logo are trademarks of Google Inc.</p>
+</footer>
+
+<script>
+
+/* Add the cookie permission request. */
+window.addEventListener("load", function(){
+  window.cookieconsent.initialise({
+    "palette": {
+      "popup": {
+        "background": "#39a935",
+        "text": "white"
+      },
+      "button": {
+        "background": "#f29100",
+        "text": "black"
+      }
+    },
+    "theme": "edgeless",
+    "content": {
+      "message": "We also need cookies to sign you in. If this is not acceptable, please do not use the service.",
+      "link": "More information"
+    }
+  })
+});
+
 var helper = (function() {
   var authResult = undefined;
 
@@ -71,7 +115,7 @@ var helper = (function() {
      *   other authentication information.
      */
     onSignInCallback: function(authResult) {
-        console.log('onSignInCallback called.')
+      // console.log('onSignInCallback called.')
       if (authResult['access_token']) {
         // The user is signed in
         this.authResult = authResult;
@@ -81,7 +125,7 @@ var helper = (function() {
         // As an example, you can troubleshoot by writing to the console:
         console.log('There was an error: ' + authResult['error']);
       }
-      console.log('authResult', authResult);
+      // console.log('authResult', authResult);
       window.location='menu';
 
 
@@ -94,8 +138,8 @@ var helper = (function() {
       // Revoke the server tokens
       $.ajax({
         type: 'POST',
-        url: $(location).attr('origin') + '{{ RR_URL_PREFIX }}/disconnect',
-        async: false,
+        url: 'disconnect',
+        async: true,
         success: function(result) {
           console.log('revoke response: ' + result);
         },
@@ -112,14 +156,14 @@ var helper = (function() {
      *   https://developers.google.com/+/web/signin/server-side-flow
      */
     connectServer: function(auth2,code) {
-      console.log('connectServer called');
+      // console.log('connectServer called');
       $.ajax({
         type: 'POST',
-        url: $(location).attr('origin') + '{{ RR_URL_PREFIX }}/connect?state={{ STATE }}',
+        url: 'connect?state={{ STATE }}',
         // url: '../../connect?state={{ STATE }}',
         contentType: 'application/octet-stream; charset=utf-8',
         success: function(result) {
-          console.log('connectServer success result: ' + result);
+          // console.log('connectServer success result: ' + result);
           if (result == 'Nodata.') {
               helper.disconnectServer();
               window.location = 'nodata';
@@ -135,28 +179,20 @@ var helper = (function() {
 })();
 
 /**
- * Add anything that needs to be done when the form is loaded.
- * client ID.
- */
-$(document).ready(function() {
-  // $('#disconnect').click(helper.disconnectServer);
-});
-
-/**
  * Called by the sign-in button
  */
 
 function onSignIn(googleUser) {
-        // The ID token you need to pass to your backend:
-        console.log('onSignIn called');
-        auth2 = gapi.auth2.getAuthInstance();
-        auth2.grantOfflineAccess().then(
-          function(result){
-            helper.connectServer(auth2,result.code);
-          });
+  // The ID token you need to pass to your backend:
+  // console.log('onSignIn called');
+  auth2 = gapi.auth2.getAuthInstance();
+  auth2.grantOfflineAccess().then(
+    function(result){
+      helper.connectServer(auth2,result.code);
+    });
 
-        // helper.connectServer(googleUser);
-      };
+  // helper.connectServer(googleUser);
+};
 
 /**
  * Called if there's a problem with the sign-in.
@@ -164,9 +200,8 @@ function onSignIn(googleUser) {
  */
 
 function onSignInFailure() {
-        // The ID token you need to pass to your backend:
-        console.log('onSignInFailure');
-      };
+  console.log('onSignInFailure');
+};
 
 
 /**
@@ -178,5 +213,6 @@ function onSignInFailure() {
 function onSignInCallback(authResult) {
   helper.onSignInCallback(authResult);
 }
+
 </script>
 </html>

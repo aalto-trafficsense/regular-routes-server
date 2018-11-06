@@ -8,6 +8,7 @@ html, body, #map-canvas {
   z-index: 42;
   text-align: center;
   pointer-events: none; /* don't block map controls in corner */
+  background: #eee;
 }
 #controls {
   display: inline-block;

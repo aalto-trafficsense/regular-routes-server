@@ -147,7 +147,7 @@ $(document).ready(function() {
             id: selectedLegId, activity: mode, line_name: $("#line").val()};
         $.ajax({
             type: "POST",
-            url: '/setlegmode',
+            url: 'setlegmode',
             data: JSON.stringify(data),
             contentType: "application/json",
             success: hashforce});

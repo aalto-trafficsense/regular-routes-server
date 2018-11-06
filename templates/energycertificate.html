@@ -1,13 +1,21 @@
 <!DOCTYPE html>
-<html>
+<html lang="en-US">
   <head>
+    <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/meyer-reset/2.0/reset.css">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <link rel="stylesheet" src="//normalize-css.googlecode.com/svn/trunk/normalize.css" />
+    <!-- <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/meyer-reset/2.0/reset.css"> -->
+    <link rel="stylesheet" type="text/css" href="static/css/common.css">
     <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/pickadate.js/3.5.3/compressed/themes/default.css">
     <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/pickadate.js/3.5.3/compressed/themes/default.date.css">
-    <link rel="stylesheet" href="../../static/css/dualdate.css">
-    <link rel="stylesheet" href="../../static/css/energycertificate.css">
-    <link rel="icon" href="../../static/icon/favicon.ico">
+    <link rel="stylesheet" href="static/css/dualdate.css">
+    <link rel="stylesheet" href="static/css/energycertificate.css">
+    <link rel="icon" type="image/png" href="static/icon/favicon-16x16.png" sizes="16x16">
+    <link rel="icon" type="image/png" href="static/icon/favicon-32x32.png" sizes="32x32">
+    <link rel="icon" type="image/png" href="static/icon/favicon-96x96.png" sizes="96x96">
+    <link rel="icon" type="image/png" href="static/icon/appicon-192x192.png" sizes="192x192">
+    <title>{{ APPLICATION_NAME }} Energy Certificate</title>
     <script src="//cdnjs.cloudflare.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
     <script src="//cdnjs.cloudflare.com/ajax/libs/pickadate.js/3.5.3/picker.js"></script>
     <script src="//cdnjs.cloudflare.com/ajax/libs/pickadate.js/3.5.3/compressed/picker.date.js"></script>
@@ -30,13 +38,20 @@
           <input class="datepicker" id="lastday" />
         </span>
         <form method="get" action="menu">
-          <button id="menu">Return to menu</button>
+          <button id="menu">Menu</button>
         </form>
       </div>
     </div>
     <div id="content"></div>
     <img id="svg" src="energycertificate_svg">
-    <script src="../../static/js/dualdate.js"></script>
-    <script src="../../static/js/energycertificate.js"></script>
+    <script src="static/js/dualdate.js"></script>
+    <script src="static/js/energycertificate.js"></script>
   </body>
+
+  <footer>
+    <p><a href="https://www.aalto.fi/department-of-built-environment/trafficsense">TrafficSense</a>
+      is a research project at <a href="http://www.aalto.fi/en/">Aalto University</a>.</p>
+    <p>Contact <a href="mailto:trafficsense.aalto@gmail.com?Subject=Web%20service%20contact"
+      target="_top">trafficsense</a>.</p>
+  </footer>
 </html>
