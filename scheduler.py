@@ -747,7 +747,9 @@ def init_mass_transit_live_reception():
     # mass_transit_client.tls_set(**tls)
     mass_transit_client.connect(hostname, port, keepalive)
     mass_transit_client.loop_start()
-    mass_transit_client.subscribe("/hfp/v1/journey/ongoing/+/+/+/+/+/+/+/+/0/#")
+    # geohash_level 0 works, but gives a low number of samples. Saving here - testing higher
+    # mass_transit_client.subscribe("/hfp/v1/journey/ongoing/+/+/+/+/+/+/+/+/0/#")
+    mass_transit_client.subscribe("/hfp/v1/journey/ongoing/+/+/+/+/+/+/+/+/4/#")
     # subscribe.callback would have been simpler, but runs loop_forever by default (i.e. locks this thread here):
     # subscribe.callback(handle_mass_transit, "/hfp/v1/journey/ongoing/+/+/+/+/+/+/+/+/0/#", hostname="mqtt.hsl.fi", port=1883)
 
