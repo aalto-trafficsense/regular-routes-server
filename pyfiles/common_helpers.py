@@ -650,6 +650,20 @@ def stop_clusters(stops, cluster_distance):
     return groups
 
 
+from functools import total_ordering
+
+@total_ordering
+class Sort0List(list):
+    """
+    Silly list subclass that sorts by the first element only, to avoid
+    comparing dicts in min and heapify below
+    """
+    def __eq__(self, other):
+        return self[0] == other[0]
+    def __lt__(self, other):
+        return self[0] < other[0]
+
+
 def do_cluster(items, mergefun, distfun, distlim):
     """Pairwise nearest merging clusterer.
     items -- list of dicts
@@ -660,11 +674,13 @@ def do_cluster(items, mergefun, distfun, distlim):
 
     def heapitem(d0, dests):
         """Find nearest neighbor for d0 as sortable [distance, nearest, d0]"""
-        return (min([distfun(d0, d1),
-                     d1] for d1 in dests if d1 is not d0)
-                  + [d0])
+        dists = (
+            Sort0List([distfun(d0, d1), d1, d0])
+            for d1 in dests if d1 is not d0
+        )
+        return min(dists)
 
-    heap = [[None, None, d] for d in items]
+    heap = [Sort0List([None, None, d]) for d in items]
     d0 = d1 = merged = None
     while len(heap) > 1:
         for item in heap:
@@ -692,7 +708,7 @@ def do_cluster(items, mergefun, distfun, distlim):
         merged = mergefun(d0, d1)
         for i in range(len(heap)):
             if heap[i][2] is d1:
-                heap[i] = [None, None, merged]
+                heap[i] = Sort0List([None, None, merged])
                 break
 
     return [x[2] for x in heap]
