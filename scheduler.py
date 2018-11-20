@@ -747,7 +747,7 @@ def init_mass_transit_live_reception():
     # mass_transit_client.tls_set(**tls)
     mass_transit_client.connect(hostname, port, keepalive)
     mass_transit_client.loop_start()
-    mass_transit_client.subscribe("/hfp/v1/journey/ongoing/+/+/+/+/+/+/+/+/0/#")
+    mass_transit_client.subscribe("/hfp/v1/journey/ongoing/+/+/+/+/+/+/+/+/3/#")
     # subscribe.callback would have been simpler, but runs loop_forever by default (i.e. locks this thread here):
     # subscribe.callback(handle_mass_transit, "/hfp/v1/journey/ongoing/+/+/+/+/+/+/+/+/0/#", hostname="mqtt.hsl.fi", port=1883)
 
