@@ -104,6 +104,12 @@ def connect():
     return response
   # Delete the one-time token - page refresh required to re-connect
   del session['state']
+  # If this request does not have `X-Requested-With` header, this could be a CSRF
+  if not request.headers.get('X-Requested-With'):
+    response = make_response(json.dumps('Invalid header.'), 403)
+    response.headers['Content-Type'] = 'application/json'
+    print('403 due to missing X-Requested-With header.')
+    return response
 
   code = request.data
 

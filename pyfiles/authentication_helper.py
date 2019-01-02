@@ -38,10 +38,10 @@ def authenticate_with_google_oauth(redirect_uri, client_secret_file, client_id, 
             json.dumps('Failed to upgrade the authorization code.'), 401)
         response.headers['Content-Type'] = 'application/json'
         # invalid token
-        print('invalid token: ' + one_time_token + ". error: " + err.message)
-        return response
+        print('invalid token: ' + one_time_token + ". error: " + str(err))
+        return False, response
 
-    return verify_and_get_account_id(client_id, credentials)
+    return verify_and_get_account_id(client_id, credentials), None
 
 
 def verify_and_read_id_token(id_token, client_id):
@@ -89,4 +89,3 @@ def verify_and_get_account_id(client_id, credentials):
     credentials.authorize(http)
 
     return data
-

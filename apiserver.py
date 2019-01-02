@@ -71,8 +71,6 @@ db, store = init_db(app)
 def register_post():
     """
         Server should receive valid one-time token that can be used to authenticate user via Google+ API
-        See: https://developers.google.com/+/web/signin/server-side-flow#step_6_send_the_authorization_code_to_the_server
-
     """
     data = request.json
     google_one_time_token = data['oneTimeToken']
@@ -84,9 +82,9 @@ def register_post():
     client_version = data.get('clientVersion')
 
     # 1. authenticate with Google
-    validation_data = authenticate_with_google_oauth(app.config['AUTH_REDIRECT_URI'], CLIENT_SECRET_FILE, CLIENT_ID, google_one_time_token)
-    if validation_data is None:
-        abort(403)  # auth failed
+    validation_data, response = authenticate_with_google_oauth(app.config['AUTH_REDIRECT_URI'], CLIENT_SECRET_FILE, CLIENT_ID, google_one_time_token)
+    if response:
+        return response
 
     account_google_id = validation_data['google_id']
 

@@ -161,6 +161,9 @@ var helper = (function() {
         type: 'POST',
         url: 'connect?state={{ STATE }}',
         // url: '../../connect?state={{ STATE }}',
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest'
+        },
         contentType: 'application/octet-stream; charset=utf-8',
         success: function(result) {
           // console.log('connectServer success result: ' + result);
@@ -188,7 +191,11 @@ function onSignIn(googleUser) {
   auth2 = gapi.auth2.getAuthInstance();
   auth2.grantOfflineAccess().then(
     function(result){
-      helper.connectServer(auth2,result.code);
+      if (result['code']) {
+        helper.connectServer(auth2,result.code);
+      } else {
+        console.log('Error during onSignIn');
+      }
     });
 
   // helper.connectServer(googleUser);
