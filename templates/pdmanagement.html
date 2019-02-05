@@ -47,7 +47,7 @@
     });
 
     function cancelParticipation() {
-        var r = confirm("Based on this request we will delete all the data you have collected so far and remove your account.");
+        var r = confirm("All the data you have collected on TrafficSense may be removed based on this request. Are you sure?");
         if (r == true) {
             $.ajax({
                 type: 'POST',
