@@ -642,42 +642,42 @@ def mass_transit_cleanup():
 # Retrieve vehicle positions from Siri real-time interface
 # As of Aug-2018 HSL no longer uses this, other cities available
 def retrieve_hsl_data():
-    url = "http://api.digitransit.fi/realtime/vehicle-positions/v1/siriaccess/vm/json"
-    response = requests.get(url, timeout=50)
-    json_data = response.json()
-    vehicle_data = json_data["Siri"]["ServiceDelivery"]["VehicleMonitoringDelivery"][0]["VehicleActivity"]
-
-    pull_vehicles = []
-
-    def vehicle_row(vehicle):
-        timestamp = datetime.datetime.fromtimestamp(vehicle["RecordedAtTime"] / 1000) #datetime doesn't like millisecond accuracy
-        line_name, line_type = interpret_jore(vehicle["MonitoredVehicleJourney"]["LineRef"]["value"])
-        direction = int(vehicle["MonitoredVehicleJourney"]["DirectionRef"]["value"])
-        longitude = vehicle["MonitoredVehicleJourney"]["VehicleLocation"]["Longitude"]
-        latitude = vehicle["MonitoredVehicleJourney"]["VehicleLocation"]["Latitude"]
-        coordinate = 'POINT(%f %f)' % (longitude, latitude)
-        vehicle_ref = vehicle["MonitoredVehicleJourney"]["VehicleRef"]["value"]
-
-        return {
-            'coordinate': coordinate,
-            'line_name': line_name,
-            'line_type': line_type,
-            'direction': direction,
-            'time': timestamp,
-            'vehicle_ref': vehicle_ref
-        }
-
-    for vehicle in vehicle_data:
-        try:
-            pull_vehicles.append(vehicle_row(vehicle))
-        except Exception:
-            log.exception("Failed to handle vehicle record: %s" % vehicle)
-
-    if pull_vehicles:
-        db.engine.execute(mass_transit_data_table.insert(pull_vehicles))
-    else:
-        log.warning(
-            "No mass transit data received at %s" % datetime.datetime.now())
+#    url = "http://api.digitransit.fi/realtime/vehicle-positions/v1/siriaccess/vm/json"
+#    response = requests.get(url, timeout=50)
+#    json_data = response.json()
+#    vehicle_data = json_data["Siri"]["ServiceDelivery"]["VehicleMonitoringDelivery"][0]["VehicleActivity"]
+#
+#    pull_vehicles = []
+#
+#    def vehicle_row(vehicle):
+#        timestamp = datetime.datetime.fromtimestamp(vehicle["RecordedAtTime"] / 1000) #datetime doesn't like millisecond accuracy
+#        line_name, line_type = interpret_jore(vehicle["MonitoredVehicleJourney"]["LineRef"]["value"])
+#        direction = int(vehicle["MonitoredVehicleJourney"]["DirectionRef"]["value"])
+#        longitude = vehicle["MonitoredVehicleJourney"]["VehicleLocation"]["Longitude"]
+#        latitude = vehicle["MonitoredVehicleJourney"]["VehicleLocation"]["Latitude"]
+#        coordinate = 'POINT(%f %f)' % (longitude, latitude)
+#        vehicle_ref = vehicle["MonitoredVehicleJourney"]["VehicleRef"]["value"]
+#
+#        return {
+#            'coordinate': coordinate,
+#            'line_name': line_name,
+#            'line_type': line_type,
+#            'direction': direction,
+#            'time': timestamp,
+#            'vehicle_ref': vehicle_ref
+#        }
+#
+#    for vehicle in vehicle_data:
+#        try:
+#            pull_vehicles.append(vehicle_row(vehicle))
+#        except Exception:
+#            log.exception("Failed to handle vehicle record: %s" % vehicle)
+#
+#    if pull_vehicles:
+#        db.engine.execute(mass_transit_data_table.insert(pull_vehicles))
+#    else:
+#        log.warning(
+#            "No mass transit data received at %s" % datetime.datetime.now())
 
     global push_vehicles
     if len(push_vehicles) > 0:
