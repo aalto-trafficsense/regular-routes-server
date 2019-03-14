@@ -642,6 +642,7 @@ def mass_transit_cleanup():
 # Retrieve vehicle positions from Siri real-time interface
 # As of Aug-2018 HSL no longer uses this, other cities available
 def retrieve_hsl_data():
+    # Disabling Siri Live retrieval for now. Reason: No data for Helsinki region and possibly the cause of cron error and scheduler jam:
 #    url = "http://api.digitransit.fi/realtime/vehicle-positions/v1/siriaccess/vm/json"
 #    response = requests.get(url, timeout=50)
 #    json_data = response.json()
