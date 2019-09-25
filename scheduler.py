@@ -684,7 +684,10 @@ def retrieve_hsl_data():
     if len(push_vehicles) > 0:
         global vehicle_push_lock
         vehicle_push_lock.acquire()
-        db.engine.execute(mass_transit_data_table.insert(push_vehicles))
+        try:
+            db.engine.execute(mass_transit_data_table.insert(push_vehicles))
+        except Exception as e:
+            print('retrieve_hsl_data() Exception: ' + e.message)
         push_vehicles = []
         vehicle_push_lock.release()
 
@@ -701,7 +704,8 @@ def handle_mass_transit(client, userdata, message):
         # print(payload)
         vehicle_row = {'time': datetime.datetime.fromtimestamp(payload['tsi']),
                        'line_name': payload['desi'],
-                       'line_type': topics[5].upper(),
+                       #'line_type': topics[5].upper(), # HFP V1
+                       'line_type': topics[6].upper(), # HFP V2                       
                        'direction': int(payload['dir']),
                        'coordinate': 'POINT(%f %f)' % (longitude, latitude),
                        'vehicle_ref': str(payload['oper']) + '/' + str(payload['veh'])}
@@ -720,6 +724,9 @@ def handle_mass_transit(client, userdata, message):
                     i += 1
                     if i == len(push_vehicles): cont_loop = False
         if not_duplicate:
+            if vehicle_row['line_type'] == 'METRO':
+                vehicle_row['line_type'] = 'SUBWAY'
+                #print("handle_mass_transit(): time:", vehicle_row['time'], "line_name:", vehicle_row['line_name'], " -> METRO changed to SUBWAY !!!")
             global vehicle_push_lock
             vehicle_push_lock.acquire()
             push_vehicles.append(vehicle_row)
@@ -736,7 +743,7 @@ def mass_transit_disconnect(client, userdata, rc):
 def init_mass_transit_live_reception():
     hostname = "mqtt.hsl.fi"
     port = 1883 # change to 443 for TLS
-    keepalive = 36000 # seconds, default = 60
+    keepalive = 36000 # seconds, default = 60  # TODO
     global mass_transit_client
     mass_transit_client = mqtt.Client()
     mass_transit_client.on_message = handle_mass_transit
@@ -748,7 +755,8 @@ def init_mass_transit_live_reception():
     # mass_transit_client.tls_set(**tls)
     mass_transit_client.connect(hostname, port, keepalive)
     mass_transit_client.loop_start()
-    mass_transit_client.subscribe("/hfp/v1/journey/ongoing/+/+/+/+/+/+/+/+/3/#")
+    #mass_transit_client.subscribe("/hfp/v1/journey/ongoing/+/+/+/+/+/+/+/+/3/#") #HFP V1
+    mass_transit_client.subscribe("/hfp/v2/journey/ongoing/vp/+/+/+/+/+/+/+/+/3/#") #HFP V2        
     # subscribe.callback would have been simpler, but runs loop_forever by default (i.e. locks this thread here):
     # subscribe.callback(handle_mass_transit, "/hfp/v1/journey/ongoing/+/+/+/+/+/+/+/+/0/#", hostname="mqtt.hsl.fi", port=1883)
 
