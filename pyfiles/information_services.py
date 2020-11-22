@@ -152,6 +152,26 @@ def retrieve_hsl_disruptions():
                 json.dump(json_data, data_file)
     print(json.dumps(json_data))
 
+# MJR Note 22.11.2020: The above could be modded to handle HSL cancelled trips (which nowadays do not seems to be
+# included in the disruptions?), but the challenge is that they don't follow the same alertId scheme, so the duplicate
+# checking would need to be completely re-designed, if saving to same table. This graphQL query produces roughly
+# all the useful fields:
+# {
+#   cancelledTripTimes(
+#     feeds: ["HSL"]
+#   ) {
+#     serviceDay
+#     trip {
+#       departureStoptime { scheduledDeparture }
+#       arrivalStoptime { scheduledArrival }
+#       gtfsId
+#       directionId
+#     }
+#     headsign
+#   }
+# }
+# serviceDay in seconds, departure and arrival times in seconds after midnight. Add and use the local toDateTime()?
+
 
 def fmi_forecast_request():
     # Get next 24H
