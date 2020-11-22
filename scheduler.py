@@ -817,12 +817,14 @@ def set_leg_waypoints():
     dd = db.metadata.tables["device_data"]
     legs = db.metadata.tables["legs"]
     glue = db.metadata.tables["leg_waypoints"]
+    start = datetime.datetime.now()-datetime.timedelta(days=60)
 
     legpoints = select(
         [legs.c.id, dd.c.waypoint_id, dd.c.time, dd.c.snapping_time],
         from_obj=dd.join(legs, and_(
             dd.c.device_id == legs.c.device_id,
             dd.c.time.between(legs.c.time_start, legs.c.time_end)))) \
+        .where(dd.c.time > start) \
         .alias("legpoints")
     done = select([glue.c.leg], distinct=True)
     nounsnapped = select(
