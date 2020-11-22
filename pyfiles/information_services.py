@@ -244,7 +244,7 @@ def fmi_request(query_id, start_time, end_time, weather_params, time_row_label):
     if debug_input:
         xml_root = ET.parse(debug_input_filename).getroot()
     else:
-        fmi_wfs = WebFeatureService(url='http://data.fmi.fi/fmi-apikey/' + get_config('FMI_API_KEY') + '/wfs',
+        fmi_wfs = WebFeatureService(url='https://opendata.fmi.fi/wfs',
                                     version='2.0.0')
         keys = ",".join(list(weather_params.keys()))
         query_params = {'place': 'helsinki',

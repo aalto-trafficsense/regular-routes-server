@@ -31,7 +31,6 @@ This is the procedure to set up an environment for developing server software on
           SECRET_KEY = 'secretkey'
           SQLALCHEMY_DATABASE_URI = 'postgresql+psycopg2://regularroutes:qwerty@localhost/postgres'
           MAPS_API_KEY = 'INSERT_Browser_API_key_from_Google_Developers_Console'
-          FMI_API_KEY = 'INSERT_key_allocated_by_Finnish_Meteorology_Institute'
           FIREBASE_KEY = 'INSERT_Server_key_from_Firebase_Console'
           RR_URL_PREFIX = ''
           AUTH_REDIRECT_URI = 'urn:ietf:wg:oauth:2.0:oob'
@@ -47,7 +46,6 @@ This is the procedure to set up an environment for developing server software on
     * On the Google Developers Console, create a project (if not already created) and enable `Google Maps JavaScript API` as explained in [devops readme](https://github.com/aalto-trafficsense/regular-routes-devops).
     * Still on the Console, create the `Browser API key` also according to [devops readme](https://github.com/aalto-trafficsense/regular-routes-devops). Under `Accept requests from these HTTP referrers (web sites)` enter `http://localhost:5000`. Press `Save`
     * From the generated `Browser API key`, copy the `API key` value into `MAPS_API_KEY` in your `regularroutes.cfg` file shown above.
-    * `FMI_API_KEY` is the key to access open weather data from the services of the [Finnish Meteorology Institute](https://en.ilmatieteenlaitos.fi/open-data). The current version is once per day fetching hourly observation and forecast data for Helsinki. If useful, apply for a key from FMI. If you do not need it, please comment out `scheduler.add_job(retrieve_weather_info, "cron", hour="6")` from `scheduler.py` initialisation.
     * `FIREBASE_KEY` is found from [Firebase console](https://console.firebase.google.com/) Settings -> Project Settings -> Cloud messaging -> Project Credentials -> Server key. Note that they `google-services.json` file from the console is needed for the corresponding [client](https://github.com/aalto-trafficsense/trafficsense-android).
     * `MASS_TRANSIT_LIVE_KEEP_DAYS` is the number of days vehicle live data will be stored. Recognised public transportation trips are stored indefinitely. A value of 1 is enough.
     * The current participation cancellation function (in siteserver.py) sends an email with the user_id to the configured EMAIL_TO address. The 'yagmail' library uses the gmail server, so a gmail account is needed (GMAIL_FROM and GMAIL_PWD) for sending.
