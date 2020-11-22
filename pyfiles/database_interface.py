@@ -482,12 +482,16 @@ def init_db(app):
     metadata.create_all(checkfirst=True)
 
     # Database upgrade operations
+    code_db_version = 1
     db_version = get_database_version()
-    if db_version == None:
-        db_version = init_database_version()
+    if db_version is None:
+        db_version = init_database_version(code_db_version)
+    db_upgraded = False
     if db_version < 1:
+        db_upgraded = True
         db.engine.execute(text('ALTER TABLE mass_transit_data ADD COLUMN direction integer;'))
-    upgrade_database_version(1)
+    if db_upgraded:
+        upgrade_database_version(code_db_version)
 
     conn = db.engine.connect().execution_options(isolation_level="AUTOCOMMIT")
     conn.execute("""ALTER TYPE client_function_enum
@@ -1677,13 +1681,13 @@ def get_database_version():
     return db.engine.execute(query).scalar()
 
 
-def init_database_version():
+def init_database_version(current_version):
     try:
-        stmt = migrate_version_table.insert({'version': 0})
+        stmt = migrate_version_table.insert({'version': current_version})
         db.engine.execute(stmt)
     except DataError as e:
         print('Database version init exception: ' + e.message)
-    return 0
+    return current_version
 
 
 def upgrade_database_version(new_db_version):
