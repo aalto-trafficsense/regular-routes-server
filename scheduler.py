@@ -84,7 +84,7 @@ def initialize():
     print("initialising scheduler")
     scheduler = BackgroundScheduler()
     scheduler.start()
-    scheduler.add_job(retrieve_hsl_data, "cron", second="*/30")
+    scheduler.add_job(retrieve_hsl_data, "cron", second="*/15")
     run_daily_tasks()
     scheduler.add_job(run_hourly_tasks, "cron", minute=24)
     scheduler.add_job(run_daily_tasks, "cron", hour="3")
