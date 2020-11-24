@@ -826,7 +826,7 @@ def set_leg_waypoints():
             dd.c.time.between(legs.c.time_start, legs.c.time_end)))) \
         .where(dd.c.time > start) \
         .alias("legpoints")
-    done = select([glue.c.leg], distinct=True)
+    done = select([glue.c.leg], distinct=True).where(glue.c.first > start)
     nounsnapped = select(
         [legpoints.c.id],
         legpoints.c.id.notin_(done),
