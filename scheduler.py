@@ -100,6 +100,7 @@ def run_daily_tasks():
     filter_device_data()
     generate_distance_data()
     generate_global_statistics()
+    set_leg_waypoints()
     mass_transit_cleanup()
 
 
@@ -107,7 +108,6 @@ def run_hourly_tasks():
     delete_device_data_duplicates()
     generate_legs()
     set_device_data_waypoints()
-    set_leg_waypoints()
     generate_trips()
 
 
@@ -826,7 +826,7 @@ def set_leg_waypoints():
             dd.c.time.between(legs.c.time_start, legs.c.time_end)))) \
         .where(dd.c.time > start) \
         .alias("legpoints")
-    done = select([glue.c.leg], distinct=True).where(glue.c.first > start)
+    done = select([glue.c.leg], distinct=True)
     nounsnapped = select(
         [legpoints.c.id],
         legpoints.c.id.notin_(done),
