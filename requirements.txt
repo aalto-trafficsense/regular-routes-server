@@ -1,4 +1,4 @@
-numpy==1.19.4
+numpy==1.22.0
 Flask==1.1.2
 Flask-SQLAlchemy==2.4.4
 # scipy==1.5.4
